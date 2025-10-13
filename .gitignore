@@ -1,11 +1,86 @@
- .venv/
-    venv/
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
 
-    # Dependencies
-    __pycache__/
-    *.pyc
-    *.egg-info/
-    dist/
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
 
-    # Sensitive/Local Files
-    .env
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
+*.egg
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+nosetests.xml
+coverage.xml
+*.cover
+
+# Pyenv
+.python-version
+
+# IDEs and editors
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# macOS files
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints
+
+# Databases
+*.sqlite3
+*.db
+instance/
+
+# Sensitive / local files
+.env
+.env.*
+secrets.json
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Static/media (Django / web projects)
+staticfiles/
+media/
+
+# Misc
+*.bak
+*~
+
+# Ignore compiled C extensions
+*.so
+.venv/
+venv/
+
+# Dependencies
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+
+# Sensitive/Local Files
+.env
