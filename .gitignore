@@ -1,0 +1,11 @@
+ .venv/
+    venv/
+
+    # Dependencies
+    __pycache__/
+    *.pyc
+    *.egg-info/
+    dist/
+
+    # Sensitive/Local Files
+    .env
