@@ -2,15 +2,15 @@
 
 ## 🧩 Task Set A: Data Modeling and Environment Setup
 
--   [ ] A.1 Finalize Complaint Data Schema
+    - [x] A.1 Finalize Complaint Data Schema
 
-    -   [ ] List required fields for a complaint record (e.g., id, telegram_user_id, hostel, wing, room_number, category, description, severity, status, created_at).
-    -   [ ] Define exact data type and constraints for each field (nullability, unique, defaults, length, formats).
-    -   [ ] Define permissible values for enumerated fields (Categories, Statuses, Severity levels).
-    -   [ ] Produce finalized schema document (JSON or Markdown) for the core complaints table.
-    -   Purpose: Provide a precise blueprint that maps Telegram inputs to the PostgreSQL data model for Phase 2.
-    -   Tools/Technologies: Markdown or JSON, DB schema conventions (Postgres types), documentation.
-    -   Expected Output: A finalized, documented schema file (e.g., `complaints_schema.md` or `complaints_schema.json`).
+        - [x] List required fields for a complaint record (e.g., id, telegram_user_id, hostel, wing, room_number, category, description, severity, status, created_at).
+        - [x] Define exact data type and constraints for each field (nullability, unique, defaults, length, formats).
+        - [x] Define permissible values for enumerated fields (Categories, Statuses, Severity levels).
+        - [x] Produce finalized schema document (JSON or Markdown) for the core complaints table.
+        - Purpose: Provide a precise blueprint that maps Telegram inputs to the PostgreSQL data model for Phase 2.
+        - Tools/Technologies: Markdown or JSON, DB schema conventions (Postgres types), documentation.
+        - Expected Output: A finalized, documented schema file (e.g., `complaints_schema.md` or `complaints_schema.json`).
 
 -   [ ] A.2 Local Python Environment Setup
     -   [ ] Create project directory `complaint_bot_project` (or use current repo root as desired).
@@ -21,7 +21,7 @@
     -   Tools/Technologies: Python 3.x, venv, pip, VS Code (or preferred IDE).
     -   Expected Output: `.venv` with installed dependencies and a committed `requirements.txt`.
 
-**Progress:** 0/2 tasks completed (0%)
+**Progress:** 1/2 tasks completed (50%)
 
 ---
 

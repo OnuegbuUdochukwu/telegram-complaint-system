@@ -13,16 +13,19 @@ from telegram.ext import (
     CallbackQueryHandler
 )
 
-# Import all required constants from the separate module
-from constants import (
-    SELECT_HOSTEL, 
-    GET_ROOM_NUMBER, 
-    SELECT_CATEGORY, 
-    GET_DESCRIPTION, 
+# Import all required constants from the unified constants module
+from merged_constants import (
+    SELECT_HOSTEL,
+    GET_ROOM_NUMBER,
+    SELECT_CATEGORY,
+    GET_DESCRIPTION,
     SUBMIT_COMPLAINT,
-    HOSTELS, 
-    COMPLAINT_CATEGORIES
+    HOSTELS,
+    CATEGORY_LABELS,
 )
+
+# Backwards-compatible variable name expected by existing code
+COMPLAINT_CATEGORIES = CATEGORY_LABELS
 
 # --- Configuration and Setup ---
 
