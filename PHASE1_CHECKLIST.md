@@ -13,15 +13,15 @@
         - Expected Output: A finalized, documented schema file (e.g., `complaints_schema.md` or `complaints_schema.json`).
 
 -   [ ] A.2 Local Python Environment Setup
-    -   [ ] Create project directory `complaint_bot_project` (or use current repo root as desired).
-    -   [ ] Initialize Python virtual environment: `python3 -m venv .venv`.
-    -   [ ] Activate venv and install core libs: `pip install python-telegram-bot requests python-dotenv`.
-    -   [ ] Generate `requirements.txt`: `pip freeze > requirements.txt`.
+    -   [x] Create project directory `complaint_bot_project` (or use current repo root as desired).
+    -   [x] Initialize Python virtual environment: `python3 -m venv .venv`.
+    -   [x] Activate venv and install core libs: `pip install python-telegram-bot requests python-dotenv`.
+    -   [x] Generate `requirements.txt`: `pip freeze > requirements.txt`.
     -   Purpose: Establish an isolated, reproducible environment to develop and run the bot.
     -   Tools/Technologies: Python 3.x, venv, pip, VS Code (or preferred IDE).
     -   Expected Output: `.venv` with installed dependencies and a committed `requirements.txt`.
 
-**Progress:** 1/2 tasks completed (50%)
+**Progress:** 2/2 tasks completed (100%)
 
 ---
 
@@ -120,8 +120,8 @@
 ## ⚙️ Overall Progress
 
 **Total Tasks:** 10  
-**Completed:** 0  
-**Overall Progress:** 0%
+**Completed:** 2  
+**Overall Progress:** 20%
 
 ---
 
