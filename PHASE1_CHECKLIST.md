@@ -31,8 +31,8 @@
 
     -   [ ] Register bot with BotFather and obtain TELEGRAM_BOT_TOKEN.
     -   [ ] Add `.env` file to project root containing `TELEGRAM_BOT_TOKEN=...` (ensure `.env` is in `.gitignore`).
-    -   [ ] Implement secure loading with `python-dotenv` (load at app startup).
-    -   [ ] Verify token is loaded and passed to the `Application`/`ApplicationBuilder` instance.
+    -   [x] Implement secure loading with `python-dotenv` (load at app startup).
+    -   [x] Verify token is loaded and passed to the `Application`/`ApplicationBuilder` instance.
     -   Purpose: Acquire credentials and ensure secrets are not hardcoded in source control.
     -   Tools/Technologies: Telegram (BotFather), python-dotenv, python-telegram-bot.
     -   Expected Output: A small script that imports the token from env and successfully instantiates the bot client.
