@@ -56,30 +56,30 @@
 
     -   [x] Map the full user journey starting at the `/report` command.
     -   [x] Define named state constants: e.g., `SELECT_HOSTEL`, `GET_ROOM_NUMBER`, `SELECT_CATEGORY`, `GET_DESCRIPTION`, `CONFIRM`.
-            [x] Produce a diagram or textual flow that shows transitions and fallback/cancel behavior.
-    -   [ ] Produce a diagram or textual flow that shows transitions and fallback/cancel behavior.
+    -   [x] Produce a diagram or textual flow that shows transitions and fallback/cancel behavior.
     -   Purpose: Define the state machine to guide implementation of the multi-step form.
     -   Tools/Technologies: Markdown, simple diagram tool (optional), Python constants module (e.g., `constants.py`).
     -   Expected Output: A states module plus a flow diagram or document describing transitions.
 
--   [ ] C.2 Implement Conversation Handler Structure
+-   [x] C.2 Implement Conversation Handler Structure
 
-    -   [ ] Create a `ConversationHandler` instance wired to the defined state constants.
-    -   [ ] Implement `/report` entry handler that starts the conversation and prompts for Hostel (inline keyboard).
-    -   [ ] Implement fallback handler(s) including `/cancel` to abort and clear conversation state.
-    -   [ ] Attach the `ConversationHandler` to the main application dispatcher.
-    -   Purpose: Build the control structure for the multi-step complaint submission.
-    -   Tools/Technologies: python-telegram-bot (ConversationHandler, CommandHandler, CallbackQueryHandler, MessageHandler).
-    -   Expected Output: Conversation handler that can be started and canceled cleanly.
+    -   [x] Create a `ConversationHandler` instance wired to the defined state constants.
+    -   [x] Implement `/report` entry handler that starts the conversation and prompts for Hostel (inline keyboard).
+    -   [x] Implement fallback handler(s) including `/cancel` to abort and clear conversation state.
+    -   [x] Attach the `ConversationHandler` to the main application dispatcher.
 
--   [ ] C.3 Input Validation and Inline Keyboard Integration
-    -   [ ] Implement inline keyboards for Hostel and Category selection (use `InlineKeyboardMarkup` + callback handlers).
-    -   [ ] Implement Room Number input step with validation (alphanumeric/format or numeric range); re-prompt on invalid input.
-    -   [ ] Implement Description step with length validation (min 10 chars, max 500 chars); re-prompt on invalid input.
-    -   [ ] Store all collected data temporarily in `context.user_data` (so `submit` can use it).
-    -   Purpose: Ensure data integrity and create a smooth, guided UX for users.
-    -   Tools/Technologies: python-telegram-bot, `InlineKeyboardMarkup`, `CallbackQueryHandler`, regex/string validation.
-    -   Expected Output: A conversation flow where choices are buttons, text inputs are validated, and data is collected in `context.user_data`.
+-   Purpose: Build the control structure for the multi-step complaint submission.
+-   Tools/Technologies: python-telegram-bot (ConversationHandler, CommandHandler, CallbackQueryHandler, MessageHandler).
+-   Expected Output: Conversation handler that can be started and canceled cleanly.
+
+-   [x] C.3 Input Validation and Inline Keyboard Integration
+-   [x] Implement inline keyboards for Hostel and Category selection (use `InlineKeyboardMarkup` + callback handlers).
+-   [x] Implement Room Number input step with validation (alphanumeric/format or numeric range); re-prompt on invalid input.
+-   [x] Implement Description step with length validation (min 10 chars, max 500 chars); re-prompt on invalid input.
+-   [x] Store all collected data temporarily in `context.user_data` (so `submit` can use it).
+-   Purpose: Ensure data integrity and create a smooth, guided UX for users.
+-   Tools/Technologies: python-telegram-bot, `InlineKeyboardMarkup`, `CallbackQueryHandler`, regex/string validation.
+-   Expected Output: A conversation flow where choices are buttons, text inputs are validated, and data is collected in `context.user_data`.
 
 **Progress:** 3/3 tasks completed (100%)
 
@@ -120,8 +120,8 @@
 ## ⚙️ Overall Progress
 
 **Total Tasks:** 10  
-**Completed:** 7  
-**Overall Progress:** 70%
+**Completed:** 9  
+**Overall Progress:** 90%
 
 ---
 
