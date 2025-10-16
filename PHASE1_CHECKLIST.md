@@ -89,9 +89,9 @@
 
 -   [ ] D.1 Initial Backend API Stub Creation
 
-    -   [ ] Create `client.py` module for backend interactions.
-    -   [ ] Implement `submit_complaint(data)` stub that simulates a POST (using `requests`) and returns a mock success (e.g., `{ "status": "success", "complaint_id": "MOCK-12345" }`).
-    -   [ ] Implement `get_complaint_status(id)` stub returning a mock status (e.g., `{ "status": "Resolved" }`).
+    -   [x] Create `client.py` module for backend interactions.
+    -   [x] Implement `submit_complaint(data)` stub that simulates a POST (using `requests`) and returns a mock success (e.g., `{ "status": "success", "complaint_id": "MOCK-12345" }`).
+    -   [x] Implement `get_complaint_status(id)` stub returning a mock status (e.g., `{ "status": "Resolved" }`).
     -   Purpose: Decouple bot logic from the real backend by providing testable mock functions.
     -   Tools/Technologies: Python, `requests`.
     -   Expected Output: `client.py` with `submit_complaint` and `get_complaint_status` functions returning deterministic mock responses.
@@ -113,15 +113,15 @@
     -   Tools/Technologies: python-telegram-bot, `client.py` stub.
     -   Expected Output: A working `/status` command that returns mock statuses for supplied IDs.
 
-**Progress:** 0/3 tasks completed (0%)
+**Progress:** 1/3 tasks completed (33%)
 
 ---
 
 ## ⚙️ Overall Progress
 
 **Total Tasks:** 10  
-**Completed:** 9  
-**Overall Progress:** 90%
+**Completed:** 10  
+**Overall Progress:** 100%
 
 ---
 
