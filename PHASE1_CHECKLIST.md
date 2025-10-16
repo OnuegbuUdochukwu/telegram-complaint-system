@@ -29,8 +29,8 @@
 
 -   [ ] B.1 Telegram Bot Registration and Secure Token Management
 
-    -   [ ] Register bot with BotFather and obtain TELEGRAM_BOT_TOKEN.
-    -   [ ] Add `.env` file to project root containing `TELEGRAM_BOT_TOKEN=...` (ensure `.env` is in `.gitignore`).
+    -   [x] Register bot with BotFather and obtain TELEGRAM_BOT_TOKEN.
+    -   [x] Add `.env` file to project root containing `TELEGRAM_BOT_TOKEN=...` (ensure `.env` is in `.gitignore`).
     -   [x] Implement secure loading with `python-dotenv` (load at app startup).
     -   [x] Verify token is loaded and passed to the `Application`/`ApplicationBuilder` instance.
     -   Purpose: Acquire credentials and ensure secrets are not hardcoded in source control.
@@ -120,8 +120,8 @@
 ## ⚙️ Overall Progress
 
 **Total Tasks:** 10  
-**Completed:** 2  
-**Overall Progress:** 20%
+**Completed:** 4  
+**Overall Progress:** 40%
 
 ---
 
