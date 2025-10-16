@@ -52,11 +52,11 @@
 
 ## 🧩 Task Set C: Complaint Logging Conversation Flow
 
--   [ ] C.1 Conversation Flow Mapping and State Definition
+-- [x] C.1 Conversation Flow Mapping and State Definition
 
-    -   [ ] Map the full user journey starting at the `/report` command.
-    -   [ ] Define named state constants: e.g., `SELECT_HOSTEL`, `GET_ROOM_NUMBER`, `SELECT_CATEGORY`, `GET_DESCRIPTION`, `CONFIRM`.
-    -   [ ] Specify input types for each state (CallbackQuery for buttons, Text for free text).
+    -   [x] Map the full user journey starting at the `/report` command.
+    -   [x] Define named state constants: e.g., `SELECT_HOSTEL`, `GET_ROOM_NUMBER`, `SELECT_CATEGORY`, `GET_DESCRIPTION`, `CONFIRM`.
+    -   [x] Specify input types for each state (CallbackQuery for buttons, Text for free text).
     -   [ ] Produce a diagram or textual flow that shows transitions and fallback/cancel behavior.
     -   Purpose: Define the state machine to guide implementation of the multi-step form.
     -   Tools/Technologies: Markdown, simple diagram tool (optional), Python constants module (e.g., `constants.py`).
@@ -81,7 +81,7 @@
     -   Tools/Technologies: python-telegram-bot, `InlineKeyboardMarkup`, `CallbackQueryHandler`, regex/string validation.
     -   Expected Output: A conversation flow where choices are buttons, text inputs are validated, and data is collected in `context.user_data`.
 
-**Progress:** 0/3 tasks completed (0%)
+**Progress:** 1/3 tasks completed (33%)
 
 ---
 
@@ -120,8 +120,8 @@
 ## ⚙️ Overall Progress
 
 **Total Tasks:** 10  
-**Completed:** 5  
-**Overall Progress:** 50%
+**Completed:** 6  
+**Overall Progress:** 60%
 
 ---
 
