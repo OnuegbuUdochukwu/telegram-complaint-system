@@ -37,16 +37,16 @@
     -   Tools/Technologies: Telegram (BotFather), python-dotenv, python-telegram-bot.
     -   Expected Output: A small script that imports the token from env and successfully instantiates the bot client.
 
--   [ ] B.2 Basic Command Implementation and Handlers
-    -   [ ] Create main application loop and instantiate `ApplicationBuilder`.
-    -   [ ] Implement `/start` handler with welcome text explaining bot purpose and `/report` usage.
-    -   [ ] Implement `/help` handler listing available commands and brief usage.
-    -   [ ] Add a generic message handler/fallback to catch unknown commands and guide user.
+-   [x] B.2 Basic Command Implementation and Handlers
+    -   [x] Create main application loop and instantiate `ApplicationBuilder`.
+    -   [x] Implement `/start` handler with welcome text explaining bot purpose and `/report` usage.
+    -   [x] Implement `/help` handler listing available commands and brief usage.
+    -   [x] Add a generic message handler/fallback to catch unknown commands and guide user.
     -   Purpose: Provide users with entry points and command routing for the bot.
     -   Tools/Technologies: python-telegram-bot (ApplicationBuilder, CommandHandler, MessageHandler).
     -   Expected Output: A running bot that responds to `/start`, `/help`, and provides a friendly fallback message.
 
-**Progress:** 0/2 tasks completed (0%)
+**Progress:** 2/2 tasks completed (100%)
 
 ---
 
@@ -120,8 +120,8 @@
 ## ⚙️ Overall Progress
 
 **Total Tasks:** 10  
-**Completed:** 4  
-**Overall Progress:** 40%
+**Completed:** 5  
+**Overall Progress:** 50%
 
 ---
 
