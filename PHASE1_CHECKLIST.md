@@ -106,14 +106,14 @@
     -   Expected Output: End-to-end `/report` → mock submit → user confirmation flow.
 
 -   [ ] D.3 Implement Mock Status Check Command
-    -   [ ] Implement `/status` command handler to prompt user for Complaint ID.
-    -   [ ] Call `get_complaint_status(id)` and reply to the user with the returned mock status.
-    -   [ ] Handle invalid/nonexistent IDs gracefully (reply that no record was found or show usage).
+    -   [x] Implement `/status` command handler to prompt user for Complaint ID.
+    -   [x] Call `get_complaint_status(id)` and reply to the user with the returned mock status.
+    -   [x] Handle invalid/nonexistent IDs gracefully (reply that no record was found or show usage).
     -   Purpose: Allow users to check the status of their submitted tickets while backend is being built.
     -   Tools/Technologies: python-telegram-bot, `client.py` stub.
     -   Expected Output: A working `/status` command that returns mock statuses for supplied IDs.
 
-**Progress:** 2/3 tasks completed (66%)
+**Progress:** 3/3 tasks completed (100%)
 
 ---
 

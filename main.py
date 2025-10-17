@@ -28,6 +28,11 @@ from merged_constants import (
 
 # Client for backend interactions (mock/stub)
 from client import submit_complaint as client_submit
+from client import get_complaint_status as client_get_status
+from merged_constants import STATUS_KEY_TO_LABEL
+
+# Local state for the status-check conversation
+STATUS_WAITING_FOR_ID = 100
 
 # Backwards-compatible variable name expected by existing code
 COMPLAINT_CATEGORIES = CATEGORY_LABELS
@@ -374,6 +379,61 @@ def main():
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.COMMAND, unknown_command))
+
+    # --- Status check conversation: supports `/status <ID>` or `/status` then ID
+    async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        """Entry for /status. If an ID is provided inline, fetch immediately; otherwise prompt."""
+        # If user typed `/status <id>` handle inline
+        text = update.message.text or ""
+        parts = text.split(maxsplit=1)
+        if len(parts) > 1 and parts[1].strip():
+            complaint_id = parts[1].strip()
+            await update.message.reply_text("⏳ Checking status...")
+            try:
+                resp = await asyncio.to_thread(client_get_status, complaint_id)
+            except Exception as exc:
+                logger.exception("Error fetching status for %s: %s", complaint_id, exc)
+                await update.message.reply_text("⚠️ Could not fetch status. Please try again later.")
+                return ConversationHandler.END
+
+            status_key = resp.get("status") if isinstance(resp, dict) else None
+            friendly = STATUS_KEY_TO_LABEL.get(status_key, status_key) if status_key else "Unknown"
+            await update.message.reply_text(f"Status for `{complaint_id}`: *{friendly}*", parse_mode='Markdown')
+            return ConversationHandler.END
+
+        # No ID inline; prompt the user
+        await update.message.reply_text("Please send the Complaint ID you want to check (or /cancel to abort):")
+        return STATUS_WAITING_FOR_ID
+
+    async def status_id_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        """Handles the message containing complaint ID and replies with status."""
+        complaint_id = (update.message.text or "").strip()
+        if not complaint_id:
+            await update.message.reply_text("Please provide a non-empty Complaint ID or /cancel to abort.")
+            return STATUS_WAITING_FOR_ID
+
+        await update.message.reply_text("⏳ Checking status...")
+        try:
+            resp = await asyncio.to_thread(client_get_status, complaint_id)
+        except Exception as exc:
+            logger.exception("Error fetching status for %s: %s", complaint_id, exc)
+            await update.message.reply_text("⚠️ Could not fetch status. Please try again later.")
+            return ConversationHandler.END
+
+        status_key = resp.get("status") if isinstance(resp, dict) else None
+        friendly = STATUS_KEY_TO_LABEL.get(status_key, status_key) if status_key else "Unknown"
+        await update.message.reply_text(f"Status for `{complaint_id}`: *{friendly}*", parse_mode='Markdown')
+        return ConversationHandler.END
+
+    status_conversation = ConversationHandler(
+        entry_points=[CommandHandler('status', status_command)],
+        states={
+            STATUS_WAITING_FOR_ID: [MessageHandler(filters.TEXT & ~filters.COMMAND, status_id_handler)]
+        },
+        fallbacks=[CommandHandler('cancel', cancel_handler)],
+    )
+
+    application.add_handler(status_conversation)
 
     logger.info("Bot is initialized. Polling for updates...")
     
