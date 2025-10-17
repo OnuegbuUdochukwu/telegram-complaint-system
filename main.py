@@ -1,6 +1,7 @@
 import os
 import logging
 import re # New Import for Room Number Validation
+import asyncio
 from dotenv import load_dotenv
 from telegram import ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
@@ -22,7 +23,11 @@ from merged_constants import (
     SUBMIT_COMPLAINT,
     HOSTELS,
     CATEGORY_LABELS,
+    CATEGORY_LABEL_TO_KEY,
 )
+
+# Client for backend interactions (mock/stub)
+from client import submit_complaint as client_submit
 
 # Backwards-compatible variable name expected by existing code
 COMPLAINT_CATEGORIES = CATEGORY_LABELS
@@ -242,24 +247,53 @@ async def submit_complaint_and_end(update: Update, context: ContextTypes.DEFAULT
     Placeholder for the final submission logic. (Task D.2 will implement the mock API call here).
     """
     final_data = context.user_data.get('complaint', {})
-    logger.info(f"*** FINAL DATA COLLECTED (Mock Submission): {final_data} ***")
+    logger.info(f"*** FINAL DATA COLLECTED (Submission): {final_data} ***")
 
-    # In Phase 1, we only confirm collection, not actual API submission.
-    await update.message.reply_text(
-        "✅ **Data Collection Complete!**\n\n"
-        "Your complaint data has been successfully collected:\n"
-        f"Hostel: `{final_data.get('hostel', 'N/A')}`\n"
-        f"Room: `{final_data.get('room_number', 'N/A')}`\n"
-        f"Category: `{final_data.get('category', 'N/A')}`\n"
-        f"Description: *[...]*\n\n"
-        "_Proceeding to final submission (API call) in Phase 2._\n\n"
-        "Thank you for reporting!"
-    )
-    
+    # Build payload expected by the backend/schema
+    payload = {
+        "telegram_user_id": str(final_data.get('telegram_user_id', '')),
+        "hostel": final_data.get('hostel'),
+        "room_number": final_data.get('room_number'),
+        # Convert display label to storage key when possible
+        "category": CATEGORY_LABEL_TO_KEY.get(final_data.get('category'), final_data.get('category')),
+        "description": final_data.get('description'),
+        # Use a default severity for now if not provided
+        "severity": final_data.get('severity', 'medium'),
+    }
+
+    # Call the synchronous client stub in a thread to avoid blocking the event loop
+    try:
+        response = await asyncio.to_thread(client_submit, payload)
+    except Exception as exc:
+        logger.exception("Error when calling client.submit_complaint: %s", exc)
+        await update.message.reply_text(
+            "⚠️ There was an error submitting your complaint. Please try again later."
+        )
+        return ConversationHandler.END
+
+    # Handle mock/real response
+    complaint_id = None
+    if isinstance(response, dict):
+        complaint_id = response.get("complaint_id") or response.get("id")
+
+    if complaint_id:
+        await update.message.reply_text(
+            "✅ Your complaint has been submitted successfully!\n\n"
+            f"Complaint ID: `{complaint_id}`\n"
+            "We will notify you when the status changes. Thank you!",
+            parse_mode='Markdown'
+        )
+    else:
+        # Fallback message if backend returned an unexpected response
+        await update.message.reply_text(
+            "✅ Data collected but the backend did not return an ID.\n"
+            "Your complaint has been saved locally for now. Please try again later to get an official ID."
+        )
+
     # Clear data and end conversation
     if 'complaint' in context.user_data:
         del context.user_data['complaint']
-    
+
     return ConversationHandler.END
 
 

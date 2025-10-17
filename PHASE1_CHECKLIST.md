@@ -98,9 +98,9 @@
 
 -   [ ] D.2 Final Submission Integration (Mock)
 
-    -   [ ] In the final conversation state, build payload from `context.user_data`.
-    -   [ ] Call `submit_complaint()` stub and handle its response.
-    -   [ ] On success, clear `context.user_data` and send a confirmation message with mock ID (`Thank you! Your complaint has been logged with ID: [MOCK-ID].`).
+    -   [x] In the final conversation state, build payload from `context.user_data`.
+    -   [x] Call `submit_complaint()` stub and handle its response.
+    -   [x] On success, clear `context.user_data` and send a confirmation message with mock ID (`Thank you! Your complaint has been logged with ID: [MOCK-ID].`).
     -   Purpose: Complete the end-to-end flow for reporting using the mock backend.
     -   Tools/Technologies: python-telegram-bot, `client.py` stub.
     -   Expected Output: End-to-end `/report` → mock submit → user confirmation flow.
@@ -113,7 +113,7 @@
     -   Tools/Technologies: python-telegram-bot, `client.py` stub.
     -   Expected Output: A working `/status` command that returns mock statuses for supplied IDs.
 
-**Progress:** 1/3 tasks completed (33%)
+**Progress:** 2/3 tasks completed (66%)
 
 ---
 
