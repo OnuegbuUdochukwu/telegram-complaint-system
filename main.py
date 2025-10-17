@@ -4,6 +4,7 @@ import re # New Import for Room Number Validation
 import asyncio
 from dotenv import load_dotenv
 from telegram import ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.request import HTTPXRequest
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -53,6 +54,37 @@ logging.basicConfig(
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+
+async def safe_reply_to_update(update: Update | object, text: str, **kwargs) -> None:
+    """Attempt to reply to the user in a resilient way. Swallows network/send errors.
+
+    Uses Update.effective_message.reply_text when available.
+    """
+    try:
+        if isinstance(update, Update) and update.effective_message:
+            await update.effective_message.reply_text(text, **kwargs)
+        else:
+            logger.debug("safe_reply_to_update: no effective_message available on update; skipping reply")
+    except Exception:
+        logger.warning("safe_reply_to_update: failed to send message to user")
+
+
+async def safe_edit_callback_query(query, text: str, **kwargs) -> None:
+    """Attempt to answer and edit a callback query; if that fails try replying to the chat.
+
+    This helps when network errors occur during edit_message_text.
+    """
+    try:
+        await query.answer()
+        await query.edit_message_text(text, **kwargs)
+    except Exception:
+        logger.warning("safe_edit_callback_query: failed to edit callback message; attempting to reply to chat")
+        try:
+            if query.message:
+                await query.message.reply_text(text, **kwargs)
+        except Exception:
+            logger.warning("safe_edit_callback_query: also failed to reply to chat")
 
 
 # --- Command Handlers (Basic) ---
@@ -271,9 +303,7 @@ async def submit_complaint_and_end(update: Update, context: ContextTypes.DEFAULT
         response = await asyncio.to_thread(client_submit, payload)
     except Exception as exc:
         logger.exception("Error when calling client.submit_complaint: %s", exc)
-        await update.message.reply_text(
-            "⚠️ There was an error submitting your complaint. Please try again later."
-        )
+        await safe_reply_to_update(update, "⚠️ There was an error submitting your complaint. Please try again later.")
         return ConversationHandler.END
 
     # Handle mock/real response
@@ -282,7 +312,8 @@ async def submit_complaint_and_end(update: Update, context: ContextTypes.DEFAULT
         complaint_id = response.get("complaint_id") or response.get("id")
 
     if complaint_id:
-        await update.message.reply_text(
+        await safe_reply_to_update(
+            update,
             "✅ Your complaint has been submitted successfully!\n\n"
             f"Complaint ID: `{complaint_id}`\n"
             "We will notify you when the status changes. Thank you!",
@@ -290,7 +321,8 @@ async def submit_complaint_and_end(update: Update, context: ContextTypes.DEFAULT
         )
     else:
         # Fallback message if backend returned an unexpected response
-        await update.message.reply_text(
+        await safe_reply_to_update(
+            update,
             "✅ Data collected but the backend did not return an ID.\n"
             "Your complaint has been saved locally for now. Please try again later to get an official ID."
         )
@@ -335,7 +367,26 @@ def main():
     """Initializes and runs the bot application."""
     logger.info("Starting bot application...")
 
-    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+    # Configure a custom HTTP request object with larger timeouts and a small
+    # connection pool to reduce the chance of ConnectTimeout/TCP issues during
+    # short network blips when talking to the Telegram API.
+    request = HTTPXRequest(
+        connection_pool_size=32,
+        connect_timeout=20.0,
+        read_timeout=30.0,
+        pool_timeout=10.0,
+    )
+
+    # Use the same HTTPXRequest instance for getUpdates polling. The
+    # Application expects a BaseRequest-like object, not a dict. Passing the
+    # request object ensures polling uses the same configured timeouts/pool.
+    application = (
+        Application.builder()
+        .token(TELEGRAM_BOT_TOKEN)
+        .request(request)
+        .get_updates_request(request)
+        .build()
+    )
     
     # --- Conversation Handler Definition ---
     complaint_conversation_handler = ConversationHandler(
@@ -388,17 +439,17 @@ def main():
         parts = text.split(maxsplit=1)
         if len(parts) > 1 and parts[1].strip():
             complaint_id = parts[1].strip()
-            await update.message.reply_text("⏳ Checking status...")
+            await safe_reply_to_update(update, "⏳ Checking status...")
             try:
                 resp = await asyncio.to_thread(client_get_status, complaint_id)
             except Exception as exc:
                 logger.exception("Error fetching status for %s: %s", complaint_id, exc)
-                await update.message.reply_text("⚠️ Could not fetch status. Please try again later.")
+                await safe_reply_to_update(update, "⚠️ Could not fetch status. Please try again later.")
                 return ConversationHandler.END
 
             status_key = resp.get("status") if isinstance(resp, dict) else None
             friendly = STATUS_KEY_TO_LABEL.get(status_key, status_key) if status_key else "Unknown"
-            await update.message.reply_text(f"Status for `{complaint_id}`: *{friendly}*", parse_mode='Markdown')
+            await safe_reply_to_update(update, f"Status for `{complaint_id}`: *{friendly}*", parse_mode='Markdown')
             return ConversationHandler.END
 
         # No ID inline; prompt the user
@@ -435,11 +486,35 @@ def main():
 
     application.add_handler(status_conversation)
 
+    # Global error handler to catch unexpected exceptions in handlers and
+    # prevent the application from crashing. We also attempt to notify the
+    # user that something went wrong where possible.
+    async def global_error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Log exceptions and notify the user with a friendly message when possible."""
+        logger.exception("Unhandled exception in update: %s", context.error)
+
+        try:
+            # If we have an Update with a message, attempt a polite reply.
+            if isinstance(update, Update) and update.effective_message:
+                await update.effective_message.reply_text(
+                    "⚠️ Oops — something went wrong while processing your request. "
+                    "Please try again in a moment."
+                )
+        except Exception:
+            # Swallow all exceptions here; we've already logged the original.
+            logger.warning("Failed to send error notification to user.")
+
+    application.add_error_handler(global_error_handler)
+
     logger.info("Bot is initialized. Polling for updates...")
-    
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
-    
-    logger.info("Bot application stopped.")
+
+    try:
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
+    except Exception as exc:
+        # Log unexpected errors during the polling lifecycle
+        logger.exception("Unexpected error while polling: %s", exc)
+    finally:
+        logger.info("Bot application stopped.")
 
 
 if __name__ == '__main__':
