@@ -1,8 +1,11 @@
 -- Migration: Create complaints table (UUID primary key variant)
 -- Adds ENUM types for category, severity, and status and the complaints table
 
--- Requires the pgcrypto extension for gen_random_uuid()
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- Note: the `pgcrypto` extension provides gen_random_uuid().
+-- Creating extensions requires database-level CREATE privileges (superuser).
+-- If pgcrypto is not installed in your Postgres cluster, ask the DB admin to run:
+--   CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- The migration will continue without attempting to create the extension here to avoid permission errors.
 
 -- ENUM types (compact storage keys)
 DO $$
@@ -36,8 +39,16 @@ CREATE TABLE IF NOT EXISTS complaints (
 );
 
 -- Constraints / Indexes
-ALTER TABLE complaints
-  ADD CONSTRAINT IF NOT EXISTS chk_room_number_format CHECK (room_number ~ '^[A-Za-z0-9\-\s]{1,10}$');
+-- Add a room number format check constraint if it does not already exist
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'chk_room_number_format'
+  ) THEN
+    ALTER TABLE complaints
+      ADD CONSTRAINT chk_room_number_format CHECK (room_number ~ '^[A-Za-z0-9\\-\\s]{1,10}$');
+  END IF;
+END$$;
 
 CREATE INDEX IF NOT EXISTS idx_complaints_telegram_user_id ON complaints (telegram_user_id);
 CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints (status);
