@@ -17,17 +17,21 @@
     -   Expected Output: A running PostgreSQL instance with a verified `cms_db` available for connection.
 
 -   [ ] 2.1.2 Initial Database Schema (DDL) Scripting
-    -   [ ] Write DDL script for `hostels` table.
-    -   [ ] Write DDL script for `porters` table (for future dashboard/auth).
-    -   [ ] Write DDL script for `users` table (Telegram ID → internal ID mapping).
+    -   [x] Write DDL script for `hostels` table.
+        -   Verification: `migrations/002_create_supporting_tables.sql` contains `hostels` DDL (UUID PK, slug, display_name, timestamps).
+    -   [x] Write DDL script for `porters` table (for future dashboard/auth).
+        -   Verification: `migrations/002_create_supporting_tables.sql` contains `porters` DDL (UUID PK, contact fields, assigned_hostel_id FK).
+    -   [x] Write DDL script for `users` table (Telegram ID → internal ID mapping).
+        -   Verification: `migrations/002_create_supporting_tables.sql` contains `users` DDL (UUID PK, telegram_user_id unique).
     -   [x] Write DDL script for core `complaints` table (id PK, fields, NOT NULLs, constraints, enums).
         -   Verification: `migrations/001_create_complaints_table.sql` exists in the repo and uses UUID variant with ENUMs.
-    -   [ ] Execute all DDL scripts against `cms_db` and verify tables created.
+    -   [x] Execute all DDL scripts against `cms_db` and verify tables created.
+        -   Verification: All four tables (`hostels`, `porters`, `users`, `complaints`) were created in `cms_db` via psql; ENUM types for complaints were created. Note: `pgcrypto` extension creation requires DB CREATE privileges and was not executed by the migration; see migration header for instructions.
     -   Purpose: Translate the Phase 1 Complaint Data Schema into executable PostgreSQL DDL to create required tables.
     -   Tools/Technologies: SQL, PostgreSQL, VS Code (or preferred editor), `psql`.
     -   Expected Output: Four fully structured tables (`hostels`, `porters`, `users`, `complaints`) created in `cms_db`.
 
-**Progress:** 1/2 tasks completed (50%)
+**Progress:** 2/2 tasks completed (100%)
 
 ---
 
