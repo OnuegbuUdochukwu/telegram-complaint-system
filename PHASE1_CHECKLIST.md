@@ -12,7 +12,7 @@
         - Tools/Technologies: Markdown or JSON, DB schema conventions (Postgres types), documentation.
         - Expected Output: A finalized, documented schema file (e.g., `complaints_schema.md` or `complaints_schema.json`).
 
--   [ ] A.2 Local Python Environment Setup
+-   [x] A.2 Local Python Environment Setup
     -   [x] Create project directory `complaint_bot_project` (or use current repo root as desired).
     -   [x] Initialize Python virtual environment: `python3 -m venv .venv`.
     -   [x] Activate venv and install core libs: `pip install python-telegram-bot requests python-dotenv`.
@@ -27,7 +27,7 @@
 
 ## 🧩 Task Set B: Core Bot Framework and Authentication
 
--   [ ] B.1 Telegram Bot Registration and Secure Token Management
+-   [x] B.1 Telegram Bot Registration and Secure Token Management
 
     -   [x] Register bot with BotFather and obtain TELEGRAM_BOT_TOKEN.
     -   [x] Add `.env` file to project root containing `TELEGRAM_BOT_TOKEN=...` (ensure `.env` is in `.gitignore`).
@@ -87,7 +87,7 @@
 
 ## 🧩 Task Set D: Mock Backend and Status Functionality
 
--   [ ] D.1 Initial Backend API Stub Creation
+-   [x] D.1 Initial Backend API Stub Creation
 
     -   [x] Create `client.py` module for backend interactions.
     -   [x] Implement `submit_complaint(data)` stub that simulates a POST (using `requests`) and returns a mock success (e.g., `{ "status": "success", "complaint_id": "MOCK-12345" }`).
@@ -96,7 +96,7 @@
     -   Tools/Technologies: Python, `requests`.
     -   Expected Output: `client.py` with `submit_complaint` and `get_complaint_status` functions returning deterministic mock responses.
 
--   [ ] D.2 Final Submission Integration (Mock)
+-   [x] D.2 Final Submission Integration (Mock)
 
     -   [x] In the final conversation state, build payload from `context.user_data`.
     -   [x] Call `submit_complaint()` stub and handle its response.
@@ -105,7 +105,7 @@
     -   Tools/Technologies: python-telegram-bot, `client.py` stub.
     -   Expected Output: End-to-end `/report` → mock submit → user confirmation flow.
 
--   [ ] D.3 Implement Mock Status Check Command
+-   [x] D.3 Implement Mock Status Check Command
     -   [x] Implement `/status` command handler to prompt user for Complaint ID.
     -   [x] Call `get_complaint_status(id)` and reply to the user with the returned mock status.
     -   [x] Handle invalid/nonexistent IDs gracefully (reply that no record was found or show usage).
