@@ -2,12 +2,16 @@
 
 ## 🗄️ Task Set 1: Data Persistence Layer (PostgreSQL)
 
--   [ ] 2.1.1 PostgreSQL Instance and Database Creation
+-   [x] 2.1.1 PostgreSQL Instance and Database Creation
 
-    -   [ ] Install PostgreSQL server locally (or set up a Docker container).
-    -   [ ] Create a dedicated superuser role for the application.
-    -   [ ] Create the primary application database named `cms_db` (Complaint Management System Database).
-    -   [ ] Verify connectivity using a database client (e.g., pgAdmin or `psql`).
+    -   [x] Install PostgreSQL server locally (or set up a Docker container).
+        -   Verification: PostgreSQL installed via Homebrew (PostgreSQL 14.x reported).
+    -   [x] Create a dedicated superuser role for the application.
+        -   Verification: `cms_admin` role created (superuser role created during setup).
+    -   [x] Create the primary application database named `cms_db` (Complaint Management System Database).
+        -   Verification: `cms_db` created and owned by `cms_admin`.
+    -   [x] Verify connectivity using a database client (e.g., pgAdmin or `psql`).
+        -   Verification: `psql` connection tested as `cms_user` (SELECT current_user returned `cms_user`; PostgreSQL 14.x).
     -   Purpose: Establish the relational database server instance required to store all application data persistently.
     -   Tools/Technologies: PostgreSQL, Docker (optional), `psql` command-line utility, pgAdmin.
     -   Expected Output: A running PostgreSQL instance with a verified `cms_db` available for connection.
@@ -16,13 +20,14 @@
     -   [ ] Write DDL script for `hostels` table.
     -   [ ] Write DDL script for `porters` table (for future dashboard/auth).
     -   [ ] Write DDL script for `users` table (Telegram ID → internal ID mapping).
-    -   [ ] Write DDL script for core `complaints` table (id PK, fields, NOT NULLs, constraints, enums).
+    -   [x] Write DDL script for core `complaints` table (id PK, fields, NOT NULLs, constraints, enums).
+        -   Verification: `migrations/001_create_complaints_table.sql` exists in the repo and uses UUID variant with ENUMs.
     -   [ ] Execute all DDL scripts against `cms_db` and verify tables created.
     -   Purpose: Translate the Phase 1 Complaint Data Schema into executable PostgreSQL DDL to create required tables.
     -   Tools/Technologies: SQL, PostgreSQL, VS Code (or preferred editor), `psql`.
     -   Expected Output: Four fully structured tables (`hostels`, `porters`, `users`, `complaints`) created in `cms_db`.
 
-**Progress:** 0/2 tasks completed (0%)
+**Progress:** 1/2 tasks completed (50%)
 
 ---
 
@@ -41,7 +46,8 @@
 
 -   [ ] 2.2.2 ORM / SQLModel Configuration and Models
 
-    -   [ ] Define the PostgreSQL connection string in `.env` (e.g., `DATABASE_URL`).
+    -   [x] Define the PostgreSQL connection string in `.env` (e.g., `DATABASE_URL`).
+        -   Verification: A `DATABASE_URL` was appended to the project `.env` (local) pointing to `postgresql+psycopg2://cms_user:cms_user_password@localhost:5432/cms_db`.
     -   [ ] Implement `get_session()` using `sqlmodel` (session generator dependency that closes sessions).
     -   [ ] Define SQLModel classes for `complaints`, `hostels`, and `porters` with Pydantic validation.
     -   [ ] Add an initialization script that calls `SQLModel.metadata.create_all()` to create tables.
