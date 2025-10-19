@@ -4,6 +4,8 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials, OAuth2PasswordRequ
 from fastapi import Body
 from . import auth
 from typing import List, Optional
+from pydantic import BaseModel
+from datetime import datetime, timezone
 from sqlmodel import select
 
 
@@ -89,3 +91,48 @@ def list_complaints(status: Optional[str] = None, admin_user: Porter = Depends(a
         statement = statement.where(Complaint.status == status)
     results = session.exec(statement).all()
     return results
+
+
+class StatusUpdateSchema(BaseModel):
+    status: str
+
+
+@app.patch("/api/v1/complaints/{complaint_id}/status", response_model=Complaint)
+def update_complaint_status(
+    complaint_id: str,
+    body: StatusUpdateSchema,
+    user: Porter = Depends(auth.get_current_user),
+    session=Depends(get_session),
+):
+    """Secure endpoint to update a complaint's status.
+
+    Requires authentication (porter or admin). Validates the status value,
+    updates `status` and `updated_at` (timezone-aware), then returns the record.
+    """
+    # Guard against invalid-looking IDs (avoid DB DataError)
+    import re
+
+    uuid_like = re.compile(r'^[0-9a-fA-F-]{1,36}$')
+    if not uuid_like.match(complaint_id):
+        raise HTTPException(status_code=404, detail="Not found")
+
+    # Fetch complaint
+    statement = select(Complaint).where(Complaint.id == complaint_id)
+    complaint = session.exec(statement).first()
+    if not complaint:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    # Validate status value
+    allowed_statuses = {"reported", "in_progress", "resolved", "closed"}
+    if body.status not in allowed_statuses:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Allowed: {', '.join(sorted(allowed_statuses))}")
+
+    # Authorization: allow porter or admin (auth.get_current_user already ensures valid token)
+    # If role-level checks are needed (e.g., only admin can set 'closed'), enforce here.
+
+    complaint.status = body.status
+    complaint.updated_at = datetime.now(timezone.utc)
+    session.add(complaint)
+    session.commit()
+    session.refresh(complaint)
+    return complaint
