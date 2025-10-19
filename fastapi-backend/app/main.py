@@ -1,17 +1,45 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.security import HTTPBasic, HTTPBasicCredentials, OAuth2PasswordRequestForm
+from fastapi import Body
+from . import auth
 from typing import List, Optional
 from sqlmodel import select
 
+
 from .database import init_db, get_session
-from .models import Complaint
+from .models import Complaint, Porter
+
+app = FastAPI(title="Complaint Management API")
 
 security = HTTPBasic()
 
-def get_admin_user(credentials: HTTPBasicCredentials = Depends(security)) -> bool:
-    # Placeholder admin guard: accepts any credentials for now. Replace with real check in Phase 3.
-    return True
+
+@app.post("/auth/login", response_model=dict)
+def login(form_data: OAuth2PasswordRequestForm = Depends(), session=Depends(get_session)):
+    # Validate credentials against porters table (email or phone as username)
+    porter = auth.authenticate_porter(form_data.username, form_data.password, session)
+    if not porter:
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    token = auth.create_access_token(subject=porter.id, role="admin" if (porter.email and porter.email.endswith("@admin.local")) else "porter")
+    return {"access_token": token, "token_type": "bearer"}
+
+
+@app.post("/auth/register", response_model=dict)
+def register_porter(full_name: str = Body(...), email: Optional[str] = Body(None), phone: Optional[str] = Body(None), password: str = Body(...), session=Depends(get_session)):
+    # Dev-only helper: create a porter with hashed password
+    from .auth import get_password_hash
+    new = {
+        "full_name": full_name,
+        "email": email,
+        "phone": phone,
+        "password_hash": get_password_hash(password),
+    }
+    porter = Porter(**{k: v for k, v in new.items() if v is not None})
+    session.add(porter)
+    session.commit()
+    session.refresh(porter)
+    return {"id": porter.id, "email": porter.email, "phone": porter.phone}
 
 app = FastAPI(title="Complaint Management API")
 
@@ -54,7 +82,7 @@ def get_complaint(complaint_id: str, session=Depends(get_session)):
 
 
 @app.get("/api/v1/complaints", response_model=List[Complaint])
-def list_complaints(status: Optional[str] = None, admin: bool = Depends(get_admin_user), session=Depends(get_session)):
+def list_complaints(status: Optional[str] = None, admin_user: Porter = Depends(auth.require_role("admin")), session=Depends(get_session)):
     # Optional filter by status (e.g., reported, in_progress, resolved)
     statement = select(Complaint)
     if status:

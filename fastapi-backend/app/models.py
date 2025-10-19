@@ -22,6 +22,8 @@ class Porter(SQLModel, table=True):
     full_name: str
     phone: Optional[str] = None
     email: Optional[str] = None
+    # password_hash stores the bcrypt-hashed password for porter/admin login
+    password_hash: Optional[str] = None
     assigned_hostel_id: Optional[str] = Field(default=None, foreign_key="hostels.id")
     active: bool = Field(default=True)
     created_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
