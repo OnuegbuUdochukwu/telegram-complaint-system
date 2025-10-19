@@ -1,191 +1,170 @@
-# Phase 3 Checklist — Telegram Complaint System
+# Phase 3 Development Checklist
 
-This checklist contains prioritized work for Phase 3: security, admin UX, real-time updates, media handling, CI, and production readiness. Each item includes a short description, acceptance criteria, rough estimate, and suggested owner (if known). Use this as a living document while implementing Phase 3.
-
----
-
-## How to use this file
-
--   Mark each item as TODO / IN-PROGRESS / DONE.
--   Add a short status line and a GitHub issue/PR link when you start work.
--   Estimates are rough; refine during sprint planning.
+This file is a reformatted, progress-trackable checklist derived from the Phase 3 task breakdown. Each major section includes tasks with nested subtasks and supporting context (Purpose, Tools/Technologies, Expected Output). After each section there's a short progress summary.
 
 ---
 
-## Priority 1 — Security & Auth (must-have)
+## 🔐 Backend — Security & Auth
 
--   [ ] 3.1 Implement JWT-based authentication for backend
+-   [x] 3.1 Implement JWT-based authentication for backend
 
-    -   Description: Add login endpoint, issue JWT access tokens (and refresh tokens optionally). Secure write endpoints (submit, update status, assign porter) and admin endpoints with role-based checks.
-    -   Acceptance criteria:
-        -   POST /auth/login returns access token for valid credentials
-        -   Protected endpoints return 401 without token and 403 for insufficient role
-        -   Tokens expire; refresh flow implemented or documented
-    -   Rough estimate: 8–16 hours
-    -   Owner: backend
+-   Purpose: Secure admin and write endpoints by issuing and validating time-limited JWTs. Provide a login flow for porters/admins.
+-   Tools/Technologies: FastAPI, python-jose, Passlib (bcrypt), SQLModel, PostgreSQL
+-   Expected Output: POST /auth/login issues access tokens; protected endpoints reject unauthorized/expired tokens.
 
--   [ ] 3.2 Harden admin endpoints and add RBAC
+-   [ ] 3.2 Harden admin endpoints and add RBAC (reporter, porter, admin)
 
-    -   Description: Implement roles (reporter, admin, porter). Ensure list, update, and assignment endpoints require admin or porter roles.
-    -   Acceptance criteria:
-        -   Admin can list and filter complaints, assign porter, change status
-        -   Porter can see assigned complaints and change status to in-progress/resolved
-    -   Rough estimate: 4–8 hours
-    -   Owner: backend
+    -   Purpose: Enforce least-privilege access across dashboard and write APIs.
+    -   Tools/Technologies: FastAPI dependency injection, SQLModel, DB role column or mapping
+    -   Expected Output: Admin/porter roles enforced; 401/403 returned on invalid/insufficient access.
 
 -   [ ] 3.3 Secrets & config management
-    -   Description: Move secrets out of .env into platform-appropriate secret store (or document vault usage). Add sample env and .env.example.
-    -   Acceptance criteria:
-        -   No credentials in repo
-        -   README documents how to configure secrets locally
-    -   Rough estimate: 2–4 hours
-    -   Owner: devops/backend
+    -   Purpose: Move secrets out of repo and document secure local setup.
+    -   Tools/Technologies: dotenv, Vault/Secrets Manager (optional), .env.example
+    -   Expected Output: No creds in repo; README docs for local dev using secrets.
+
+**Progress:** 1/3 tasks completed (33%)
 
 ---
 
-## Priority 2 — Admin Dashboard (UX)
+## 🖥️ Admin Dashboard & API
 
--   [ ] 3.4 Build Admin Dashboard (React or Svelte)
+-   [ ] 3.4 Build Admin Dashboard (MVP)
 
-    -   Description: Create a single-page admin UI to list complaints with filters (status, hostel, date), view details, assign porter, change status, and upload notes/media (if implemented).
-    -   Acceptance criteria:
-        -   Dashboard authenticates via JWT
-        -   Lists complaints with server-side pagination and filters
-        -   Complaint detail view allows status/assignment changes
-    -   Rough estimate: 40–80 hours (MVP)
-    -   Owner: frontend
+    -   Purpose: Provide a UI for admins/porters to list, filter, view, assign, and update complaints.
+    -   Tools/Technologies: React (or Svelte), fetch/httpx, JWT for auth, frontend routing
+    -   Expected Output: Minimal SPA with list view, detail modal/page, and assignment/status controls.
 
--   [ ] 3.5 API: list + update endpoints for dashboard
-    -   Description: Implement paginated GET /api/v1/complaints with query params (status, hostel, assigned_to, page, page_size) and PATCH /api/v1/complaints/{id} for updates.
-    -   Acceptance criteria:
-        -   Endpoints respect RBAC and pagination
-        -   PATCH validates allowed transitions (e.g., can't move from resolved to new without audit)
-    -   Rough estimate: 8–16 hours
-    -   Owner: backend
+-   [ ] 3.5 API: paginated list + update endpoints for dashboard
+    -   Purpose: Support dashboard with server-side pagination, filters, and PATCH updates to complaints.
+    -   Tools/Technologies: FastAPI, SQLModel, PostgreSQL, Pydantic request/response models
+    -   Expected Output: GET /api/v1/complaints?page=&page_size=&status=&hostel= ; PATCH /api/v1/complaints/{id} to change status/assignment.
+
+**Progress:** 0/2 tasks completed (0%)
 
 ---
 
-## Priority 3 — Real-time & Notifications
+## ⚡ Real-time & Notifications
 
--   [ ] 3.6 WebSocket or server-sent events for real-time updates
+-   [ ] 3.6 WebSocket or Server-Sent Events (SSE) for real-time updates
 
-    -   Description: Add a WebSocket endpoint that broadcasts new complaints and status updates to connected dashboard clients.
-    -   Acceptance criteria:
-        -   Dashboard receives new complaint events in <1s
-        -   Authenticated connections only
-    -   Rough estimate: 8–16 hours
-    -   Owner: backend/frontend
+    -   Purpose: Deliver new complaint and status-change events to connected dashboards in near real-time.
+    -   Tools/Technologies: FastAPI WebSockets or SSE, Redis (pub/sub) optional, frontend WS client
+    -   Expected Output: Authenticated WS/SSE endpoint and client displays new events within ~1s.
 
 -   [ ] 3.7 Push notifications / Telegram admin alerts (optional)
-    -   Description: Send optional Telegram messages to admin chat or push notifications to mobile web when new high-priority complaints appear.
-    -   Acceptance criteria:
-        -   Configurable per-hostel or global
-        -   Rate-limited and opt-in
-    -   Rough estimate: 6–12 hours
-    -   Owner: backend
+    -   Purpose: Notify on high-priority complaints via Telegram or push channels.
+    -   Tools/Technologies: python-telegram-bot for sending messages, push providers (FCM/APNs) optional
+    -   Expected Output: Configurable alerting pipeline (hostel-level) that is rate-limited and opt-in.
+
+**Progress:** 0/2 tasks completed (0%)
 
 ---
 
-## Priority 4 — Media handling (photos / attachments)
+## 🖼️ Media handling (photos & attachments)
 
 -   [ ] 3.8 Photo uploads and storage
 
-    -   Description: Allow reporters to attach photos from Telegram. Decide on storage backend: S3-compatible (recommended), local disk (dev), or DB (not recommended).
-    -   Acceptance criteria:
-        -   Upload endpoint returns secure URL or signed URL
-        -   Uploaded media accessible only to authenticated dashboard/admin clients
-    -   Rough estimate: 8–20 hours (including storage & signed URLs)
-    -   Owner: backend/devops
+    -   Purpose: Allow reporters to attach images; store them securely and serve thumbnails/links to dashboard.
+    -   Tools/Technologies: S3-compatible storage (MinIO/AWS S3), signed URLs, FastAPI upload endpoint
+    -   Expected Output: Upload endpoint returning signed URLs; access restricted to authenticated users.
 
 -   [ ] 3.9 Thumbnailing & size limits
-    -   Description: Generate thumbnails on upload (or on-demand). Enforce size limits and file type checks.
-    -   Acceptance criteria:
-        -   Images larger than configured size are rejected or downscaled
-        -   Thumbnails available via authenticated endpoint
-    -   Rough estimate: 4–8 hours
-    -   Owner: backend
+    -   Purpose: Reduce bandwidth and display-friendly thumbnails; enforce size/type limits.
+    -   Tools/Technologies: Pillow or libvips, background worker (Celery/RQ) optional
+    -   Expected Output: Thumbnails produced and available via authenticated endpoints; upload size/type limited.
+
+**Progress:** 0/2 tasks completed (0%)
 
 ---
 
-## Priority 5 — CI/CD, infra, and production hardening
+## 🛠️ CI/CD, Infra & Production Readiness
 
 -   [ ] 3.10 CI: GitHub Actions workflow
 
-    -   Description: Add CI to run lint, unit tests, and integration tests against a test PostgreSQL service on PRs.
-    -   Acceptance criteria:
-        -   PRs run tests and fail on regression
-        -   Builds run in matrix (python versions optionally)
-    -   Rough estimate: 6–12 hours
-    -   Owner: devops
+    -   Purpose: Run tests and lint on PRs and prevent regressions before merges.
+    -   Tools/Technologies: GitHub Actions, PostgreSQL service in CI, Python matrix
+    -   Expected Output: Workflow that runs unit and integration tests; PRs block on failing tests.
 
 -   [ ] 3.11 Dockerize backend and optional worker
 
-    -   Description: Add Dockerfile(s) for backend and a docker-compose for local dev (Postgres, backend, redis if needed). Add production-ready Dockerfile with environment variable configuration.
-    -   Acceptance criteria:
-        -   docker-compose up boots a working dev environment
-        -   Images can be built reproducibly in CI
-    -   Rough estimate: 6–12 hours
-    -   Owner: devops
+    -   Purpose: Standardize dev and production builds; enable local reproducible environments.
+    -   Tools/Technologies: Dockerfile, docker-compose, optional Redis/Postgres services
+    -   Expected Output: docker-compose up for local dev; reproducible CI builds.
 
 -   [ ] 3.12 Observability: logging, metrics, error tracking
-    -   Description: Add structured logging, health checks, Prometheus metrics endpoint (or use FastAPI middleware integrations), and Sentry (optional) for exceptions.
-    -   Acceptance criteria:
-        -   Metrics endpoint available and basic dashboards documented
-        -   Errors captured in Sentry in staging (optional)
-    -   Rough estimate: 6–12 hours
-    -   Owner: backend/devops
+    -   Purpose: Make system observable and trace errors in staging/production.
+    -   Tools/Technologies: structured JSON logging, Prometheus client, Sentry integration
+    -   Expected Output: /metrics endpoint and Sentry configured for error reporting.
+
+**Progress:** 0/3 tasks completed (0%)
 
 ---
 
-## Priority 6 — Operational & Misc
+## 🧭 Operational & Misc
 
 -   [ ] 3.13 Migration tooling (Alembic)
 
-    -   Description: Integrate Alembic or a migration runner and convert existing SQL files into versioned migrations.
-    -   Acceptance criteria:
-        -   Alembic configured
-        -   Existing schema represented as baseline revision
-    -   Rough estimate: 4–8 hours
-    -   Owner: backend
+    -   Purpose: Manage schema changes safely and reproducibly across environments.
+    -   Tools/Technologies: Alembic, SQLAlchemy/SQLModel integration
+    -   Expected Output: Alembic configured and baseline revision created from current schema.
 
 -   [ ] 3.14 Data privacy & retention policy
 
-    -   Description: Document how long complaints and media are retained and add tools to purge old data.
-    -   Acceptance criteria:
-        -   Written policy in repo
-        -   Admin endpoint to run purge job (or scheduled job)
-    -   Rough estimate: 2–4 hours
-    -   Owner: product/security
+    -   Purpose: Define retention for complaints and media and add tools to purge old data.
+    -   Tools/Technologies: DB scheduled jobs or background workers, policy docs
+    -   Expected Output: In-repo retention policy and admin purge endpoint or cron job.
 
 -   [ ] 3.15 Load testing & capacity planning
-    -   Description: Run lightweight load tests (k6 or Locust) to validate system under expected traffic and estimate scaling needs.
-    -   Acceptance criteria:
-        -   Load test scripts checked in
-        -   Test report with recommendations
-    -   Rough estimate: 8–16 hours
-    -   Owner: devops
+    -   Purpose: Validate system performance and estimate scaling requirements.
+    -   Tools/Technologies: k6, Locust, or similar load testers
+    -   Expected Output: Load test scripts and a report with recommended scaling limits.
+
+**Progress:** 0/3 tasks completed (0%)
 
 ---
 
-## Quick first sprint (2 weeks) — recommended scope
-
-Pick a subset to land a secure MVP for admins to manage complaints.
-
-Sprint goal: Secure the backend, add RBAC and basic dashboard list/detail features, and run CI.
+## 🚀 Quick first sprint (2 weeks) — recommended scope (MVP)
 
 -   [ ] Implement JWT auth + RBAC (3.1 + 3.2)
+
+    -   Purpose: Secure backend so dashboard and write flows can be developed safely.
+    -   Tools/Technologies: FastAPI, python-jose, SQLModel
+    -   Expected Output: Working /auth/login and protected endpoints; basic role enforcement.
+
 -   [ ] Add GET /api/v1/complaints pagination + PATCH for status changes (3.5)
+
+    -   Purpose: Provide stable API endpoints for dashboard list and status updates.
+    -   Tools/Technologies: FastAPI, SQLModel, Pydantic
+    -   Expected Output: Paginated list and PATCH endpoint with RBAC checks.
+
 -   [ ] Create minimal React dashboard to list complaints and view detail (3.4, MVP subset)
+
+    -   Purpose: Provide an early UI for admins and porters to manage complaints.
+    -   Tools/Technologies: React, fetch/httpx, JWT auth
+    -   Expected Output: SPA listing complaints, detail modal and status/assignment controls.
+
 -   [ ] Add GitHub Actions CI for tests and linting (3.10)
+    -   Purpose: Prevent regressions and automate tests on PRs.
+    -   Tools/Technologies: GitHub Actions, pytest, flake8/ruff (optional)
+    -   Expected Output: CI workflow that runs tests and lints on PRs.
+
+**Sprint Progress:** 1/4 tasks completed (25%)
 
 ---
 
-## Next steps (after creating this file)
+## 📈 Overall Progress
 
-1. Create issues and assign owners for each checked item above.
-2. Break sprint goals into smaller tasks and estimate in story points.
-3. Start with authentication and CI; they unblock safe development for the rest of Phase 3.
+**Total Tasks:** 15
+**Completed:** 1
+**Overall Progress:** 7%
 
 ---
+
+## Next steps
+
+1. Create issues for each top-level task and assign owners & estimates in your issue tracker.
+2. Convert the sprint items into smaller tickets and start with authentication + CI.
+3. Add migrations (Alembic) before making schema changes (e.g., adding Porter.role/password_hash).
 
 Document version: 2025-10-19
