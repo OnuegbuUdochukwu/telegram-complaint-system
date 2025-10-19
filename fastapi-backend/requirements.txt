@@ -6,3 +6,4 @@ psycopg2-binary==2.9.9
 httpx==0.24.1
 python-jose==3.3.0
 passlib[bcrypt]==1.7.4
+alembic==1.12.0
