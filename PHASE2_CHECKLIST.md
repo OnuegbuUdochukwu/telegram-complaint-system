@@ -40,10 +40,16 @@
 -   [ ] 2.2.1 FastAPI Project Initialization & Environment
 
     -   [ ] Create backend directory (e.g., `fastapi-backend`).
+    -   [x] Create backend directory (e.g., `fastapi-backend`).
+        -   Verification: `fastapi-backend/` directory created in repo and pushed to `origin/main`.
     -   [ ] Initialize Python virtual environment inside backend.
+        -   Note: `fastapi-backend/run.sh` is provided to create and populate a `.venv` when run locally; venv creation was not executed automatically.
     -   [ ] Install core dependencies: `fastapi`, `uvicorn`, `python-dotenv[cli]`.
+        -   Verification: `fastapi-backend/requirements.txt` added to repo listing core and HTTP/DB deps; installation remains a manual step (or run `fastapi-backend/run.sh`).
     -   [ ] Install DB dependencies: `sqlmodel`, `psycopg2-binary`.
-    -   [ ] Create initial `app/main.py` and `.env` for database credentials.
+        -   See requirements note above.
+    -   [x] Create initial `app/main.py` and `.env` for database credentials.
+        -   Verification: `fastapi-backend/app/main.py` and `.env.example` were added; `app/models.py` and `app/database.py` present.
     -   Purpose: Set up the backend service scaffold and required environment so the API can be developed and run.
     -   Tools/Technologies: Python, venv, pip, FastAPI, Uvicorn, python-dotenv, VS Code.
     -   Expected Output: A runnable FastAPI application scaffold that starts with Uvicorn (e.g., "Application startup complete").
