@@ -14,29 +14,29 @@ def get_session() -> Generator[Session, None, None]:
         yield session
 
 def init_db() -> None:
-    # Create SQLModel-managed tables (safe for SQLite and Postgres mapped models)
+    # For SQLite/local dev, create tables directly
     SQLModel.metadata.create_all(engine)
 
-    # If we're connected to a Postgres database, apply raw SQL migrations
-    # kept in the repository's migrations/ directory. This mirrors the
-    # simple migration system used by project SQL files (001_*.sql etc.).
+    # For Postgres, prefer running Alembic migrations so schema is managed.
     try:
         dialect = engine.dialect.name
     except Exception:
         dialect = ""
 
     if dialect and "postgres" in dialect:
-        migrations_dir = Path(__file__).resolve().parents[2] / "migrations"
-        if migrations_dir.exists():
-            # Apply SQL files in lexicographic order (001_*, 002_*, ...)
-            for sql_file in sorted(migrations_dir.glob("*.sql")):
-                sql_text = sql_file.read_text()
-                with engine.begin() as conn:
-                    try:
-                        # Use exec_driver_sql to allow multiple statements and DO blocks
-                        conn.exec_driver_sql(sql_text)
-                    except Exception:
-                        # Continue on errors to avoid stopping startup; these will
-                        # surface in logs if they fail. In production you may want
-                        # stricter behavior.
-                        pass
+        # Run Alembic programmatically to bring DB to latest revision.
+        try:
+            from alembic.config import Config
+            from alembic import command
+
+            alembic_cfg = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+            # Ensure alembic.ini uses the same DB URL as our .env
+            from dotenv import dotenv_values
+            env = dotenv_values("../.env")
+            if env.get("DATABASE_URL"):
+                alembic_cfg.set_main_option("sqlalchemy.url", env.get("DATABASE_URL"))
+
+            command.upgrade(alembic_cfg, "head")
+        except Exception:
+            # If Alembic fails, fall back to create_all (safer for dev).
+            SQLModel.metadata.create_all(engine)
