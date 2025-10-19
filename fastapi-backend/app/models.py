@@ -4,6 +4,7 @@ from sqlmodel import SQLModel, Field
 
 
 class Hostel(SQLModel, table=True):
+    __tablename__ = "hostels"
     id: Optional[str] = Field(default=None, primary_key=True)
     slug: str = Field(sa_column_kwargs={"unique": True})
     display_name: str
@@ -12,6 +13,7 @@ class Hostel(SQLModel, table=True):
 
 
 class Porter(SQLModel, table=True):
+    __tablename__ = "porters"
     id: Optional[str] = Field(default=None, primary_key=True)
     full_name: str
     phone: Optional[str] = None
@@ -23,6 +25,7 @@ class Porter(SQLModel, table=True):
 
 
 class User(SQLModel, table=True):
+    __tablename__ = "users"
     id: Optional[str] = Field(default=None, primary_key=True)
     telegram_user_id: str = Field(sa_column_kwargs={"unique": True})
     display_name: Optional[str] = None
@@ -31,6 +34,7 @@ class User(SQLModel, table=True):
 
 
 class Complaint(SQLModel, table=True):
+    __tablename__ = "complaints"
     id: Optional[str] = Field(default=None, primary_key=True)
     telegram_user_id: str
     hostel: str
