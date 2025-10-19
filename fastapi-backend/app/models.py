@@ -1,7 +1,10 @@
 from typing import Optional, List
 from datetime import datetime
-import uuid
 from sqlmodel import SQLModel, Field
+
+# SQLAlchemy imports for explicit server-side UUID column
+from sqlalchemy import Column, text
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 
 class Hostel(SQLModel, table=True):
@@ -36,17 +39,20 @@ class User(SQLModel, table=True):
 
 class Complaint(SQLModel, table=True):
     __tablename__ = "complaints"
-    # Use a Python-generated UUID string by default to avoid requiring
-    # the database-side `gen_random_uuid()` extension during local dev.
-    # For production, prefer DB-generated UUIDs and ensure `pgcrypto` is
-    # installed or migrate to `uuid-ossp` as appropriate.
-    id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    # Use a PostgreSQL UUID column with server_default so the DB assigns
+    # the value using gen_random_uuid(). The sa_column explicitly marks
+    # the Column as the primary key so SQLAlchemy/SQLModel can map it.
+    id: Optional[str] = Field(
+        default=None,
+        primary_key=True,
+        sa_column=Column(PG_UUID(as_uuid=False), primary_key=True, server_default=text("gen_random_uuid()")),
+    )
     telegram_user_id: str
     hostel: str
-    # Wing is optional for backwards compatibility with bot payloads that
-    # don't yet collect this value. Use an empty string as default so DB's
-    # NOT NULL constraint (migration) is satisfied when inserting.
-    wing: str = Field(default="")
+    # Wing is optional for backwards compatibility with older bot payloads.
+    # Make it nullable so clients that don't include it can still create
+    # complaints without providing an empty-string placeholder.
+    wing: Optional[str] = None
     room_number: str
     category: str
     description: str

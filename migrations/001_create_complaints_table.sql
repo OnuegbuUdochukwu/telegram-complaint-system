@@ -7,6 +7,22 @@
 --   CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- The migration will continue without attempting to create the extension here to avoid permission errors.
 
+-- Attempt to create pgcrypto if the current role has the required privileges.
+-- This will succeed silently for superusers and will do nothing for users
+-- without permissions (safe to run in mixed environments).
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pgcrypto') THEN
+    BEGIN
+      PERFORM pg_catalog.set_config('search_path', '', false);
+      EXECUTE 'CREATE EXTENSION IF NOT EXISTS pgcrypto';
+    EXCEPTION WHEN insufficient_privilege THEN
+      -- no-op: extension creation skipped due to lack of privileges
+      RAISE NOTICE 'pgcrypto not created: insufficient privileges';
+    END;
+  END IF;
+END$$;
+
 -- ENUM types (compact storage keys)
 DO $$
 BEGIN
@@ -26,7 +42,7 @@ CREATE TABLE IF NOT EXISTS complaints (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   telegram_user_id VARCHAR(32) NOT NULL,
   hostel VARCHAR(50) NOT NULL,
-  wing VARCHAR(20) NOT NULL,
+  wing VARCHAR(20), -- nullable to support older clients that don't provide wing
   room_number VARCHAR(10) NOT NULL,
   category complaint_category NOT NULL,
   description TEXT NOT NULL,
