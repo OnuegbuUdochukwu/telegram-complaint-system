@@ -4,7 +4,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials, OAuth2PasswordRequ
 from fastapi import Body
 from . import auth
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, StrictStr
 from datetime import datetime, timezone
 from sqlmodel import select
 
@@ -43,7 +43,6 @@ def register_porter(full_name: str = Body(...), email: Optional[str] = Body(None
     session.refresh(porter)
     return {"id": porter.id, "email": porter.email, "phone": porter.phone}
 
-app = FastAPI(title="Complaint Management API")
 
 
 @app.on_event("startup")
@@ -60,7 +59,8 @@ class ComplaintCreate(BaseModel):
     telegram_user_id: str
     hostel: str
     wing: Optional[str] = None
-    room_number: str
+    # Use StrictStr so integers are rejected (Pydantic will return 422)
+    room_number: StrictStr
     category: str
     description: str
     photo_urls: Optional[List[str]] = None
