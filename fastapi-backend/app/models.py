@@ -1,5 +1,6 @@
 from typing import Optional, List
 from datetime import datetime
+import uuid
 from sqlmodel import SQLModel, Field
 
 
@@ -35,10 +36,17 @@ class User(SQLModel, table=True):
 
 class Complaint(SQLModel, table=True):
     __tablename__ = "complaints"
-    id: Optional[str] = Field(default=None, primary_key=True)
+    # Use a Python-generated UUID string by default to avoid requiring
+    # the database-side `gen_random_uuid()` extension during local dev.
+    # For production, prefer DB-generated UUIDs and ensure `pgcrypto` is
+    # installed or migrate to `uuid-ossp` as appropriate.
+    id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
     telegram_user_id: str
     hostel: str
-    wing: str
+    # Wing is optional for backwards compatibility with bot payloads that
+    # don't yet collect this value. Use an empty string as default so DB's
+    # NOT NULL constraint (migration) is satisfied when inserting.
+    wing: str = Field(default="")
     room_number: str
     category: str
     description: str
