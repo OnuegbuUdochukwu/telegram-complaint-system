@@ -17,7 +17,10 @@ SECRET_KEY = config.get("JWT_SECRET") or "change-me-in-prod"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(config.get("JWT_ACCESS_MINUTES") or 60)
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Use pbkdf2_sha256 here to avoid requiring a working bcrypt C-extension
+# in test environments. It's secure and avoids the bcrypt/packaging issues
+# we hit in CI/local where the bcrypt binary wasn't behaving as expected.
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 security = HTTPBearer()
 
 
@@ -82,10 +85,24 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
 
 def require_role(required_role: str):
     def role_checker(user: Porter = Depends(get_current_user)) -> Porter:
-        # Simple role check: here we treat 'admin' as email containing 'admin' or a special field.
-        # In a real system, Porter model should have a 'role' column. For now infer from email.
-        user_role = "admin" if (user.email and user.email.endswith("@admin.local")) else "porter"
+        # Use explicit role column stored on Porter model
+        user_role = (user.role or "porter").lower()
         if required_role == "admin" and user_role != "admin":
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient privileges")
         return user
     return role_checker
+
+
+def create_porter(session, full_name: str, password: str, email: Optional[str] = None, phone: Optional[str] = None, role: Optional[str] = "porter") -> Porter:
+    """Helper to create a porter with hashed password. Returns the created Porter."""
+    ph = get_password_hash(password)
+    data = {"full_name": full_name, "password_hash": ph, "role": role}
+    if email:
+        data["email"] = email
+    if phone:
+        data["phone"] = phone
+    porter = Porter(**data)
+    session.add(porter)
+    session.commit()
+    session.refresh(porter)
+    return porter
