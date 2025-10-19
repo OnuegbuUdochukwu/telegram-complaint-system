@@ -18,79 +18,102 @@ from __future__ import annotations
 import os
 import time
 import logging
-from typing import Any, Dict
+import random
+from typing import Any, Dict, Optional
 
-import requests
+import httpx
 
 logger = logging.getLogger(__name__)
 
 BACKEND_URL = os.getenv("BACKEND_URL")  # e.g. http://localhost:8000
 
+# HTTP client defaults
+_DEFAULT_TIMEOUT = httpx.Timeout(10.0, connect=5.0)
+_MAX_RETRIES = 3
+_BACKOFF_FACTOR = 0.5
+
+# Reuse a global client for connection pooling when BACKEND_URL is set
+_client: Optional[httpx.Client] = None
+if BACKEND_URL:
+  _client = httpx.Client(timeout=_DEFAULT_TIMEOUT)
+
 
 def _mock_complaint_id() -> str:
-    """Generate a short deterministic mock complaint id."""
-    return f"MOCK-{int(time.time())}"
+  return f"MOCK-{int(time.time())}"
+
+
+def _is_retryable(exc: Exception, response: Optional[httpx.Response]) -> bool:
+  # network errors are retryable; 5xx responses are retryable
+  if isinstance(exc, httpx.RequestError):
+    return True
+  if response is not None and 500 <= response.status_code < 600:
+    return True
+  return False
+
+
+def _attempt_request(method: str, url: str, **kwargs) -> Dict[str, Any]:
+  last_exc: Optional[Exception] = None
+  for attempt in range(1, _MAX_RETRIES + 1):
+    try:
+      client = _client or httpx.Client(timeout=_DEFAULT_TIMEOUT)
+      resp = client.request(method, url, **kwargs)
+      # Treat 4xx as non-retryable client error
+      if 400 <= resp.status_code < 500:
+        resp.raise_for_status()
+      # For 5xx, raise to trigger retry
+      if 500 <= resp.status_code < 600:
+        resp.raise_for_status()
+      return resp.json()
+    except Exception as exc:
+      last_exc = exc
+      # Determine if we should retry
+      response = exc.response if hasattr(exc, "response") else None
+      if attempt == _MAX_RETRIES or not _is_retryable(exc, response):
+        logger.warning("Request to %s failed (attempt %s/%s): %s", url, attempt, _MAX_RETRIES, exc)
+        break
+      backoff = _BACKOFF_FACTOR * (2 ** (attempt - 1))
+      jitter = random.uniform(0, backoff * 0.1)
+      sleep_time = backoff + jitter
+      logger.info("Retrying %s in %.2fs (attempt %s/%s)", url, sleep_time, attempt + 1, _MAX_RETRIES)
+      time.sleep(sleep_time)
+
+  raise last_exc if last_exc is not None else RuntimeError("Request failed without exception")
 
 
 def submit_complaint(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Submit a complaint payload to the backend.
+  """Submit complaint to backend with retries and fallback to mock.
 
-    Behaviour:
-    - If BACKEND_URL is set, attempt a POST to {BACKEND_URL}/complaints and return
-      the parsed JSON response on success. On network/error, fall back to a
-      mock response and log the error.
-    - If BACKEND_URL is not set, return a deterministic mock success payload.
+  Returns a dict with at least 'status' and 'complaint_id' keys on success.
+  """
+  if BACKEND_URL:
+    url = BACKEND_URL.rstrip("/") + "/api/v1/complaints/submit"
+    try:
+      return _attempt_request("POST", url, json=data)
+    except Exception as exc:  # pragma: no cover - network fallback
+      logger.warning("Backend POST to %s failed after retries: %s", url, exc)
 
-    The mock response format:
-      {"status": "success", "complaint_id": "MOCK-<unix_ts>"}
-
-    Note: This function intentionally keeps the interface small and synchronous
-    to be easy to call from the bot handlers. Replace or extend with async
-    behaviour if your real backend requires it.
-    """
-    if BACKEND_URL:
-        url = BACKEND_URL.rstrip("/") + "/complaints"
-        try:
-            resp = requests.post(url, json=data, timeout=5)
-            resp.raise_for_status()
-            return resp.json()
-        except Exception as exc:  # pragma: no cover - network fallback
-            logger.warning("Backend POST to %s failed, falling back to mock response: %s", url, exc)
-
-    # Mock response
-    mock = {"status": "success", "complaint_id": _mock_complaint_id()}
-    logger.info("Returning mock submit response: %s", mock)
-    return mock
+  # fallback mock response
+  mock = {"status": "success", "complaint_id": _mock_complaint_id()}
+  logger.info("Returning mock submit response: %s", mock)
+  return mock
 
 
 def get_complaint_status(complaint_id: str) -> Dict[str, Any]:
-    """Retrieve a complaint status.
+  """Get complaint status from backend with retries and mock fallback."""
+  if BACKEND_URL:
+    url = BACKEND_URL.rstrip("/") + f"/api/v1/complaints/{complaint_id}"
+    try:
+      return _attempt_request("GET", url)
+    except Exception as exc:  # pragma: no cover - network fallback
+      logger.warning("Backend GET %s failed after retries: %s", url, exc)
 
-    Behaviour:
-    - If BACKEND_URL is set, attempt a GET to {BACKEND_URL}/complaints/{id}
-      and return the parsed JSON response on success. On network/error, fall
-      back to a mock response and log the error.
-    - If BACKEND_URL is not set, return a deterministic mock status.
-
-    Mock response format:
-      {"status": "Resolved", "complaint_id": complaint_id}
-    """
-    if BACKEND_URL:
-        url = BACKEND_URL.rstrip("/") + f"/complaints/{complaint_id}"
-        try:
-            resp = requests.get(url, timeout=5)
-            resp.raise_for_status()
-            return resp.json()
-        except Exception as exc:  # pragma: no cover - network fallback
-            logger.warning("Backend GET %s failed, falling back to mock response: %s", url, exc)
-
-    # Mock status rotation (simple deterministic behaviour based on timestamp)
-    ts = int(time.time())
-    statuses = ["reported", "in_progress", "on_hold", "resolved"]
-    status = statuses[ts % len(statuses)]
-    mock = {"status": status, "complaint_id": complaint_id}
-    logger.info("Returning mock status response: %s", mock)
-    return mock
+  # Mock status rotation (simple deterministic behaviour based on timestamp)
+  ts = int(time.time())
+  statuses = ["reported", "in_progress", "on_hold", "resolved"]
+  status = statuses[ts % len(statuses)]
+  mock = {"status": status, "complaint_id": complaint_id}
+  logger.info("Returning mock status response: %s", mock)
+  return mock
 
 
 # Small convenience for manual testing
