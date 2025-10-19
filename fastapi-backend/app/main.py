@@ -56,13 +56,25 @@ def health():
     return {"status": "ok"}
 
 
+class ComplaintCreate(BaseModel):
+    telegram_user_id: str
+    hostel: str
+    wing: Optional[str] = None
+    room_number: str
+    category: str
+    description: str
+    photo_urls: Optional[List[str]] = None
+    severity: str
+
+
 @app.post("/api/v1/complaints/submit", status_code=201)
-def submit_complaint(payload: Complaint, session=Depends(get_session)):
-    # Basic validation handled by SQLModel/Pydantic; store record
-    session.add(payload)
+def submit_complaint(payload: ComplaintCreate, session=Depends(get_session)):
+    # Map validated Pydantic payload into SQLModel Complaint for persistence
+    complaint = Complaint(**payload.dict())
+    session.add(complaint)
     session.commit()
-    session.refresh(payload)
-    return {"complaint_id": payload.id}
+    session.refresh(complaint)
+    return {"complaint_id": complaint.id}
 
 
 @app.get("/api/v1/complaints/{complaint_id}")
