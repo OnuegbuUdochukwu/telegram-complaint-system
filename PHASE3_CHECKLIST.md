@@ -12,18 +12,19 @@ This file is a reformatted, progress-trackable checklist derived from the Phase 
 -   Tools/Technologies: FastAPI, python-jose, Passlib (bcrypt), SQLModel, PostgreSQL
 -   Expected Output: POST /auth/login issues access tokens; protected endpoints reject unauthorized/expired tokens.
 
--   [ ] 3.2 Harden admin endpoints and add RBAC (reporter, porter, admin)
 
-    -   Purpose: Enforce least-privilege access across dashboard and write APIs.
-    -   Tools/Technologies: FastAPI dependency injection, SQLModel, DB role column or mapping
-    -   Expected Output: Admin/porter roles enforced; 401/403 returned on invalid/insufficient access.
+-   [x] 3.2 Harden admin endpoints and add RBAC (reporter, porter, admin)
+
+-   Purpose: Enforce least-privilege access across dashboard and write APIs.
+-   Tools/Technologies: FastAPI dependency injection, SQLModel, DB role column or mapping
+-   Expected Output: Admin/porter roles enforced; 401/403 returned on invalid/insufficient access.
 
 -   [ ] 3.3 Secrets & config management
     -   Purpose: Move secrets out of repo and document secure local setup.
     -   Tools/Technologies: dotenv, Vault/Secrets Manager (optional), .env.example
     -   Expected Output: No creds in repo; README docs for local dev using secrets.
 
-**Progress:** 1/3 tasks completed (33%)
+**Progress:** 2/3 tasks completed (67%)
 
 ---
 
@@ -126,11 +127,11 @@ This file is a reformatted, progress-trackable checklist derived from the Phase 
 
 ## 🚀 Quick first sprint (2 weeks) — recommended scope (MVP)
 
--   [ ] Implement JWT auth + RBAC (3.1 + 3.2)
+-   [x] Implement JWT auth + RBAC (3.1 + 3.2)
 
-    -   Purpose: Secure backend so dashboard and write flows can be developed safely.
-    -   Tools/Technologies: FastAPI, python-jose, SQLModel
-    -   Expected Output: Working /auth/login and protected endpoints; basic role enforcement.
+-   Purpose: Secure backend so dashboard and write flows can be developed safely.
+-   Tools/Technologies: FastAPI, python-jose, SQLModel
+-   Expected Output: Working /auth/login and protected endpoints; basic role enforcement.
 
 -   [ ] Add GET /api/v1/complaints pagination + PATCH for status changes (3.5)
 
@@ -149,15 +150,15 @@ This file is a reformatted, progress-trackable checklist derived from the Phase 
     -   Tools/Technologies: GitHub Actions, pytest, flake8/ruff (optional)
     -   Expected Output: CI workflow that runs tests and lints on PRs.
 
-**Sprint Progress:** 1/4 tasks completed (25%)
+**Sprint Progress:** 2/4 tasks completed (50%)
 
 ---
 
 ## 📈 Overall Progress
 
 **Total Tasks:** 15
-**Completed:** 1
-**Overall Progress:** 7%
+**Completed:** 2
+**Overall Progress:** 13%
 
 ---
 
