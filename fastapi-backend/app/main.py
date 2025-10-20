@@ -86,28 +86,8 @@ def register_porter(
     return {"id": porter.id, "email": porter.email, "phone": porter.phone}
 
 
-@app.post("/auth/dev-token", response_model=dict)
-def dev_token(email: Optional[str] = Body(None), porter_id: Optional[str] = Body(None), session=Depends(get_session)):
-    """Development helper: return a JWT for a porter by email or id.
-
-    This endpoint is allowed only when ALLOW_DEV_REGISTER=1 (tests/dev).
-    It is intentionally simple and should not exist in production.
-    """
-    if os.environ.get("ALLOW_DEV_REGISTER") not in ("1", "true", "True"):
-        raise HTTPException(status_code=403, detail="Dev token endpoint disabled")
-
-    from sqlmodel import select
-    porter = None
-    if porter_id:
-        porter = session.exec(select(Porter).where(Porter.id == porter_id)).first()
-    elif email:
-        porter = session.exec(select(Porter).where(Porter.email == email)).first()
-
-    if not porter:
-        raise HTTPException(status_code=404, detail="Porter not found")
-
-    token = auth.create_access_token(subject=porter.id, role=(porter.role or "porter"))
-    return {"access_token": token, "token_type": "bearer", "id": porter.id}
+# NOTE: removed dev-only /auth/dev-token endpoint. Tests use fixtures in
+# tests/conftest.py to create porters and tokens directly.
 
 
 
