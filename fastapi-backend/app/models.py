@@ -80,3 +80,12 @@ class Complaint(SQLModel, table=True):
     assigned_porter_id: Optional[str] = None
     created_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
     updated_at: Optional[datetime] = None
+
+
+class AssignmentAudit(SQLModel, table=True):
+    __tablename__ = "assignment_audits"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    complaint_id: str = Field(foreign_key="complaints.id")
+    assigned_by: str
+    assigned_to: str
+    created_at: Optional[datetime] = Field(default_factory=datetime.utcnow)

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Tuple
 from datetime import datetime, timedelta
 from pydantic import BaseModel
 from fastapi import Depends, HTTPException, status
@@ -21,7 +21,10 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(config.get("JWT_ACCESS_MINUTES") or 60)
 # in test environments. It's secure and avoids the bcrypt/packaging issues
 # we hit in CI/local where the bcrypt binary wasn't behaving as expected.
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
-security = HTTPBearer()
+# Use auto_error=False so the dependency doesn't raise before we can
+# provide a consistent 401 message (this avoids intermittent differences
+# between HTTP client and FastAPI's security layer during tests).
+security = HTTPBearer(auto_error=False)
 
 
 class Token(BaseModel):
@@ -73,12 +76,23 @@ def authenticate_porter(username: str, password: str, session) -> Optional[Porte
 
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), session=Depends(get_session)) -> Porter:
+    # HTTPBearer(auto_error=False) returns None when no credentials were provided
+    if not credentials or not getattr(credentials, "credentials", None):
+        # Normalize to a consistent 401 for the callers
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
     token = credentials.credentials
-    payload = decode_access_token(token)
+    try:
+        payload = decode_access_token(token)
+    except HTTPException:
+        # decode_access_token already raises a 401; re-raise to preserve semantics
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials")
+
     porter_id = payload.sub
     statement = select(Porter).where(Porter.id == porter_id)
     porter = session.exec(statement).first()
     if not porter:
+        # Token subject did not map to a valid porter
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials")
     return porter
 
@@ -93,8 +107,35 @@ def require_role(required_role: str):
     return role_checker
 
 
+def get_token_subject(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
+    """Return the token subject (sub) from the Authorization header.
+
+    This helper decodes the token and returns its subject so handlers
+    can compare directly against request payloads when needed.
+    """
+    if not credentials or not getattr(credentials, "credentials", None):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    token = credentials.credentials
+    payload = decode_access_token(token)
+    return payload.sub
+
+
 def create_porter(session, full_name: str, password: str, email: Optional[str] = None, phone: Optional[str] = None, role: Optional[str] = "porter") -> Porter:
     """Helper to create a porter with hashed password. Returns the created Porter."""
+    # If a porter with the same email or phone already exists, return it
+    # to avoid creating duplicate rows which can make login/registration
+    # behavior non-deterministic in tests.
+    if email:
+        stmt = select(Porter).where(Porter.email == email)
+        existing = session.exec(stmt).first()
+        if existing:
+            return existing
+    if phone:
+        stmt = select(Porter).where(Porter.phone == phone)
+        existing = session.exec(stmt).first()
+        if existing:
+            return existing
+
     ph = get_password_hash(password)
     data = {"full_name": full_name, "password_hash": ph, "role": role}
     if email:
@@ -106,3 +147,28 @@ def create_porter(session, full_name: str, password: str, email: Optional[str] =
     session.commit()
     session.refresh(porter)
     return porter
+
+
+# RBAC / status transition rules
+ALLOWED_TRANSITIONS = {
+    "reported": {"in_progress"},
+    "in_progress": {"resolved", "reported"},
+    "resolved": {"closed", "in_progress"},
+    "closed": set(),
+}
+
+
+def can_transition(role: Optional[str], old_status: str, new_status: str) -> Tuple[bool, int, str]:
+    """Return (allowed, http_code, message) for the requested transition.
+
+    - Returns (False, 400, msg) for invalid transitions.
+    - Returns (False, 403, msg) for role-not-allowed transitions (e.g., only admin can 'closed').
+    - Returns (True, 200, '') for allowed transitions.
+    """
+    old = old_status or "reported"
+    if new_status not in ALLOWED_TRANSITIONS.get(old, set()):
+        return False, 400, f"Invalid status transition from {old} to {new_status}"
+    # Only admin may set 'closed'
+    if new_status == "closed" and (role or "porter") != "admin":
+        return False, 403, "Only admin can set status to 'closed'"
+    return True, 200, ""

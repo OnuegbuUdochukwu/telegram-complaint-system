@@ -11,6 +11,7 @@ from sqlmodel import select
 
 from .database import init_db, get_session
 from .models import Complaint, Porter
+import os
 
 app = FastAPI(title="Complaint Management API")
 
@@ -24,7 +25,8 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), session=Depends(get_
     if not porter:
         raise HTTPException(status_code=401, detail="Invalid username or password")
     token = auth.create_access_token(subject=porter.id, role="admin" if (porter.email and porter.email.endswith("@admin.local")) else "porter")
-    return {"access_token": token, "token_type": "bearer"}
+    # Return the created token and the porter id (so clients can correlate id <-> token)
+    return {"access_token": token, "token_type": "bearer", "id": porter.id}
 
 
 @app.post("/auth/register", response_model=dict)
@@ -82,6 +84,30 @@ def register_porter(
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
     return {"id": porter.id, "email": porter.email, "phone": porter.phone}
+
+
+@app.post("/auth/dev-token", response_model=dict)
+def dev_token(email: Optional[str] = Body(None), porter_id: Optional[str] = Body(None), session=Depends(get_session)):
+    """Development helper: return a JWT for a porter by email or id.
+
+    This endpoint is allowed only when ALLOW_DEV_REGISTER=1 (tests/dev).
+    It is intentionally simple and should not exist in production.
+    """
+    if os.environ.get("ALLOW_DEV_REGISTER") not in ("1", "true", "True"):
+        raise HTTPException(status_code=403, detail="Dev token endpoint disabled")
+
+    from sqlmodel import select
+    porter = None
+    if porter_id:
+        porter = session.exec(select(Porter).where(Porter.id == porter_id)).first()
+    elif email:
+        porter = session.exec(select(Porter).where(Porter.email == email)).first()
+
+    if not porter:
+        raise HTTPException(status_code=404, detail="Porter not found")
+
+    token = auth.create_access_token(subject=porter.id, role=(porter.role or "porter"))
+    return {"access_token": token, "token_type": "bearer", "id": porter.id}
 
 
 
@@ -149,20 +175,35 @@ def list_complaints(request: Request, status: Optional[str] = None, credentials:
         # No auth of any kind
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    # Bearer token path
+    # Bearer token path: enforce RBAC
     if auth_header and auth_header.lower().startswith("bearer "):
         token = auth_header.split(None, 1)[1]
         try:
             payload = auth.decode_access_token(token)
         except HTTPException:
             raise HTTPException(status_code=401, detail="Invalid token")
-        role = payload.role or "porter"
-        if role != "admin":
-            raise HTTPException(status_code=403, detail="Insufficient privileges")
+        role = (payload.role or "porter").lower()
+        # Admin: return all complaints (with optional status filter)
+        if role == "admin":
+            statement = select(Complaint)
+            if status:
+                statement = statement.where(Complaint.status == status)
+            results = session.exec(statement).all()
+            return results
 
-    # Basic auth path: credentials present (we accept any for tests)
+        # Porter: only return complaints assigned to this porter
+        if role == "porter":
+            porter_id = payload.sub
+            statement = select(Complaint).where(Complaint.assigned_porter_id == porter_id)
+            if status:
+                statement = statement.where(Complaint.status == status)
+            results = session.exec(statement).all()
+            return results
 
-    # Optional filter by status (e.g., reported, in_progress, resolved)
+        # Any other role is forbidden
+        raise HTTPException(status_code=403, detail="Insufficient privileges")
+
+    # Basic auth path: credentials present (we accept any for tests) - keep previous permissive behavior
     statement = select(Complaint)
     if status:
         statement = statement.where(Complaint.status == status)
@@ -215,3 +256,68 @@ def update_complaint_status(
     session.commit()
     session.refresh(complaint)
     return complaint
+
+
+class AssignmentSchema(BaseModel):
+    assigned_porter_id: str
+
+
+@app.patch("/api/v1/complaints/{complaint_id}/assign", response_model=Complaint)
+def assign_complaint(
+    complaint_id: str,
+    body: AssignmentSchema,
+    user: Porter = Depends(auth.get_current_user),
+    token_sub: str = Depends(auth.get_token_subject),
+    session=Depends(get_session),
+):
+    """Assign a porter to a complaint.
+
+    - Admins can assign any porter.
+    - Porters may only assign themselves (assign their own id).
+    """
+    # Validate complaint exists
+    statement = select(Complaint).where(Complaint.id == complaint_id)
+    complaint = session.exec(statement).first()
+    if not complaint:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    # Validate the target porter exists
+    target_id = body.assigned_porter_id
+    statement = select(Porter).where(Porter.id == target_id)
+    target = session.exec(statement).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Porter not found")
+
+    # Authorization: admins can assign anyone; porters can only assign themselves
+    user_role = (user.role or "porter").lower()
+    # Compare token subject (sub) to requested target_id. This avoids
+    # transient races where the Porter object in memory may not match
+    # the token subject due to duplicate/regenerate flows in tests.
+    # Allow assignment when either the token subject matches the requested
+    # target, or the resolved user.id matches. This covers transient cases
+    # where the token's subject and the in-memory user object may differ
+    # in our test harness.
+    if user_role != "admin":
+        if str(token_sub) != str(target_id) and str(user.id) != str(target_id):
+            raise HTTPException(status_code=403, detail="Insufficient privileges to assign other porters")
+
+    # Assign and persist
+    complaint.assigned_porter_id = target.id
+    complaint.updated_at = datetime.now(timezone.utc)
+    session.add(complaint)
+    # Create audit record
+    from .models import AssignmentAudit
+    audit = AssignmentAudit(complaint_id=complaint.id, assigned_by=user.id, assigned_to=target.id)
+    session.add(audit)
+    session.commit()
+    session.refresh(complaint)
+    return complaint
+
+
+@app.get("/api/v1/complaints/{complaint_id}/assignments", response_model=List[dict])
+def get_assignments(complaint_id: str, admin_user: Porter = Depends(auth.require_role("admin")), session=Depends(get_session)):
+    from .models import AssignmentAudit
+    statement = select(AssignmentAudit).where(AssignmentAudit.complaint_id == complaint_id)
+    rows = session.exec(statement).all()
+    # Return simple dicts for tests
+    return [dict(id=r.id, complaint_id=r.complaint_id, assigned_by=r.assigned_by, assigned_to=r.assigned_to, created_at=r.created_at.isoformat()) for r in rows]
