@@ -47,16 +47,52 @@ This checklist provides detailed, implementation-ready steps for each Phase 3 ta
 
 -   [ ] 3.4 Build Admin Dashboard (MVP)
 
-    -   [ ] Scaffold React (or Svelte) SPA in /dashboard or /admin-dashboard
-    -   [ ] Implement JWT login flow in frontend
-    -   [ ] Add complaints list view with filters (status, hostel, date)
-    -   [ ] Add complaint detail modal/page
-    -   [ ] Add assignment/status controls (PATCH endpoints)
+    -   Core Frontend UI and Interactivity
+        -   [ ] 3.4.1 Dashboard Login Page (UI)
+            -   Purpose: Provide staff a secure, user-friendly way to log in and obtain a JWT for dashboard operations.
+            -   Tools/Technologies: HTML, Tailwind CSS, JavaScript (Fetch API), sessionStorage (or secure storage), optional bundler.
+            -   Expected Output: login.html that posts credentials to POST /auth/login, stores JWT on success, and redirects to index.html.
+            -   Subtasks:
+                -   [ ] Create login.html with Tailwind-styled login card (username + password).
+                -   [ ] Implement JS form handler that calls POST /auth/login.
+                -   [ ] Safely store returned JWT (e.g., sessionStorage) with guidance about XSS considerations.
+                -   [ ] Redirect to main dashboard (index.html) upon successful login.
+                -   [ ] UX: show error messages on failed login.
+        -   [ ] 3.4.2 Complaint List View (UI & Data Fetch)
+            -   Purpose: Present a responsive list of complaints to staff, with sorting/filtering and token-authenticated API calls.
+            -   Tools/Technologies: HTML, Tailwind CSS, JavaScript, Fetch API, JWT in headers.
+            -   Expected Output: index.html with a complaint table/list that fetches GET /api/v1/complaints using the stored JWT and supports client-side sorting/filtering.
+            -   Subtasks:
+                -   [ ] Create index.html structure (Header, Nav, Main content).
+                -   [ ] Implement JS to attach JWT in Authorization: Bearer <token> for requests.
+                -   [ ] Fetch GET /api/v1/complaints and render a table with columns: ID, Hostel, Category, Severity, Status.
+                -   [ ] Implement client-side filtering (e.g., by status) and sorting (by date/severity).
+                -   [ ] Add "Refresh" button and auto-refresh hooks (to be used by WebSocket events).
+        -   [ ] 3.4.3 Complaint Detail View Modal
+            -   Purpose: Allow staff to review a complaint’s full details before actioning it.
+            -   Tools/Technologies: HTML, Tailwind CSS, JavaScript, Fetch API.
+            -   Expected Output: A responsive modal or detail pane that displays full complaint data fetched via GET /api/v1/complaints/{id}.
+            -   Subtasks:
+                -   [ ] Add click handler on complaint rows to open detail modal.
+                -   [ ] Fetch GET /api/v1/complaints/{id} and populate modal fields: description, created_at, telegram_user_id, photo URLs.
+                -   [ ] Ensure modal is dismissible and accessible (keyboard/aria).
+                -   [ ] Add an area for status & assignment controls (wired in 3.4.4).
+        -   [ ] 3.4.4 Status and Assignment Functionality
+            -   Purpose: Integrate backend write APIs into the UI so staff can change status and assign personnel from the detail view.
+            -   Tools/Technologies: HTML, JavaScript, Fetch API, JWT auth, Pydantic-backed endpoints.
+            -   Expected Output: From the detail modal, staff can select a status and/or assign a porter; UI calls PATCH /api/v1/complaints/{id}/status and PATCH /api/v1/complaints/{id}/assign, then refreshes the main list.
+            -   Subtasks:
+                -   [ ] Add status dropdown with allowed statuses (e.g., reported, in_progress, on_hold, resolved, rejected).
+                -   [ ] Add "Assign to me" and "Assign" controls (show list of porters if needed).
+                -   [ ] Implement JS to call PATCH /api/v1/complaints/{id}/status.
+                -   [ ] Implement JS to call PATCH /api/v1/complaints/{id}/assign.
+                -   [ ] On success, close modal and refresh list.
+    -   [ ] Scaffold React (or Svelte) SPA in /dashboard or /admin-dashboard (if using SPA framework)
     -   [ ] Integrate frontend with backend API (httpx/fetch)
     -   [ ] Add tests for dashboard UI and API integration
     -   Purpose: Provide a UI for admins/porters to list, filter, view, assign, and update complaints.
-    -   Tools/Technologies: React (or Svelte), fetch/httpx, JWT for auth, frontend routing
-    -   Expected Output: Minimal SPA with list view, detail modal/page, and assignment/status controls.
+    -   Tools/Technologies: HTML, Tailwind CSS, JavaScript, React/Svelte (optional), fetch/httpx, JWT for auth, frontend routing
+    -   Expected Output: Minimal dashboard with login, list, detail modal, and assignment/status controls.
 
 -   [ ] 3.5 API: paginated list + update endpoints for dashboard
     -   [ ] Implement GET /api/v1/complaints with pagination (page, page_size)
