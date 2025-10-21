@@ -1,4 +1,4 @@
-#!/Users/onuegbuudochukwu/Documents/Udo/Desktop/FOR_DEPLOY/telegram-complaint-system/.venv/bin/python
+#!/Users/onuegbuudochukwu/Documents/Udo/Desktop/FOR_DEPLOY/telegram-complaint-system/.venv/bin/python3.12
 import sys
 from httpx import main
 if __name__ == '__main__':

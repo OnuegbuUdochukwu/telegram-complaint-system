@@ -8,7 +8,7 @@ Usage (from repo root):
 """
 import hashlib
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 ROOT = Path(__file__).resolve().parents[2]
 MIG_DIR = ROOT / "migrations"
@@ -19,7 +19,7 @@ for sql_file in sorted(MIG_DIR.glob("*.sql")):
     content = sql_file.read_text()
     # Create a deterministic revision id from filename+content
     rev_hash = hashlib.sha1((sql_file.name + content).encode()).hexdigest()[:12]
-    rev_filename = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{rev_hash}_{sql_file.stem}.py"
+    rev_filename = f"{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}_{rev_hash}_{sql_file.stem}.py"
     out = ALEMBIC_VERSIONS / rev_filename
     if out.exists():
         print(f"Skipping existing alembic revision for {sql_file.name}")

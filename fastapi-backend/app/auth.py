@@ -1,5 +1,5 @@
 from typing import Optional, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm, HTTPBearer, HTTPAuthorizationCredentials
@@ -50,7 +50,7 @@ def create_access_token(subject: str, role: Optional[str] = None, expires_delta:
     to_encode = {"sub": subject}
     if role:
         to_encode["role"] = role
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": int(expire.timestamp())})
     encoded = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded

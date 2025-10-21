@@ -1,5 +1,5 @@
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlmodel import SQLModel, Field
 
 # SQLAlchemy imports for explicit server-side UUID column
@@ -19,7 +19,7 @@ class Hostel(SQLModel, table=True):
     id: Optional[str] = Field(default=None, primary_key=True)
     slug: str = Field(sa_column_kwargs={"unique": True})
     display_name: str
-    created_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
+    created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
     # (Hostel has no auth fields)
 
 
@@ -38,7 +38,7 @@ class Porter(SQLModel, table=True):
     role: Optional[str] = Field(default='porter')
     assigned_hostel_id: Optional[str] = Field(default=None, foreign_key="hostels.id")
     active: bool = Field(default=True)
-    created_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
+    created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: Optional[datetime] = None
 
 
@@ -47,7 +47,7 @@ class User(SQLModel, table=True):
     id: Optional[str] = Field(default=None, primary_key=True)
     telegram_user_id: str = Field(sa_column_kwargs={"unique": True})
     display_name: Optional[str] = None
-    created_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
+    created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: Optional[datetime] = None
 
 
@@ -78,7 +78,7 @@ class Complaint(SQLModel, table=True):
     severity: str
     status: str = Field(default="reported")
     assigned_porter_id: Optional[str] = None
-    created_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
+    created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: Optional[datetime] = None
 
 
@@ -88,4 +88,4 @@ class AssignmentAudit(SQLModel, table=True):
     complaint_id: str = Field(foreign_key="complaints.id")
     assigned_by: str
     assigned_to: str
-    created_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
+    created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
