@@ -7,16 +7,21 @@ from sqlalchemy import Column, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 import uuid
 from dotenv import dotenv_values
+from pathlib import Path
 
 # Detect whether we're using Postgres so we can use a native UUID column.
-_env = dotenv_values("../.env")
+_env_path = Path(__file__).resolve().parents[2] / ".env"
+_env = dotenv_values(str(_env_path))
 _DATABASE_URL = _env.get("DATABASE_URL", "") or ""
 _USE_PG_UUID = any(x in _DATABASE_URL for x in ("postgres://", "postgresql://", "psycopg2"))
 
 
 class Hostel(SQLModel, table=True):
     __tablename__ = "hostels"
-    id: Optional[str] = Field(default=None, primary_key=True)
+    if _USE_PG_UUID:
+        id: Optional[str] = Field(default=None, primary_key=True, sa_column=Column(PG_UUID(as_uuid=False), primary_key=True, server_default=text("gen_random_uuid()")))
+    else:
+        id: Optional[str] = Field(default=None, primary_key=True)
     slug: str = Field(sa_column_kwargs={"unique": True})
     display_name: str
     created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -36,7 +41,11 @@ class Porter(SQLModel, table=True):
     password_hash: Optional[str] = None
     # Role for RBAC: 'porter' or 'admin'. Default to 'porter'.
     role: Optional[str] = Field(default='porter')
-    assigned_hostel_id: Optional[str] = Field(default=None, foreign_key="hostels.id")
+    # assigned_hostel_id references hostels.id; ensure column type matches hostels.id
+    if _USE_PG_UUID:
+        assigned_hostel_id: Optional[str] = Field(default=None, foreign_key="hostels.id", sa_column=Column(PG_UUID(as_uuid=False)))
+    else:
+        assigned_hostel_id: Optional[str] = Field(default=None, foreign_key="hostels.id")
     active: bool = Field(default=True)
     created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: Optional[datetime] = None
@@ -77,7 +86,11 @@ class Complaint(SQLModel, table=True):
     photo_urls: Optional[List[str]] = None
     severity: str
     status: str = Field(default="reported")
-    assigned_porter_id: Optional[str] = None
+    # Ensure assigned_porter_id column type matches porters.id when using Postgres UUIDs
+    if _USE_PG_UUID:
+        assigned_porter_id: Optional[str] = Field(default=None, foreign_key="porters.id", sa_column=Column(PG_UUID(as_uuid=False)))
+    else:
+        assigned_porter_id: Optional[str] = None
     created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: Optional[datetime] = None
 
@@ -85,7 +98,14 @@ class Complaint(SQLModel, table=True):
 class AssignmentAudit(SQLModel, table=True):
     __tablename__ = "assignment_audits"
     id: Optional[int] = Field(default=None, primary_key=True)
-    complaint_id: str = Field(foreign_key="complaints.id")
-    assigned_by: str
-    assigned_to: str
+    # Use matching column types for FK references. When Postgres with UUIDs is used
+    # ensure complaint_id / assigned_by / assigned_to use the native UUID column type
+    if _USE_PG_UUID:
+        complaint_id: str = Field(foreign_key="complaints.id", sa_column=Column(PG_UUID(as_uuid=False)))
+        assigned_by: str = Field(sa_column=Column(PG_UUID(as_uuid=False)))
+        assigned_to: str = Field(sa_column=Column(PG_UUID(as_uuid=False)))
+    else:
+        complaint_id: str = Field(foreign_key="complaints.id")
+        assigned_by: str
+        assigned_to: str
     created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))

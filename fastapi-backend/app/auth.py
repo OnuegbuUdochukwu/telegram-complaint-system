@@ -11,8 +11,18 @@ from sqlmodel import select
 
 # Settings (in real deploy these should come from env variables)
 from dotenv import dotenv_values
+from pathlib import Path
+import logging
 
-config = dotenv_values("../.env")
+logger = logging.getLogger("app.auth")
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    logger.addHandler(handler)
+
+_env_path = Path(__file__).resolve().parents[2] / ".env"
+config = dotenv_values(str(_env_path))
 SECRET_KEY = config.get("JWT_SECRET") or "change-me-in-prod"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(config.get("JWT_ACCESS_MINUTES") or 60)
@@ -59,7 +69,9 @@ def create_access_token(subject: str, role: Optional[str] = None, expires_delta:
 def decode_access_token(token: str) -> TokenPayload:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return TokenPayload(**payload)
+        tp = TokenPayload(**payload)
+        logger.debug("Decoded token payload: %s", tp.dict())
+        return tp
     except JWTError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials") from exc
 
@@ -79,6 +91,8 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     # HTTPBearer(auto_error=False) returns None when no credentials were provided
     if not credentials or not getattr(credentials, "credentials", None):
         # Normalize to a consistent 401 for the callers
+        logger.info("[auth.debug] No credentials provided or empty credentials object: %s", credentials)
+        print(f"[auth.debug] No credentials provided or empty credentials object: {credentials}")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
     token = credentials.credentials
@@ -86,13 +100,27 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         payload = decode_access_token(token)
     except HTTPException:
         # decode_access_token already raises a 401; re-raise to preserve semantics
+        logger.info("[auth.debug] decode_access_token failed for token: %s", token)
+        print(f"[auth.debug] decode_access_token failed for token: {token}")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials")
 
     porter_id = payload.sub
+    # Debug: print the token payload and subject type to help diagnose mapping issues
+    # Use logger to ensure lines appear in uvicorn/app logs
+    try:
+        p_dict = payload.dict()
+    except Exception:
+        p_dict = getattr(payload, "__dict__", str(payload))
+    logger.info("[auth.debug] Decoded token payload: %s", p_dict)
+    logger.info("[auth.debug] Token subject (sub) value: %r (type=%s)", porter_id, type(porter_id))
+    print(f"[auth.debug] Decoded token payload: {p_dict}")
+    print(f"[auth.debug] Token subject (sub) value: {porter_id!r} (type={type(porter_id)})")
     statement = select(Porter).where(Porter.id == porter_id)
     porter = session.exec(statement).first()
     if not porter:
         # Token subject did not map to a valid porter
+        logger.info("[auth.debug] No porter found matching id: %r", porter_id)
+        print(f"[auth.debug] No porter found matching id: {porter_id!r}")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials")
     return porter
 

@@ -4,7 +4,8 @@ from dotenv import dotenv_values
 from pathlib import Path
 from sqlalchemy import text as sa_text
 
-config = dotenv_values("../.env")
+_env_path = Path(__file__).resolve().parents[2] / ".env"
+config = dotenv_values(str(_env_path))
 DATABASE_URL = config.get("DATABASE_URL") or "sqlite:///./test.db"
 
 engine = create_engine(DATABASE_URL, echo=False)
@@ -14,10 +15,10 @@ def get_session() -> Generator[Session, None, None]:
         yield session
 
 def init_db() -> None:
-    # For SQLite/local dev, create tables directly
-    SQLModel.metadata.create_all(engine)
-
-    # For Postgres, prefer running Alembic migrations so schema is managed.
+    # Decide whether to run Alembic migrations (Postgres) or create tables
+    # directly (SQLite/local dev). Running create_all against an existing
+    # Postgres database whose columns use native UUIDs can emit incompatible
+    # DDL (mismatched types). Therefore, for Postgres we prefer Alembic.
     try:
         dialect = engine.dialect.name
     except Exception:
@@ -38,5 +39,8 @@ def init_db() -> None:
 
             command.upgrade(alembic_cfg, "head")
         except Exception:
-            # If Alembic fails, fall back to create_all (safer for dev).
+            # If Alembic fails for some reason, fall back to create_all as a last resort.
             SQLModel.metadata.create_all(engine)
+    else:
+        # Non-Postgres (e.g., SQLite tests/dev) — create tables directly.
+        SQLModel.metadata.create_all(engine)

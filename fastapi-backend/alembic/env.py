@@ -14,7 +14,9 @@ config = context.config
 # Allow alembic CLI to read DATABASE_URL from project's .env so
 # the user doesn't have to manually edit alembic.ini.
 from dotenv import dotenv_values
-env = dotenv_values("../.env")
+from pathlib import Path
+_env_path = Path(__file__).resolve().parents[1] / ".env"
+env = dotenv_values(str(_env_path))
 DATABASE_URL = env.get("DATABASE_URL") or ""
 if DATABASE_URL:
     config.set_main_option("sqlalchemy.url", DATABASE_URL)
