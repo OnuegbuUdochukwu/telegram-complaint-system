@@ -16,7 +16,6 @@
     -   Tools/Technologies: PostgreSQL, Docker (optional), `psql` command-line utility, pgAdmin.
     -   Expected Output: A running PostgreSQL instance with a verified `cms_db` available for connection.
 
--   [ ] 2.1.2 Initial Database Schema (DDL) Scripting
 -   [x] 2.1.2 Initial Database Schema (DDL) Scripting
 -   [x] Write DDL script for `hostels` table.
     -   Verification: `migrations/002_create_supporting_tables.sql` contains `hostels` DDL (UUID PK, slug, display_name, timestamps).
