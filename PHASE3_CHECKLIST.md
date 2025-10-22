@@ -53,18 +53,18 @@ This checklist provides detailed, implementation-ready steps for each Phase 3 ta
             -   Tools/Technologies: HTML, Tailwind CSS, JavaScript (Fetch API), sessionStorage (or secure storage), optional bundler.
             -   Expected Output: login.html that posts credentials to POST /auth/login, stores JWT on success, and redirects to index.html.
             -   Subtasks:
-                -   [ ] Create login.html with Tailwind-styled login card (username + password).
-                -   [ ] Implement JS form handler that calls POST /auth/login.
-                -   [ ] Safely store returned JWT (e.g., sessionStorage) with guidance about XSS considerations.
-                -   [ ] Redirect to main dashboard (index.html) upon successful login.
-                -   [ ] UX: show error messages on failed login.
+            -   [x] Create login.html with Tailwind-styled login card (username + password).
+            -   [x] Implement JS form handler that calls POST /auth/login.
+            -   [x] Safely store returned JWT (e.g., sessionStorage) with guidance about XSS considerations.
+            -   [x] Redirect to main dashboard (index.html) upon successful login.
+            -   [x] UX: show error messages on failed login.
         -   [ ] 3.4.2 Complaint List View (UI & Data Fetch)
             -   Purpose: Present a responsive list of complaints to staff, with sorting/filtering and token-authenticated API calls.
             -   Tools/Technologies: HTML, Tailwind CSS, JavaScript, Fetch API, JWT in headers.
             -   Expected Output: index.html with a complaint table/list that fetches GET /api/v1/complaints using the stored JWT and supports client-side sorting/filtering.
             -   Subtasks:
                 -   [ ] Create index.html structure (Header, Nav, Main content).
-                -   [ ] Implement JS to attach JWT in Authorization: Bearer <token> for requests.
+            -   [x] Implement JS to attach JWT in Authorization: Bearer <token> for requests.
                 -   [ ] Fetch GET /api/v1/complaints and render a table with columns: ID, Hostel, Category, Severity, Status.
                 -   [ ] Implement client-side filtering (e.g., by status) and sorting (by date/severity).
                 -   [ ] Add "Refresh" button and auto-refresh hooks (to be used by WebSocket events).
@@ -83,10 +83,10 @@ This checklist provides detailed, implementation-ready steps for each Phase 3 ta
             -   Expected Output: From the detail modal, staff can select a status and/or assign a porter; UI calls PATCH /api/v1/complaints/{id}/status and PATCH /api/v1/complaints/{id}/assign, then refreshes the main list.
             -   Subtasks:
                 -   [ ] Add status dropdown with allowed statuses (e.g., reported, in_progress, on_hold, resolved, rejected).
-                -   [ ] Add "Assign to me" and "Assign" controls (show list of porters if needed).
-                -   [ ] Implement JS to call PATCH /api/v1/complaints/{id}/status.
-                -   [ ] Implement JS to call PATCH /api/v1/complaints/{id}/assign.
-                -   [ ] On success, close modal and refresh list.
+                    -   [ ] Add "Assign to me" and "Assign" controls (show list of porters if needed).
+                    -   [x] Implement JS to call PATCH /api/v1/complaints/{id}/status.
+                    -   [x] Implement JS to call PATCH /api/v1/complaints/{id}/assign.
+                    -   [x] On success, close modal and refresh list.
     -   [ ] Scaffold React (or Svelte) SPA in /dashboard or /admin-dashboard (if using SPA framework)
     -   [ ] Integrate frontend with backend API (httpx/fetch)
     -   [ ] Add tests for dashboard UI and API integration
