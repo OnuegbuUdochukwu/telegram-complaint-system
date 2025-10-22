@@ -73,7 +73,7 @@ def decode_access_token(token: str) -> TokenPayload:
         logger.debug("Decoded token payload: %s", tp.dict())
         return tp
     except JWTError as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials") from exc
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials", headers={"X-Auth-Reason": "Invalid token"}) from exc
 
 
 def authenticate_porter(username: str, password: str, session) -> Optional[Porter]:
@@ -93,7 +93,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         # Normalize to a consistent 401 for the callers
         logger.info("[auth.debug] No credentials provided or empty credentials object: %s", credentials)
         print(f"[auth.debug] No credentials provided or empty credentials object: {credentials}")
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated", headers={"X-Auth-Reason": "No credentials"})
 
     token = credentials.credentials
     try:
@@ -102,7 +102,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         # decode_access_token already raises a 401; re-raise to preserve semantics
         logger.info("[auth.debug] decode_access_token failed for token: %s", token)
         print(f"[auth.debug] decode_access_token failed for token: {token}")
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials", headers={"X-Auth-Reason": "Token decode failed"})
 
     porter_id = payload.sub
     # Debug: print the token payload and subject type to help diagnose mapping issues
@@ -121,7 +121,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         # Token subject did not map to a valid porter
         logger.info("[auth.debug] No porter found matching id: %r", porter_id)
         print(f"[auth.debug] No porter found matching id: {porter_id!r}")
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials", headers={"X-Auth-Reason": "Token subject not found"})
     return porter
 
 
@@ -142,7 +142,7 @@ def get_token_subject(credentials: HTTPAuthorizationCredentials = Depends(securi
     can compare directly against request payloads when needed.
     """
     if not credentials or not getattr(credentials, "credentials", None):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated", headers={"X-Auth-Reason": "No credentials"})
     token = credentials.credentials
     payload = decode_access_token(token)
     return payload.sub

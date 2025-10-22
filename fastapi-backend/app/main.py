@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Request, Query
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials, OAuth2PasswordRequestForm
 from fastapi import Body
@@ -36,7 +37,11 @@ import os
 
 app = FastAPI(title="Complaint Management API")
 
-security = HTTPBasic()
+# Use auto_error=False so the dependency doesn't automatically raise a 401
+# (which would include a WWW-Authenticate: Basic header and trigger the
+# browser's native login popup). We want the route handler to decide how
+# to respond and return a JSON 401 when appropriate.
+security = HTTPBasic(auto_error=False)
 
 
 @app.post("/auth/login", response_model=dict)
@@ -94,7 +99,7 @@ def register_porter(
     # Otherwise, require admin token manually (dependency removed so we check here)
     auth_header = request.headers.get("authorization")
     if not auth_header or not auth_header.lower().startswith("bearer "):
-        raise HTTPException(status_code=401, detail="Not authenticated")
+        raise HTTPException(status_code=401, detail="Not authenticated", headers={"X-Auth-Reason": "Missing bearer token"})
     token = auth_header.split(None, 1)[1]
     try:
         payload = auth.decode_access_token(token)
@@ -211,8 +216,9 @@ def list_complaints(
     auth_header = request.headers.get("authorization")
 
     if not auth_header and not credentials:
-        # No auth of any kind
-        raise HTTPException(status_code=401, detail="Unauthorized")
+        # No auth of any kind. Return a JSON 401 without WWW-Authenticate
+        # to avoid browsers showing the native Basic Auth popup.
+        raise HTTPException(status_code=401, detail="Unauthorized", headers={"X-Auth-Reason": "No credentials provided"})
 
     # Build base query
     statement = select(Complaint)
@@ -511,3 +517,12 @@ def list_categories(session=Depends(get_session)):
 
 # Mount static files for dashboard
 app.mount("/dashboard", StaticFiles(directory="../dashboard", html=True), name="dashboard")
+
+# CORS: allow dashboard to call the API; in production set more restrictive origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
+)
