@@ -132,13 +132,26 @@ This checklist provides detailed, implementation-ready steps for each Phase 3 ta
     -   Tools/Technologies: python-telegram-bot, push providers (optional)
     -   Expected Output: Configurable alerting pipeline (hostel-level) that is rate-limited and opt-in.
 
-**Progress:** 0/11 subtasks completed (0%)
+-   [ ] 3.8 Dashboard Broadcast Integration
+
+    -   Purpose: Ensure the dashboard list is automatically refreshed when a new complaint is filed.
+    -   Detailed steps:
+
+        -  [ ] Modify the POST /api/v1/complaints/submit endpoint (Phase 2, 2.4) in FastAPI. After successfully saving a new complaint to PostgreSQL, the endpoint must broadcast a notification message (e.g., { "event": "new_complaint", "id": new_id }) to all connected WebSockets (3.6).
+        -  [ ] In the Dashboard JavaScript (3.4.2), implement a WebSocket client connection to /ws/dashboard.
+        -  [ ] Implement an event listener in the JS client that, upon receiving the "new_complaint" event, calls the list refresh function (3.4.2).
+
+    -   Tools: Python, FastAPI, JavaScript, WebSockets
+
+    -   Expected Output: Seamless, real-time update capability: New Telegram complaint → FastAPI saves → FastAPI broadcasts → Dashboard list refreshes automatically.
+
+**Progress:** 0/16 subtasks completed (0%)
 
 ---
 
 ## 🖼️ Media handling (photos & attachments)
 
--   [ ] 3.8 Photo uploads and storage
+-   [ ] 3.9 Photo uploads and storage
 
     -   [ ] Design DB schema for photo metadata (complaint_id, file_url, etc.)
     -   [ ] Integrate S3-compatible storage (MinIO/AWS S3)
@@ -150,7 +163,7 @@ This checklist provides detailed, implementation-ready steps for each Phase 3 ta
     -   Tools/Technologies: S3-compatible storage, FastAPI, signed URLs
     -   Expected Output: Upload endpoint returning signed URLs; access restricted to authenticated users.
 
--   [ ] 3.9 Thumbnailing & size limits
+-   [ ] 3.10 Thumbnailing & size limits
     -   [ ] Integrate Pillow or libvips for thumbnail generation
     -   [ ] Add background worker (Celery/RQ, optional)
     -   [ ] Enforce upload size/type limits
@@ -165,7 +178,7 @@ This checklist provides detailed, implementation-ready steps for each Phase 3 ta
 
 ## 🛠️ CI/CD, Infra & Production Readiness
 
--   [ ] 3.10 CI: GitHub Actions workflow
+-   [ ] 3.11 CI: GitHub Actions workflow
 
     -   [ ] Create .github/workflows/ci.yml for backend
     -   [ ] Add steps: checkout, setup Python, install deps, run alembic upgrade, seed admin user, run pytest
@@ -178,7 +191,7 @@ This checklist provides detailed, implementation-ready steps for each Phase 3 ta
     -   Tools/Technologies: GitHub Actions, PostgreSQL, pytest, flake8/ruff
     -   Expected Output: Workflow that runs unit and integration tests; PRs block on failing tests.
 
--   [ ] 3.11 Dockerize backend and optional worker
+-   [ ] 3.12 Dockerize backend and optional worker
 
     -   [ ] Write Dockerfile for backend
     -   [ ] Write docker-compose.yml for local dev (backend, Postgres, optional Redis)
@@ -188,7 +201,7 @@ This checklist provides detailed, implementation-ready steps for each Phase 3 ta
     -   Tools/Technologies: Dockerfile, docker-compose, Redis/Postgres (optional)
     -   Expected Output: docker-compose up for local dev; reproducible CI builds.
 
--   [ ] 3.12 Observability: logging, metrics, error tracking
+-   [ ] 3.13 Observability: logging, metrics, error tracking
     -   [ ] Integrate structured JSON logging in backend
     -   [ ] Add Prometheus metrics endpoint (/metrics)
     -   [ ] Integrate Sentry for error tracking
@@ -203,7 +216,7 @@ This checklist provides detailed, implementation-ready steps for each Phase 3 ta
 
 ## 🧭 Operational & Misc
 
--   [x] 3.13 Migration tooling (Alembic)
+-   [x] 3.14 Migration tooling (Alembic)
 
     -   [x] Configure Alembic for backend (alembic.ini, env.py)
     -   [x] Create baseline revision from current schema
@@ -214,7 +227,7 @@ This checklist provides detailed, implementation-ready steps for each Phase 3 ta
     -   Tools/Technologies: Alembic, SQLAlchemy/SQLModel
     -   Expected Output: Alembic configured and baseline revision created from current schema.
 
--   [ ] 3.14 Data privacy & retention policy
+-   [ ] 3.15 Data privacy & retention policy
 
     -   [ ] Define retention policy for complaints/media
     -   [ ] Document policy in repo
@@ -224,7 +237,7 @@ This checklist provides detailed, implementation-ready steps for each Phase 3 ta
     -   Tools/Technologies: DB scheduled jobs, background workers, policy docs
     -   Expected Output: In-repo retention policy and admin purge endpoint or cron job.
 
--   [ ] 3.15 Load testing & capacity planning
+-   [ ] 3.16 Load testing & capacity planning
     -   [ ] Write load test scripts (k6, Locust, etc.)
     -   [ ] Run tests and collect metrics
     -   [ ] Document scaling recommendations
