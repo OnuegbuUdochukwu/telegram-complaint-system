@@ -111,41 +111,41 @@ This checklist provides detailed, implementation-ready steps for each Phase 3 ta
 
 ## ⚡ Real-time & Notifications
 
--   [ ] 3.6 WebSocket or Server-Sent Events (SSE) for real-time updates
+-   [x] 3.6 WebSocket or Server-Sent Events (SSE) for real-time updates
 
-    -   [ ] Design event model for complaint/status changes
-    -   [ ] Implement FastAPI WebSocket/SSE endpoint
-    -   [ ] Add authentication for WS/SSE (JWT)
-    -   [ ] Integrate Redis pub/sub for scaling (optional)
-    -   [ ] Add frontend client for real-time updates
-    -   [ ] Add tests for event delivery and client reconnection
+    -   [x] Design event model for complaint/status changes
+    -   [x] Implement FastAPI WebSocket/SSE endpoint
+    -   [x] Add authentication for WS/SSE (JWT)
+    -   [x] Integrate Redis pub/sub for scaling (optional)
+    -   [x] Add frontend client for real-time updates
+    -   [x] Add tests for event delivery and client reconnection
     -   Purpose: Deliver new complaint and status-change events to connected dashboards in near real-time.
     -   Tools/Technologies: FastAPI WebSockets or SSE, Redis (optional), frontend WS client
     -   Expected Output: Authenticated WS/SSE endpoint and client displays new events within ~1s.
 
--   [ ] 3.7 Push notifications / Telegram admin alerts (optional)
-    -   [ ] Integrate python-telegram-bot for admin alerts
-    -   [ ] Add push notification provider (FCM/APNs, optional)
-    -   [ ] Add rate-limiting and opt-in controls
-    -   [ ] Add tests for alerting pipeline
+-   [x] 3.7 Push notifications / Telegram admin alerts (optional)
+    -   [x] Integrate python-telegram-bot for admin alerts
+    -   [x] Add push notification provider (FCM/APNs, optional)
+    -   [x] Add rate-limiting and opt-in controls
+    -   [x] Add tests for alerting pipeline
     -   Purpose: Notify on high-priority complaints via Telegram or push channels.
     -   Tools/Technologies: python-telegram-bot, push providers (optional)
     -   Expected Output: Configurable alerting pipeline (hostel-level) that is rate-limited and opt-in.
 
--   [ ] 3.8 Dashboard Broadcast Integration
+-   [x] 3.8 Dashboard Broadcast Integration
 
     -   Purpose: Ensure the dashboard list is automatically refreshed when a new complaint is filed.
     -   Detailed steps:
 
-        -  [ ] Modify the POST /api/v1/complaints/submit endpoint (Phase 2, 2.4) in FastAPI. After successfully saving a new complaint to PostgreSQL, the endpoint must broadcast a notification message (e.g., { "event": "new_complaint", "id": new_id }) to all connected WebSockets (3.6).
-        -  [ ] In the Dashboard JavaScript (3.4.2), implement a WebSocket client connection to /ws/dashboard.
-        -  [ ] Implement an event listener in the JS client that, upon receiving the "new_complaint" event, calls the list refresh function (3.4.2).
+        -  [x] Modify the POST /api/v1/complaints/submit endpoint (Phase 2, 2.4) in FastAPI. After successfully saving a new complaint to PostgreSQL, the endpoint must broadcast a notification message (e.g., { "event": "new_complaint", "id": new_id }) to all connected WebSockets (3.6).
+        -  [x] In the Dashboard JavaScript (3.4.2), implement a WebSocket client connection to /ws/dashboard.
+        -  [x] Implement an event listener in the JS client that, upon receiving the "new_complaint" event, calls the list refresh function (3.4.2).
 
     -   Tools: Python, FastAPI, JavaScript, WebSockets
 
     -   Expected Output: Seamless, real-time update capability: New Telegram complaint → FastAPI saves → FastAPI broadcasts → Dashboard list refreshes automatically.
 
-**Progress:** 0/16 subtasks completed (0%)
+**Progress:** 16/16 subtasks completed (100%)
 
 ---
 
@@ -277,9 +277,9 @@ This checklist provides detailed, implementation-ready steps for each Phase 3 ta
 
 ## 📈 Overall Progress
 
-**Total Top-Level Tasks:** 15
-**Completed:** 6
-**Overall Progress:** 40%
+**Total Top-Level Tasks:** 16
+**Completed:** 9
+**Overall Progress:** 56%
 
 ---
 

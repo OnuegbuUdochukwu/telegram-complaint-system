@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Request, Query
+from fastapi import FastAPI, Depends, HTTPException, status, Request, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials, OAuth2PasswordRequestForm
@@ -9,12 +9,10 @@ from typing import List, Optional
 from pydantic import BaseModel, StrictStr
 from datetime import datetime, timezone
 from sqlmodel import select, func
-
-
-from .database import init_db, get_session
-from .models import Complaint, Porter
-from pydantic import BaseModel
+from .websocket_manager import manager
+from .telegram_notifier import telegram_notifier
 import logging
+import json
 
 
 class PorterPublic(BaseModel):
@@ -157,7 +155,7 @@ class ComplaintUpdate(BaseModel):
 
 
 @app.post("/api/v1/complaints/submit", status_code=201)
-def submit_complaint(payload: ComplaintCreate, session=Depends(get_session)):
+async def submit_complaint(payload: ComplaintCreate, session=Depends(get_session)):
     # Map validated Pydantic payload into SQLModel Complaint for persistence
     data = payload.dict()
     # Validate category and severity to avoid writing invalid ENUM values into Postgres
@@ -174,6 +172,33 @@ def submit_complaint(payload: ComplaintCreate, session=Depends(get_session)):
     session.add(complaint)
     session.commit()
     session.refresh(complaint)
+    
+    # Broadcast new complaint event to WebSocket clients
+    try:
+        await manager.broadcast_new_complaint(
+            complaint_id=complaint.id,
+            hostel=complaint.hostel,
+            category=complaint.category,
+            severity=complaint.severity
+        )
+        logger.info(f"Broadcasted new complaint event: {complaint.id}")
+    except Exception as e:
+        logger.error(f"Failed to broadcast new complaint event: {e}")
+    
+    # Send Telegram notification
+    try:
+        complaint_data = {
+            "id": complaint.id,
+            "hostel": complaint.hostel,
+            "category": complaint.category,
+            "severity": complaint.severity,
+            "description": complaint.description,
+            "room_number": complaint.room_number
+        }
+        await telegram_notifier.send_complaint_alert(complaint_data)
+    except Exception as e:
+        logger.error(f"Failed to send Telegram notification: {e}")
+    
     return {"complaint_id": complaint.id}
 
 
@@ -253,16 +278,16 @@ def list_complaints(
         # Admin: return all complaints
         if role == "admin":
             pass  # No additional filtering needed
-        
+
         # Porter: only return complaints assigned to this porter
         elif role == "porter":
             porter_id = payload.sub
             statement = statement.where(Complaint.assigned_porter_id == porter_id)
             count_statement = count_statement.where(Complaint.assigned_porter_id == porter_id)
-        
+
         # Any other role is forbidden
         else:
-            raise HTTPException(status_code=403, detail="Insufficient privileges")
+        raise HTTPException(status_code=403, detail="Insufficient privileges")
 
     # Apply pagination
     offset = (page - 1) * page_size
@@ -339,7 +364,7 @@ class AssignmentSchema(BaseModel):
 
 
 @app.patch("/api/v1/complaints/{complaint_id}", response_model=Complaint)
-def update_complaint(
+async def update_complaint(
     complaint_id: str,
     body: ComplaintUpdate,
     user: Porter = Depends(auth.get_current_user),
@@ -365,6 +390,8 @@ def update_complaint(
 
     user_role = (user.role or "porter").lower()
     updated = False
+    old_status = complaint.status
+    old_assigned_to = complaint.assigned_porter_id
 
     # Handle status update
     if body.status is not None:
@@ -407,6 +434,30 @@ def update_complaint(
         
         session.commit()
         session.refresh(complaint)
+        
+        # Broadcast events
+        try:
+            # Broadcast status update if status changed
+            if body.status is not None and old_status != body.status:
+                await manager.broadcast_status_update(
+                    complaint_id=complaint.id,
+                    old_status=old_status,
+                    new_status=body.status,
+                    updated_by=user.full_name or user.id
+                )
+                logger.info(f"Broadcasted status update: {complaint.id} {old_status} -> {body.status}")
+            
+            # Broadcast assignment update if assignment changed
+            if body.assigned_porter_id is not None and old_assigned_to != body.assigned_porter_id:
+                await manager.broadcast_assignment(
+                    complaint_id=complaint.id,
+                    assigned_to=body.assigned_porter_id,
+                    assigned_by=user.id
+                )
+                logger.info(f"Broadcasted assignment update: {complaint.id} -> {body.assigned_porter_id}")
+                
+        except Exception as e:
+            logger.error(f"Failed to broadcast update events: {e}")
 
     return complaint
 
@@ -515,8 +566,83 @@ def list_categories(session=Depends(get_session)):
     return [CategoryPublic(name=n) for n in names if n]
 
 
-# Mount static files for dashboard
-app.mount("/dashboard", StaticFiles(directory="../dashboard", html=True), name="dashboard")
+@app.websocket("/ws/dashboard")
+async def websocket_endpoint(websocket: WebSocket, token: str = None):
+    """
+    WebSocket endpoint for real-time dashboard updates.
+    
+    Requires JWT token as query parameter for authentication.
+    """
+    try:
+        # Authenticate the WebSocket connection
+        if not token:
+            await websocket.close(code=4001, reason="Missing authentication token")
+            return
+        
+        # Decode and validate the JWT token
+        try:
+            payload = auth.decode_access_token(token)
+            user_id = payload.sub
+            user_role = (payload.role or "porter").lower()
+        except Exception as e:
+            logger.error(f"WebSocket authentication failed: {e}")
+            await websocket.close(code=4001, reason="Invalid authentication token")
+            return
+        
+        # Connect the WebSocket
+        await manager.connect(websocket, user_id, user_role)
+        
+        try:
+            # Keep the connection alive and handle incoming messages
+            while True:
+                # Wait for messages from the client (ping/pong, etc.)
+                data = await websocket.receive_text()
+                
+                # Handle ping messages
+                if data == "ping":
+                    await websocket.send_text("pong")
+                else:
+                    # Echo back any other messages (for debugging)
+                    await websocket.send_text(f"Echo: {data}")
+                    
+        except WebSocketDisconnect:
+            manager.disconnect(websocket)
+            logger.info(f"WebSocket disconnected: user_id={user_id}")
+        except Exception as e:
+            logger.error(f"WebSocket error: {e}")
+            manager.disconnect(websocket)
+            
+    except Exception as e:
+        logger.error(f"WebSocket connection error: {e}")
+        try:
+            await websocket.close(code=4000, reason="Internal server error")
+        except:
+            pass
+
+
+@app.get("/api/v1/notifications/config")
+def get_notification_config(user: Porter = Depends(auth.require_role("admin"))):
+    """Get current notification configuration (admin only)."""
+    return telegram_notifier.get_config()
+
+
+@app.post("/api/v1/notifications/config")
+def update_notification_config(
+    config: dict,
+    user: Porter = Depends(auth.require_role("admin"))
+):
+    """Update notification configuration (admin only)."""
+    telegram_notifier.update_config(config)
+    return {"message": "Configuration updated successfully"}
+
+
+@app.get("/api/v1/websocket/stats")
+def get_websocket_stats(user: Porter = Depends(auth.require_role("admin"))):
+    """Get WebSocket connection statistics (admin only)."""
+    return {
+        "total_connections": manager.get_connection_count(),
+        "connections_by_role": manager.get_connections_by_role()
+    }
 
 # CORS: allow dashboard to call the API; in production set more restrictive origins
 app.add_middleware(
