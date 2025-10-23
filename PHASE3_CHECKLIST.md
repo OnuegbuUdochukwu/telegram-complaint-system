@@ -45,10 +45,10 @@ This checklist provides detailed, implementation-ready steps for each Phase 3 ta
 
 ## 🖥️ Admin Dashboard & API
 
--   [ ] 3.4 Build Admin Dashboard (MVP)
+-   [x] 3.4 Build Admin Dashboard (MVP)
 
     -   Core Frontend UI and Interactivity
-        -   [ ] 3.4.1 Dashboard Login Page (UI)
+        -   [x] 3.4.1 Dashboard Login Page (UI)
             -   Purpose: Provide staff a secure, user-friendly way to log in and obtain a JWT for dashboard operations.
             -   Tools/Technologies: HTML, Tailwind CSS, JavaScript (Fetch API), sessionStorage (or secure storage), optional bundler.
             -   Expected Output: login.html that posts credentials to POST /auth/login, stores JWT on success, and redirects to index.html.
@@ -58,46 +58,46 @@ This checklist provides detailed, implementation-ready steps for each Phase 3 ta
             -   [x] Safely store returned JWT (e.g., sessionStorage) with guidance about XSS considerations.
             -   [x] Redirect to main dashboard (index.html) upon successful login.
             -   [x] UX: show error messages on failed login.
-        -   [ ] 3.4.2 Complaint List View (UI & Data Fetch)
+        -   [x] 3.4.2 Complaint List View (UI & Data Fetch)
             -   Purpose: Present a responsive list of complaints to staff, with sorting/filtering and token-authenticated API calls.
             -   Tools/Technologies: HTML, Tailwind CSS, JavaScript, Fetch API, JWT in headers.
             -   Expected Output: index.html with a complaint table/list that fetches GET /api/v1/complaints using the stored JWT and supports client-side sorting/filtering.
             -   Subtasks:
-                -   [ ] Create index.html structure (Header, Nav, Main content).
-            -   [x] Implement JS to attach JWT in Authorization: Bearer <token> for requests.
-                -   [ ] Fetch GET /api/v1/complaints and render a table with columns: ID, Hostel, Category, Severity, Status.
-                -   [ ] Implement client-side filtering (e.g., by status) and sorting (by date/severity).
-                -   [ ] Add "Refresh" button and auto-refresh hooks (to be used by WebSocket events).
-        -   [ ] 3.4.3 Complaint Detail View Modal
-            -   Purpose: Allow staff to review a complaint’s full details before actioning it.
+                -   [x] Create index.html structure (Header, Nav, Main content).
+                -   [x] Implement JS to attach JWT in Authorization: Bearer <token> for requests.
+                -   [x] Fetch GET /api/v1/complaints and render a table with columns: ID, Hostel, Category, Severity, Status.
+                -   [x] Implement client-side filtering (e.g., by status) and sorting (by date/severity).
+                -   [x] Add "Refresh" button and auto-refresh hooks (to be used by WebSocket events).
+        -   [x] 3.4.3 Complaint Detail View Modal
+            -   Purpose: Allow staff to review a complaint's full details before actioning it.
             -   Tools/Technologies: HTML, Tailwind CSS, JavaScript, Fetch API.
             -   Expected Output: A responsive modal or detail pane that displays full complaint data fetched via GET /api/v1/complaints/{id}.
             -   Subtasks:
-                -   [ ] Add click handler on complaint rows to open detail modal.
-                -   [ ] Fetch GET /api/v1/complaints/{id} and populate modal fields: description, created_at, telegram_user_id, photo URLs.
-                -   [ ] Ensure modal is dismissible and accessible (keyboard/aria).
-                -   [ ] Add an area for status & assignment controls (wired in 3.4.4).
-        -   [ ] 3.4.4 Status and Assignment Functionality
+                -   [x] Add click handler on complaint rows to open detail modal.
+                -   [x] Fetch GET /api/v1/complaints/{id} and populate modal fields: description, created_at, telegram_user_id, photo URLs.
+                -   [x] Ensure modal is dismissible and accessible (keyboard/aria).
+                -   [x] Add an area for status & assignment controls (wired in 3.4.4).
+        -   [x] 3.4.4 Status and Assignment Functionality
             -   Purpose: Integrate backend write APIs into the UI so staff can change status and assign personnel from the detail view.
             -   Tools/Technologies: HTML, JavaScript, Fetch API, JWT auth, Pydantic-backed endpoints.
             -   Expected Output: From the detail modal, staff can select a status and/or assign a porter; UI calls PATCH /api/v1/complaints/{id}/status and PATCH /api/v1/complaints/{id}/assign, then refreshes the main list.
             -   Subtasks:
-                -   [ ] Add status dropdown with allowed statuses (e.g., reported, in_progress, on_hold, resolved, rejected).
-                    -   [ ] Add "Assign to me" and "Assign" controls (show list of porters if needed).
+                -   [x] Add status dropdown with allowed statuses (e.g., reported, in_progress, on_hold, resolved, rejected).
+                    -   [x] Add "Assign to me" and "Assign" controls (show list of porters if needed).
                     -   [x] Implement JS to call PATCH /api/v1/complaints/{id}/status.
                     -   [x] Implement JS to call PATCH /api/v1/complaints/{id}/assign.
                     -   [x] On success, close modal and refresh list.
-    -   [ ] Scaffold React (or Svelte) SPA in /dashboard or /admin-dashboard (if using SPA framework)
-    -   [ ] Integrate frontend with backend API (httpx/fetch)
+    -   [x] Scaffold React (or Svelte) SPA in /dashboard or /admin-dashboard (if using SPA framework)
+    -   [x] Integrate frontend with backend API (httpx/fetch)
     -   [ ] Add tests for dashboard UI and API integration
     -   Purpose: Provide a UI for admins/porters to list, filter, view, assign, and update complaints.
     -   Tools/Technologies: HTML, Tailwind CSS, JavaScript, React/Svelte (optional), fetch/httpx, JWT for auth, frontend routing
     -   Expected Output: Minimal dashboard with login, list, detail modal, and assignment/status controls.
 
--   [ ] 3.5 API: paginated list + update endpoints for dashboard
-    -   [ ] Implement GET /api/v1/complaints with pagination (page, page_size)
-    -   [ ] Add filters (status, hostel, date range)
-    -   [ ] Implement PATCH /api/v1/complaints/{id} for status/assignment updates
+-   [x] 3.5 API: paginated list + update endpoints for dashboard
+    -   [x] Implement GET /api/v1/complaints with pagination (page, page_size)
+    -   [x] Add filters (status, hostel, date range)
+    -   [x] Implement PATCH /api/v1/complaints/{id} for status/assignment updates
     -   [x] Harden endpoints with RBAC and JWT auth
     -   [x] Add assignment audit logging (AssignmentAudit model, audit table)
     -   [x] Add tests for pagination, filters, and PATCH logic
@@ -105,7 +105,7 @@ This checklist provides detailed, implementation-ready steps for each Phase 3 ta
     -   Tools/Technologies: FastAPI, SQLModel, PostgreSQL, Pydantic request/response models
     -   Expected Output: GET /api/v1/complaints?page=&page_size=&status=&hostel= ; PATCH /api/v1/complaints/{id} to change status/assignment.
 
-**Progress:** 3/7 subtasks completed (43%)
+**Progress:** 7/7 subtasks completed (100%)
 
 ---
 
@@ -245,28 +245,28 @@ This checklist provides detailed, implementation-ready steps for each Phase 3 ta
     -   [x] /auth/login and protected endpoints working
     -   [x] Basic role enforcement in place
 
--   [ ] Add GET /api/v1/complaints pagination + PATCH for status changes (3.5)
+-   [x] Add GET /api/v1/complaints pagination + PATCH for status changes (3.5)
 
     -   [x] PATCH endpoint for assignment/status changes implemented
     -   [x] Assignment audit logging present
-    -   [ ] Pagination and filters for GET endpoint pending
+    -   [x] Pagination and filters for GET endpoint implemented
 
--   [ ] Create minimal React dashboard to list complaints and view detail (3.4, MVP subset)
+-   [x] Create minimal React dashboard to list complaints and view detail (3.4, MVP subset)
 
-    -   [ ] SPA listing complaints, detail modal, status/assignment controls
+    -   [x] SPA listing complaints, detail modal, status/assignment controls
 
 -   [ ] Add GitHub Actions CI for tests and linting (3.10)
     -   [ ] CI workflow that runs tests and lints on PRs
 
-**Sprint Progress:** 5/8 subtasks completed (62%)
+**Sprint Progress:** 7/8 subtasks completed (87%)
 
 ---
 
 ## 📈 Overall Progress
 
 **Total Top-Level Tasks:** 15
-**Completed:** 4
-**Overall Progress:** 27%
+**Completed:** 6
+**Overall Progress:** 40%
 
 ---
 
