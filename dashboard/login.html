@@ -260,11 +260,38 @@
                     });
 
                     if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.detail || "Login failed");
+                        // Some servers may return non-JSON error pages (HTML). Try to
+                        // parse JSON first, and fall back to text if parsing fails so
+                        // the UI shows a useful message instead of `Unexpected token`.
+                        let msg = "Login failed";
+                        try {
+                            const errorData = await response.json();
+                            msg =
+                                errorData.detail ||
+                                JSON.stringify(errorData) ||
+                                msg;
+                        } catch (err) {
+                            // Non-JSON response, fall back to plain text
+                            try {
+                                const text = await response.text();
+                                msg = text || msg;
+                            } catch (err2) {
+                                /* ignore */
+                            }
+                        }
+                        throw new Error(msg);
                     }
 
-                    const data = await response.json();
+                    let data;
+                    try {
+                        data = await response.json();
+                    } catch (err) {
+                        // If server returned a non-JSON success payload (unlikely),
+                        // fall back to throwing a parse error for visibility.
+                        throw new Error(
+                            "Login succeeded but response was not JSON"
+                        );
+                    }
 
                     // Store token and user info in sessionStorage
                     sessionStorage.setItem("access_token", data.access_token);

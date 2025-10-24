@@ -10,6 +10,11 @@ BACKEND_PATH = os.path.join(REPO_ROOT, "fastapi-backend")
 if BACKEND_PATH not in sys.path:
     sys.path.insert(0, BACKEND_PATH)
 
+# For test isolation, force a SQLite DB and allow dev registration during pytest runs.
+# This prevents tests from trying to connect to the developer's Postgres DB.
+os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
+os.environ.setdefault("ALLOW_DEV_REGISTER", "1")
+
 from sqlmodel import Session
 
 import app.database as database
@@ -18,7 +23,11 @@ import app.auth as auth
 
 @pytest.fixture(scope="session")
 def db_engine():
-    return database.engine
+    # Ensure tables are created for the test database to avoid NOT NULL/PK issues
+    from sqlmodel import SQLModel
+    engine = database.engine
+    SQLModel.metadata.create_all(engine)
+    return engine
 
 
 @pytest.fixture

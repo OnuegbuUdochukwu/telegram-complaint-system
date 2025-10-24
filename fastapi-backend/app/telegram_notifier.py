@@ -75,6 +75,7 @@ class TelegramNotifier:
         except Exception as e:
             logger.error(f"Failed to initialize Telegram bot: {e}")
             self.config.enabled = False
+            self.bot = None
     
     async def send_complaint_alert(self, complaint_data: Dict[str, Any]) -> bool:
         """Send a complaint alert to admin chat."""

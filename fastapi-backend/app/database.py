@@ -2,11 +2,14 @@ from typing import Generator
 from sqlmodel import SQLModel, create_engine, Session
 from dotenv import dotenv_values
 from pathlib import Path
+import os
 from sqlalchemy import text as sa_text
 
 _env_path = Path(__file__).resolve().parents[2] / ".env"
+# Load .env but allow explicit environment variable to override it. Tests set
+# DATABASE_URL in os.environ to force a local SQLite DB for isolation.
 config = dotenv_values(str(_env_path))
-DATABASE_URL = config.get("DATABASE_URL") or "sqlite:///./test.db"
+DATABASE_URL = os.environ.get("DATABASE_URL") or config.get("DATABASE_URL") or "sqlite:///./test.db"
 
 engine = create_engine(DATABASE_URL, echo=False)
 

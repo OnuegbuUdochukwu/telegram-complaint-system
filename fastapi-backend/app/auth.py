@@ -8,6 +8,7 @@ from passlib.context import CryptContext
 from .database import get_session
 from .models import Porter
 from sqlmodel import select
+import uuid
 
 # Settings (in real deploy these should come from env variables)
 from dotenv import dotenv_values
@@ -92,7 +93,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     if not credentials or not getattr(credentials, "credentials", None):
         # Normalize to a consistent 401 for the callers
         logger.info("[auth.debug] No credentials provided or empty credentials object: %s", credentials)
-        print(f"[auth.debug] No credentials provided or empty credentials object: {credentials}")
+        logger.debug("[auth.debug] No credentials provided or empty credentials object: %s", credentials)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated", headers={"X-Auth-Reason": "No credentials"})
 
     token = credentials.credentials
@@ -101,7 +102,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     except HTTPException:
         # decode_access_token already raises a 401; re-raise to preserve semantics
         logger.info("[auth.debug] decode_access_token failed for token: %s", token)
-        print(f"[auth.debug] decode_access_token failed for token: {token}")
+        logger.debug("[auth.debug] decode_access_token failed for token: %s", token)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials", headers={"X-Auth-Reason": "Token decode failed"})
 
     porter_id = payload.sub
@@ -112,15 +113,15 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     except Exception:
         p_dict = getattr(payload, "__dict__", str(payload))
     logger.info("[auth.debug] Decoded token payload: %s", p_dict)
+    logger.debug("[auth.debug] Decoded token payload: %s", p_dict)
     logger.info("[auth.debug] Token subject (sub) value: %r (type=%s)", porter_id, type(porter_id))
-    print(f"[auth.debug] Decoded token payload: {p_dict}")
-    print(f"[auth.debug] Token subject (sub) value: {porter_id!r} (type={type(porter_id)})")
+    logger.debug("[auth.debug] Token subject (sub) value: %r (type=%s)", porter_id, type(porter_id))
     statement = select(Porter).where(Porter.id == porter_id)
     porter = session.exec(statement).first()
     if not porter:
         # Token subject did not map to a valid porter
         logger.info("[auth.debug] No porter found matching id: %r", porter_id)
-        print(f"[auth.debug] No porter found matching id: {porter_id!r}")
+        logger.debug("[auth.debug] No porter found matching id: %r", porter_id)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials", headers={"X-Auth-Reason": "Token subject not found"})
     return porter
 
@@ -165,7 +166,8 @@ def create_porter(session, full_name: str, password: str, email: Optional[str] =
             return existing
 
     ph = get_password_hash(password)
-    data = {"full_name": full_name, "password_hash": ph, "role": role}
+    # Ensure an id is always present for SQLite/local tests to avoid NULL PK insert errors
+    data = {"id": str(uuid.uuid4()), "full_name": full_name, "password_hash": ph, "role": role}
     if email:
         data["email"] = email
     if phone:

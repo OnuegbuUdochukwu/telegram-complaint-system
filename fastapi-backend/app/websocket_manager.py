@@ -31,7 +31,7 @@ class NewComplaintEvent(WebSocketEvent):
 
     def __init__(self, complaint_id: str, hostel: str, category: str, severity: str, **kwargs):
         data = {
-            "complaint_id": complaint_id,
+            "id": complaint_id,  # Fixed: should be "id" not "complaint_id"
             "hostel": hostel,
             "category": category,
             "severity": severity
@@ -186,6 +186,42 @@ class ConnectionManager:
             role: len(connections) 
             for role, connections in self.connections_by_role.items()
         }
+    
+    async def cleanup_disconnected_connections(self):
+        """Clean up any disconnected WebSocket connections."""
+        disconnected = []
+        for websocket in list(self.active_connections.keys()):
+            try:
+                # Try to send a ping to check if connection is still alive
+                await websocket.ping()
+            except Exception:
+                # Connection is dead, mark for removal
+                disconnected.append(websocket)
+        
+        # Remove disconnected connections
+        for websocket in disconnected:
+            self.disconnect(websocket)
+        
+        if disconnected:
+            logger.info(f"Cleaned up {len(disconnected)} disconnected WebSocket connections")
+    
+    async def shutdown(self):
+        """Gracefully shutdown all WebSocket connections."""
+        logger.info("Shutting down WebSocket manager...")
+        
+        # Send close message to all connections
+        for websocket in list(self.active_connections.keys()):
+            try:
+                await websocket.close(code=1000, reason="Server shutdown")
+            except Exception as e:
+                logger.error(f"Error closing WebSocket during shutdown: {e}")
+        
+        # Clear all connections
+        self.active_connections.clear()
+        for role in self.connections_by_role:
+            self.connections_by_role[role].clear()
+        
+        logger.info("WebSocket manager shutdown complete")
 
 
 # Global connection manager instance

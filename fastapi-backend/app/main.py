@@ -14,6 +14,14 @@ from .telegram_notifier import telegram_notifier
 import logging
 import json
 
+# Local imports required by route handlers and dependencies
+from .database import get_session, init_db
+from .models import Complaint, Porter, AssignmentAudit, Hostel
+from sqlalchemy import text as sa_text
+
+# Application logger
+logger = logging.getLogger("app")
+
 
 class PorterPublic(BaseModel):
     id: str
@@ -34,6 +42,13 @@ class CategoryPublic(BaseModel):
 import os
 
 app = FastAPI(title="Complaint Management API")
+
+# Serve the static dashboard files from the repository's `dashboard/` folder
+from pathlib import Path
+_ROOT = Path(__file__).resolve().parents[2]
+_DASHBOARD_DIR = _ROOT / "dashboard"
+if _DASHBOARD_DIR.exists():
+    app.mount("/dashboard", StaticFiles(directory=str(_DASHBOARD_DIR), html=True), name="dashboard")
 
 # Use auto_error=False so the dependency doesn't automatically raise a 401
 # (which would include a WWW-Authenticate: Basic header and trigger the
@@ -196,6 +211,7 @@ async def submit_complaint(payload: ComplaintCreate, session=Depends(get_session
             "room_number": complaint.room_number
         }
         await telegram_notifier.send_complaint_alert(complaint_data)
+        logger.info(f"Sent Telegram notification for complaint: {complaint.id}")
     except Exception as e:
         logger.error(f"Failed to send Telegram notification: {e}")
     
@@ -287,7 +303,7 @@ def list_complaints(
 
         # Any other role is forbidden
         else:
-        raise HTTPException(status_code=403, detail="Insufficient privileges")
+            raise HTTPException(status_code=403, detail="Insufficient privileges")
 
     # Apply pagination
     offset = (page - 1) * page_size
@@ -435,7 +451,7 @@ async def update_complaint(
         session.commit()
         session.refresh(complaint)
         
-        # Broadcast events
+        # Broadcast events and send notifications
         try:
             # Broadcast status update if status changed
             if body.status is not None and old_status != body.status:
@@ -446,6 +462,18 @@ async def update_complaint(
                     updated_by=user.full_name or user.id
                 )
                 logger.info(f"Broadcasted status update: {complaint.id} {old_status} -> {body.status}")
+                
+                # Send Telegram notification for status update
+                try:
+                    await telegram_notifier.send_status_update_alert(
+                        complaint_id=complaint.id,
+                        old_status=old_status,
+                        new_status=body.status,
+                        updated_by=user.full_name or user.id
+                    )
+                    logger.info(f"Sent Telegram status update notification: {complaint.id}")
+                except Exception as e:
+                    logger.error(f"Failed to send Telegram status update notification: {e}")
             
             # Broadcast assignment update if assignment changed
             if body.assigned_porter_id is not None and old_assigned_to != body.assigned_porter_id:
@@ -549,10 +577,15 @@ def list_porters(user: Porter = Depends(auth.get_current_user), session=Depends(
 @app.get("/api/v1/hostels", response_model=List[HostelPublic])
 def list_hostels(user: Porter = Depends(auth.get_current_user), session=Depends(get_session)):
     """Return configured hostels for dashboard filter population."""
-    from .models import Hostel
-    stmt = select(Hostel)
-    results = session.exec(stmt).all()
-    return [HostelPublic(id=r.id, slug=r.slug, display_name=r.display_name) for r in results]
+    # Use a raw SQL query to return simple tuples so SQLAlchemy/SQLModel
+    # don't attempt to parse the stored `created_at` strings into
+    # Python datetimes (some DB dumps may contain timezone-aware strings
+    # that cause the ORM layer to raise on fetch). This keeps the
+    # endpoint robust against minor serialization differences in local
+    # seeded DB files.
+    rows = session.exec(sa_text("SELECT id, slug, display_name FROM hostels")).all()
+    # rows are tuples: (id, slug, display_name)
+    return [HostelPublic(id=r[0], slug=r[1], display_name=r[2]) for r in rows]
 
 
 @app.get("/api/v1/categories", response_model=List[CategoryPublic])
@@ -644,6 +677,16 @@ def get_websocket_stats(user: Porter = Depends(auth.require_role("admin"))):
         "connections_by_role": manager.get_connections_by_role()
     }
 
+
+@app.get("/api/v1/websocket/health")
+def websocket_health_check():
+    """Health check endpoint for WebSocket service."""
+    return {
+        "status": "healthy",
+        "active_connections": manager.get_connection_count(),
+        "service": "websocket_manager"
+    }
+
 # CORS: allow dashboard to call the API; in production set more restrictive origins
 app.add_middleware(
     CORSMiddleware,
@@ -652,3 +695,22 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept"],
 )
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize services on startup."""
+    logger.info("Starting up complaint system...")
+    # WebSocket manager is already initialized as a global instance
+    logger.info("WebSocket manager initialized")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Clean up resources on shutdown."""
+    logger.info("Shutting down complaint system...")
+    try:
+        await manager.shutdown()
+        logger.info("WebSocket manager shutdown complete")
+    except Exception as e:
+        logger.error(f"Error during WebSocket manager shutdown: {e}")

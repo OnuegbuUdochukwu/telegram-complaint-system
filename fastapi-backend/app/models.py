@@ -8,11 +8,13 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 import uuid
 from dotenv import dotenv_values
 from pathlib import Path
+import os
 
 # Detect whether we're using Postgres so we can use a native UUID column.
+# Prefer environment variable override (useful for tests/CI), fall back to .env file.
 _env_path = Path(__file__).resolve().parents[2] / ".env"
 _env = dotenv_values(str(_env_path))
-_DATABASE_URL = _env.get("DATABASE_URL", "") or ""
+_DATABASE_URL = os.environ.get("DATABASE_URL", "") or _env.get("DATABASE_URL", "") or ""
 _USE_PG_UUID = any(x in _DATABASE_URL for x in ("postgres://", "postgresql://", "psycopg2"))
 
 
