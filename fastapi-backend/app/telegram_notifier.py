@@ -60,6 +60,16 @@ class TelegramNotifier:
         self.bot: Optional[Bot] = None
         self.config = NotificationConfig()
         self.rate_limiter = RateLimiter()
+        # If an admin chat id is set in the environment (.env), ensure it's reflected
+        # in the runtime configuration so notifications can be sent without restart.
+        env_chat = os.environ.get("TELEGRAM_ADMIN_CHAT_ID") or config.get("TELEGRAM_ADMIN_CHAT_ID")
+        if env_chat:
+            try:
+                # prefer list of strings
+                self.config.admin_chat_ids = [str(env_chat)]
+            except Exception:
+                pass
+
         self._initialize_bot()
     
     def _initialize_bot(self):
@@ -197,7 +207,19 @@ class TelegramNotifier:
     
     def get_config(self) -> Dict[str, Any]:
         """Get current notification configuration."""
-        return self.config.model_dump()
+        # Support pydantic v2 (.model_dump) and v1 (.dict) APIs
+        if hasattr(self.config, "model_dump"):
+            try:
+                return self.config.model_dump()
+            except Exception:
+                pass
+        if hasattr(self.config, "dict"):
+            try:
+                return self.config.dict()
+            except Exception:
+                pass
+        # Fallback
+        return dict(getattr(self.config, "__dict__", {}))
 
 
 # Global notifier instance

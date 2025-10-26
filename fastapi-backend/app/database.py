@@ -4,6 +4,7 @@ from dotenv import dotenv_values
 from pathlib import Path
 import os
 from sqlalchemy import text as sa_text
+from sqlalchemy.pool import NullPool
 
 _env_path = Path(__file__).resolve().parents[2] / ".env"
 # Load .env but allow explicit environment variable to override it. Tests set
@@ -11,7 +12,17 @@ _env_path = Path(__file__).resolve().parents[2] / ".env"
 config = dotenv_values(str(_env_path))
 DATABASE_URL = os.environ.get("DATABASE_URL") or config.get("DATABASE_URL") or "sqlite:///./test.db"
 
-engine = create_engine(DATABASE_URL, echo=False)
+# Configure sqlite to be usable from multiple threads in this local/dev setup.
+# For production (Postgres) these options are ignored.
+engine_kwargs = {"echo": False}
+if DATABASE_URL.startswith("sqlite"):
+    # Allow connections to be used across threads (useful for uvicorn worker threads)
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
+    # Use NullPool to avoid reusing connections across threads in a way that
+    # can lead to 'SQLite objects created in a thread can only be used in that same thread.'
+    engine_kwargs["poolclass"] = NullPool
+
+engine = create_engine(DATABASE_URL, **engine_kwargs)
 
 def get_session() -> Generator[Session, None, None]:
     with Session(engine) as session:

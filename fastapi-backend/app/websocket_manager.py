@@ -118,8 +118,24 @@ class ConnectionManager:
             self.disconnect(websocket)
 
     async def broadcast(self, event: WebSocketEvent, target_role: Optional[str] = None):
-        """Broadcast an event to all connected clients or specific role."""
-        message = event.model_dump_json()
+        """Broadcast an event to all connected clients or specific role.
+
+        Support both pydantic v1 and v2 model serialization APIs. In pydantic v2
+        models expose `model_dump_json`; in v1 they expose `json()`.
+        """
+        # Prefer pydantic v2 API when available
+        if hasattr(event, "model_dump_json"):
+            message = event.model_dump_json()
+        elif hasattr(event, "json"):
+            # pydantic v1 BaseModel.json() returns a JSON string
+            message = event.json()
+        else:
+            # Fallback: build a JSON string manually
+            try:
+                message = json.dumps(event.dict())
+            except Exception:
+                # As a last resort, serialize __dict__ (may include non-serializable types)
+                message = json.dumps({k: v for k, v in getattr(event, "__dict__", {}).items()})
         
         if target_role:
             # Send to specific role
