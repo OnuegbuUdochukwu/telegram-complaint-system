@@ -151,28 +151,28 @@ This checklist provides detailed, implementation-ready steps for each Phase 3 ta
 
 ## 🖼️ Media handling (photos & attachments)
 
--   [ ] 3.9 Photo uploads and storage
+-   [x] 3.9 Photo uploads and storage
 
-    -   [ ] Design DB schema for photo metadata (complaint_id, file_url, etc.)
-    -   [ ] Integrate S3-compatible storage (MinIO/AWS S3)
-    -   [ ] Implement FastAPI upload endpoint (POST /api/v1/complaints/{id}/photo)
-    -   [ ] Generate and return signed URLs for uploads/downloads
-    -   [ ] Restrict access to authenticated users (JWT)
-    -   [ ] Add tests for upload, access, and permissions
+    -   [x] Design DB schema for photo metadata (complaint_id, file_url, etc.)
+    -   [x] Integrate S3-compatible storage (MinIO/AWS S3)
+    -   [x] Implement FastAPI upload endpoint (POST /api/v1/complaints/{id}/photo)
+    -   [x] Generate and return signed URLs for uploads/downloads
+    -   [x] Restrict access to authenticated users (JWT)
+    -   [x] Add tests for upload, access, and permissions
     -   Purpose: Allow reporters to attach images; store them securely and serve thumbnails/links to dashboard.
     -   Tools/Technologies: S3-compatible storage, FastAPI, signed URLs
     -   Expected Output: Upload endpoint returning signed URLs; access restricted to authenticated users.
 
--   [ ] 3.10 Thumbnailing & size limits
-    -   [ ] Integrate Pillow or libvips for thumbnail generation
+-   [x] 3.10 Thumbnailing & size limits
+    -   [x] Integrate Pillow or libvips for thumbnail generation
     -   [ ] Add background worker (Celery/RQ, optional)
-    -   [ ] Enforce upload size/type limits
-    -   [ ] Add tests for thumbnailing and limits
+    -   [x] Enforce upload size/type limits
+    -   [x] Add tests for thumbnailing and limits
     -   Purpose: Reduce bandwidth and display-friendly thumbnails; enforce size/type limits.
     -   Tools/Technologies: Pillow/libvips, background worker (optional)
     -   Expected Output: Thumbnails produced and available via authenticated endpoints; upload size/type limited.
 
-**Progress:** 0/9 subtasks completed (0%)
+**Progress:** 8/9 subtasks completed (89%)
 
 ---
 
@@ -278,8 +278,8 @@ This checklist provides detailed, implementation-ready steps for each Phase 3 ta
 ## 📈 Overall Progress
 
 **Total Top-Level Tasks:** 16
-**Completed:** 9
-**Overall Progress:** 56%
+**Completed:** 11
+**Overall Progress:** 69%
 
 ---
 

@@ -111,3 +111,33 @@ class AssignmentAudit(SQLModel, table=True):
         assigned_by: str
         assigned_to: str
     created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class Photo(SQLModel, table=True):
+    __tablename__ = "photos"
+    if _USE_PG_UUID:
+        id: Optional[str] = Field(default=None, primary_key=True, sa_column=Column(PG_UUID(as_uuid=False), primary_key=True, server_default=text("gen_random_uuid()")))
+    else:
+        id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    
+    if _USE_PG_UUID:
+        complaint_id: str = Field(foreign_key="complaints.id", sa_column=Column(PG_UUID(as_uuid=False)))
+    else:
+        complaint_id: str = Field(foreign_key="complaints.id")
+    
+    # S3/Storage URL for the original photo
+    file_url: str
+    
+    # S3/Storage URL for the thumbnail (optional)
+    thumbnail_url: Optional[str] = None
+    
+    # File metadata
+    file_name: str
+    file_size: Optional[int] = None  # Size in bytes
+    mime_type: Optional[str] = None  # e.g., "image/jpeg"
+    
+    # Dimensions (optional, useful for display)
+    width: Optional[int] = None
+    height: Optional[int] = None
+    
+    created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))

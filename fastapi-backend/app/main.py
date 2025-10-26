@@ -16,8 +16,12 @@ import json
 
 # Local imports required by route handlers and dependencies
 from .database import get_session, init_db
-from .models import Complaint, Porter, AssignmentAudit, Hostel
+from .models import Complaint, Porter, AssignmentAudit, Hostel, Photo
 from sqlalchemy import text as sa_text
+from .storage import upload_photo, upload_thumbnail, get_photo_url, delete_photo
+from .photo_utils import validate_image, process_image, get_mime_type
+from fastapi import File, UploadFile
+from fastapi.responses import StreamingResponse
 
 # Application logger
 logger = logging.getLogger("app")
@@ -557,6 +561,154 @@ def list_assignments(complaint_id: str, user: Porter = Depends(auth.get_current_
     rows = session.exec(stmt).all()
     # Map to simple dicts for the test expectations
     return [ {"id": r.id, "complaint_id": r.complaint_id, "assigned_by": r.assigned_by, "assigned_to": r.assigned_to, "created_at": r.created_at.isoformat() if r.created_at else None} for r in rows ]
+
+
+@app.post("/api/v1/complaints/{complaint_id}/photos")
+async def upload_photo_to_complaint(
+    complaint_id: str,
+    file: UploadFile = File(...),
+    user: Porter = Depends(auth.get_current_user),
+    session=Depends(get_session)
+):
+    """
+    Upload a photo to a complaint.
+    
+    Requires authentication. Validates file size, type, and dimensions.
+    Processes the image and generates a thumbnail.
+    """
+    import uuid
+    import io
+    
+    # Validate complaint exists
+    statement = select(Complaint).where(Complaint.id == complaint_id)
+    complaint = session.exec(statement).first()
+    if not complaint:
+        raise HTTPException(status_code=404, detail="Complaint not found")
+    
+    # Generate photo ID
+    photo_id = str(uuid.uuid4())
+    
+    # Read file data
+    file_data = await file.read()
+    
+    # Validate image
+    is_valid, error_msg = validate_image(file_data, file.filename)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_msg)
+    
+    # Process image (optimize and generate thumbnail)
+    try:
+        optimized_data, thumbnail_data, width, height, mime_type = process_image(file_data, file.filename)
+        
+        # Upload to storage
+        file_url, thumbnail_url = upload_photo(optimized_data, complaint_id, photo_id, mime_type)
+        
+        # Upload thumbnail
+        if thumbnail_data:
+            thumbnail_storage_url = upload_thumbnail(thumbnail_data, complaint_id, photo_id)
+            if thumbnail_storage_url:
+                thumbnail_url = thumbnail_storage_url
+        
+        # Create photo record in database
+        photo = Photo(
+            id=photo_id,
+            complaint_id=complaint_id,
+            file_url=file_url,
+            thumbnail_url=thumbnail_url,
+            file_name=file.filename,
+            file_size=len(optimized_data),
+            mime_type=mime_type,
+            width=width,
+            height=height
+        )
+        
+        session.add(photo)
+        session.commit()
+        session.refresh(photo)
+        
+        logger.info(f"Uploaded photo {photo_id} for complaint {complaint_id}")
+        
+        return {
+            "id": photo.id,
+            "complaint_id": photo.complaint_id,
+            "file_url": photo.file_url,
+            "thumbnail_url": photo.thumbnail_url,
+            "file_name": photo.file_name,
+            "file_size": photo.file_size,
+            "width": photo.width,
+            "height": photo.height,
+            "created_at": photo.created_at.isoformat() if photo.created_at else None
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to upload photo: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to upload photo: {str(e)}")
+
+
+@app.get("/api/v1/complaints/{complaint_id}/photos")
+def list_complaint_photos(
+    complaint_id: str,
+    user: Porter = Depends(auth.get_current_user),
+    session=Depends(get_session)
+):
+    """Get all photos for a complaint."""
+    # Validate complaint exists
+    statement = select(Complaint).where(Complaint.id == complaint_id)
+    complaint = session.exec(statement).first()
+    if not complaint:
+        raise HTTPException(status_code=404, detail="Complaint not found")
+    
+    # Get all photos for this complaint
+    statement = select(Photo).where(Photo.complaint_id == complaint_id).order_by(Photo.created_at.desc())
+    photos = session.exec(statement).all()
+    
+    return [
+        {
+            "id": photo.id,
+            "complaint_id": photo.complaint_id,
+            "file_url": photo.file_url,
+            "thumbnail_url": photo.thumbnail_url,
+            "file_name": photo.file_name,
+            "file_size": photo.file_size,
+            "mime_type": photo.mime_type,
+            "width": photo.width,
+            "height": photo.height,
+            "created_at": photo.created_at.isoformat() if photo.created_at else None
+        }
+        for photo in photos
+    ]
+
+
+@app.delete("/api/v1/complaints/{complaint_id}/photos/{photo_id}")
+def delete_complaint_photo(
+    complaint_id: str,
+    photo_id: str,
+    user: Porter = Depends(auth.get_current_user),
+    session=Depends(get_session)
+):
+    """Delete a photo from a complaint."""
+    # Validate complaint exists
+    statement = select(Complaint).where(Complaint.id == complaint_id)
+    complaint = session.exec(statement).first()
+    if not complaint:
+        raise HTTPException(status_code=404, detail="Complaint not found")
+    
+    # Get photo
+    statement = select(Photo).where(Photo.id == photo_id, Photo.complaint_id == complaint_id)
+    photo = session.exec(statement).first()
+    if not photo:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    
+    # Delete from storage
+    delete_photo(complaint_id, photo_id)
+    
+    # Delete from database
+    session.delete(photo)
+    session.commit()
+    
+    logger.info(f"Deleted photo {photo_id} from complaint {complaint_id}")
+    
+    return {"message": "Photo deleted successfully"}
 
 
 @app.get("/api/v1/porters", response_model=List[PorterPublic])
