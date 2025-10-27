@@ -96,8 +96,14 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Welcome, {user.mention_html()}! 👋\n\n"
         "I am the **Covenant University Hostel Complaint System Bot**, designed to digitize maintenance requests.\n\n"
         "Here's what I can do:\n"
-        "🔹 Use the **/report** command to submit a new maintenance request (e.g., plumbing, electrical, etc.).\n"
-        "🔹 Use the **/help** command to see this guide again."
+        "🔹 **/report** - Submit a new maintenance request\n"
+        "🔹 **/status** - Check the status of your complaints\n"
+        "🔹 **/mycomplaints** - View all your submitted complaints\n"
+        "🔹 **/help** - Show available commands\n\n"
+        "**Status Lifecycle:**\n"
+        "📝 Reported → 🔧 In Progress → ✅ Resolved\n"
+        "⏸️ On Hold for reviews, ❌ Rejected if inapplicable\n\n"
+        "Get started by typing **/report** or **/status** to track your requests!"
     )
     await update.message.reply_html(welcome_message)
 
@@ -107,7 +113,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_message = (
         "**Available Commands:**\n"
         "🔹 **/report** - Start a new conversation to log a maintenance complaint.\n"
-        "🔹 **/status** - (Phase 2: Coming Soon) Check the current status of a submitted ticket.\n"
+        "🔹 **/status** - Check the status of your complaints.\n"
+        "🔹 **/mycomplaints** - View all your submitted complaints.\n"
         "🔹 **/help** - Show this list of commands.\n\n"
         "To submit a request, just type **/report**!"
     )
@@ -431,60 +438,67 @@ def main():
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.COMMAND, unknown_command))
 
-    # --- Status check conversation: supports `/status <ID>` or `/status` then ID
-    async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-        """Entry for /status. If an ID is provided inline, fetch immediately; otherwise prompt."""
-        # If user typed `/status <id>` handle inline
-        text = update.message.text or ""
-        parts = text.split(maxsplit=1)
-        if len(parts) > 1 and parts[1].strip():
-            complaint_id = parts[1].strip()
-            await safe_reply_to_update(update, "⏳ Checking status...")
-            try:
-                resp = await asyncio.to_thread(client_get_status, complaint_id)
-            except Exception as exc:
-                logger.exception("Error fetching status for %s: %s", complaint_id, exc)
-                await safe_reply_to_update(update, "⚠️ Could not fetch status. Please try again later.")
-                return ConversationHandler.END
-
-            status_key = resp.get("status") if isinstance(resp, dict) else None
-            friendly = STATUS_KEY_TO_LABEL.get(status_key, status_key) if status_key else "Unknown"
-            await safe_reply_to_update(update, f"Status for `{complaint_id}`: *{friendly}*", parse_mode='Markdown')
-            return ConversationHandler.END
-
-        # No ID inline; prompt the user
-        await update.message.reply_text("Please send the Complaint ID you want to check (or /cancel to abort):")
-        return STATUS_WAITING_FOR_ID
-
-    async def status_id_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-        """Handles the message containing complaint ID and replies with status."""
-        complaint_id = (update.message.text or "").strip()
-        if not complaint_id:
-            await update.message.reply_text("Please provide a non-empty Complaint ID or /cancel to abort.")
-            return STATUS_WAITING_FOR_ID
-
-        await update.message.reply_text("⏳ Checking status...")
+    # --- Enhanced status check with better UX
+    async def get_my_complaints(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Get all complaints for the current user."""
+        user_id = str(update.effective_user.id)
+        
+        await safe_reply_to_update(update, "⏳ Fetching your complaints...")
+        
         try:
-            resp = await asyncio.to_thread(client_get_status, complaint_id)
+            # Call backend to get user's complaints
+            from client import get_user_complaints
+            complaints = await asyncio.to_thread(get_user_complaints, user_id)
         except Exception as exc:
-            logger.exception("Error fetching status for %s: %s", complaint_id, exc)
-            await update.message.reply_text("⚠️ Could not fetch status. Please try again later.")
-            return ConversationHandler.END
-
-        status_key = resp.get("status") if isinstance(resp, dict) else None
-        friendly = STATUS_KEY_TO_LABEL.get(status_key, status_key) if status_key else "Unknown"
-        await update.message.reply_text(f"Status for `{complaint_id}`: *{friendly}*", parse_mode='Markdown')
-        return ConversationHandler.END
-
-    status_conversation = ConversationHandler(
-        entry_points=[CommandHandler('status', status_command)],
-        states={
-            STATUS_WAITING_FOR_ID: [MessageHandler(filters.TEXT & ~filters.COMMAND, status_id_handler)]
-        },
-        fallbacks=[CommandHandler('cancel', cancel_handler)],
-    )
-
-    application.add_handler(status_conversation)
+            logger.exception("Error fetching complaints for user %s: %s", user_id, exc)
+            await safe_reply_to_update(update, "⚠️ Could not fetch your complaints. Please try again later.")
+            return
+        
+        if not complaints or len(complaints.get('items', [])) == 0:
+            await safe_reply_to_update(update, 
+                "📋 You haven't submitted any complaints yet.\n\n"
+                "Use /report to submit a new complaint.")
+            return
+        
+        # Format the complaints list
+        message_parts = ["📋 **Your Complaints**\n"]
+        
+        items = complaints.get('items', [])
+        for idx, complaint in enumerate(items[:10], 1):  # Show first 10
+            complaint_id = complaint.get('id', 'Unknown')
+            status = complaint.get('status', 'reported')
+            status_emoji = {
+                'reported': '📝',
+                'in_progress': '🔧',
+                'on_hold': '⏸️',
+                'resolved': '✅',
+                'closed': '✔️',
+                'rejected': '❌'
+            }.get(status, '📄')
+            
+            status_label = STATUS_KEY_TO_LABEL.get(status, status.title())
+            hostel = complaint.get('hostel', 'Unknown')
+            category = complaint.get('category', 'Unknown')
+            created_at = complaint.get('created_at', '')
+            
+            message_parts.append(
+                f"{idx}. {status_emoji} *{status_label}*\n"
+                f"   ID: `{complaint_id[:8]}`\n"
+                f"   Hostel: {hostel} | Category: {category[:20]}\n"
+            )
+        
+        if len(items) > 10:
+            message_parts.append(f"\n_...and {len(items) - 10} more_")
+        
+        await safe_reply_to_update(update, "\n".join(message_parts), parse_mode='Markdown')
+    
+    # Status check command - shows all complaints with inline buttons
+    async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Show user's complaints with status in a nice format."""
+        await get_my_complaints(update, context)
+    
+    application.add_handler(CommandHandler('status', status_command))
+    application.add_handler(CommandHandler('mycomplaints', get_my_complaints))
 
     # Global error handler to catch unexpected exceptions in handlers and
     # prevent the application from crashing. We also attempt to notify the

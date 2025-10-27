@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Request, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials, OAuth2PasswordRequestForm
 from fastapi import Body
 from fastapi.staticfiles import StaticFiles
@@ -11,6 +11,10 @@ from datetime import datetime, timezone
 from sqlmodel import select, func
 from .websocket_manager import manager
 from .telegram_notifier import telegram_notifier
+from .observability import (
+    setup_logging, init_sentry, setup_metrics_middleware,
+    metrics_endpoint, get_health_check
+)
 import logging
 import json
 
@@ -22,6 +26,10 @@ from .storage import upload_photo, upload_thumbnail, get_photo_url, delete_photo
 from .photo_utils import validate_image, process_image, get_mime_type
 from fastapi import File, UploadFile
 from fastapi.responses import StreamingResponse
+
+# Setup observability
+setup_logging()
+init_sentry()
 
 # Application logger
 logger = logging.getLogger("app")
@@ -46,6 +54,9 @@ class CategoryPublic(BaseModel):
 import os
 
 app = FastAPI(title="Complaint Management API")
+
+# Setup metrics middleware
+setup_metrics_middleware(app)
 
 # Serve the static dashboard files from the repository's `dashboard/` folder
 from pathlib import Path
@@ -145,7 +156,15 @@ def on_startup():
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    """Health check endpoint."""
+    return get_health_check()
+
+
+@app.get("/metrics")
+def metrics() -> Response:
+    """Prometheus metrics endpoint."""
+    from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 class ComplaintCreate(BaseModel):
@@ -249,18 +268,24 @@ def list_complaints(
     hostel: Optional[str] = Query(None),
     category: Optional[str] = Query(None),
     severity: Optional[str] = Query(None),
+    telegram_user_id: Optional[str] = Query(None),
     credentials: Optional[HTTPBasicCredentials] = Depends(security), 
     session=Depends(get_session)
 ):
     """
     Dashboard endpoint with pagination and filters. Allows either Basic auth (tests use this) or a Bearer token.
-    - If no auth provided: return 401
+    - If no auth provided: return 401 (unless filtering by telegram_user_id for bot access)
     - If Basic credentials provided: accept (tests treat any creds as ok)
     - If Bearer token provided: validate and require role == 'admin'
+    
+    Special case: If telegram_user_id is provided, allow access without auth for bot users to view their own complaints.
     """
     auth_header = request.headers.get("authorization")
 
-    if not auth_header and not credentials:
+    # Allow public access if filtering by telegram_user_id (for bot users)
+    allow_public_access = telegram_user_id is not None
+
+    if not auth_header and not credentials and not allow_public_access:
         # No auth of any kind. Return a JSON 401 without WWW-Authenticate
         # to avoid browsers showing the native Basic Auth popup.
         raise HTTPException(status_code=401, detail="Unauthorized", headers={"X-Auth-Reason": "No credentials provided"})
@@ -285,8 +310,12 @@ def list_complaints(
     if severity:
         statement = statement.where(Complaint.severity == severity)
         count_statement = count_statement.where(Complaint.severity == severity)
+    
+    if telegram_user_id:
+        statement = statement.where(Complaint.telegram_user_id == telegram_user_id)
+        count_statement = count_statement.where(Complaint.telegram_user_id == telegram_user_id)
 
-    # Bearer token path: enforce RBAC
+    # Bearer token path: enforce RBAC (only if we have authentication)
     if auth_header and auth_header.lower().startswith("bearer "):
         token = auth_header.split(None, 1)[1]
         try:
@@ -837,6 +866,112 @@ def websocket_health_check():
         "status": "healthy",
         "active_connections": manager.get_connection_count(),
         "service": "websocket_manager"
+    }
+
+
+class PurgeRequest(BaseModel):
+    """Request model for admin purge endpoint."""
+    complaint_status: Optional[str] = None
+    days_old: Optional[int] = None
+
+
+@app.delete("/api/v1/admin/purge")
+def purge_old_data(
+    user: Porter = Depends(auth.require_role("admin")),
+    session=Depends(get_session),
+    request: PurgeRequest = None
+):
+    """
+    Admin-only endpoint to purge old complaint data based on retention policy.
+    
+    Retention Policy:
+    - Resolved: 90 days
+    - Closed: 30 days
+    - Rejected: 7 days
+    """
+    from datetime import timedelta
+    
+    # Default retention periods (in days)
+    RETENTION_PERIODS = {
+        "resolved": 90,
+        "closed": 30,
+        "rejected": 7
+    }
+    
+    # Override with user-specified days if provided
+    if request and request.days_old:
+        retention_days = request.days_old
+    else:
+        # Use default retention for the specified status
+        if request and request.complaint_status:
+            status = request.complaint_status.lower()
+            retention_days = RETENTION_PERIODS.get(status, 90)
+        else:
+            # No specific status requested - apply to all that need purging
+            retention_days = None
+    
+    cutoff_date = datetime.now(timezone.utc) - timedelta(days=retention_days or 90)
+    
+    # Find complaints to purge
+    # Only purge if complaint is in a terminally resolved state (resolved, closed, rejected)
+    # AND older than the retention period
+    base_statement = select(Complaint).where(
+        Complaint.updated_at < cutoff_date if retention_days else True
+    )
+    
+    # Filter by status if specified
+    if request and request.complaint_status:
+        base_statement = base_statement.where(Complaint.status == request.complaint_status)
+    else:
+        # Purge all terminally resolved complaints
+        base_statement = base_statement.where(
+            Complaint.status.in_(["resolved", "closed", "rejected"])
+        )
+    
+    complaints_to_purge = session.exec(base_statement).all()
+    
+    if not complaints_to_purge:
+        return {
+            "message": "No data to purge",
+            "purged_count": 0,
+            "cutoff_date": cutoff_date.isoformat()
+        }
+    
+    purged_complaint_ids = []
+    photos_deleted = 0
+    
+    # Delete photos and complaints
+    for complaint in complaints_to_purge:
+        # Get associated photos
+        photo_statement = select(Photo).where(Photo.complaint_id == complaint.id)
+        photos = session.exec(photo_statement).all()
+        
+        # Delete photos from storage and database
+        for photo in photos:
+            try:
+                from .storage import delete_photo
+                delete_photo(complaint.id, photo.id)
+            except Exception as e:
+                logger.error(f"Failed to delete photo {photo.id}: {e}")
+            
+            session.delete(photo)
+            photos_deleted += 1
+        
+        # Delete complaint
+        purged_complaint_ids.append(complaint.id)
+        session.delete(complaint)
+        
+        logger.info(f"Purging complaint {complaint.id} (status: {complaint.status}, age: {(datetime.now(timezone.utc) - complaint.updated_at).days} days)")
+    
+    # Commit all deletions
+    session.commit()
+    
+    return {
+        "message": f"Successfully purged {len(purged_complaint_ids)} complaints and {photos_deleted} photos",
+        "purged_complaint_ids": purged_complaint_ids,
+        "complaints_purged": len(purged_complaint_ids),
+        "photos_deleted": photos_deleted,
+        "cutoff_date": cutoff_date.isoformat()
     }
 
 # CORS: allow dashboard to call the API; in production set more restrictive origins

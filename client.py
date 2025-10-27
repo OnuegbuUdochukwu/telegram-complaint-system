@@ -116,6 +116,49 @@ def get_complaint_status(complaint_id: str) -> Dict[str, Any]:
   return mock
 
 
+def get_user_complaints(telegram_user_id: str, page: int = 1, page_size: int = 20) -> Dict[str, Any]:
+  """Get all complaints for a specific user from backend with retries and mock fallback."""
+  if BACKEND_URL:
+    url = BACKEND_URL.rstrip("/") + f"/api/v1/complaints"
+    params = {
+      "telegram_user_id": telegram_user_id,
+      "page": page,
+      "page_size": page_size
+    }
+    try:
+      return _attempt_request("GET", url, params=params)
+    except Exception as exc:
+      logger.warning("Backend GET %s failed after retries: %s", url, exc)
+
+  # Mock response with a few sample complaints
+  mock_items = []
+  for i in range(3):
+    ts = int(time.time()) - i * 3600  # Stagger times
+    statuses = ["reported", "in_progress", "resolved"]
+    status = statuses[(ts // 100) % len(statuses)]
+    mock_items.append({
+      "id": f"COMP-{int(time.time())}-{i}",
+      "telegram_user_id": telegram_user_id,
+      "hostel": ["Bethel", "Canaan", "Dorcas"][i % 3],
+      "room_number": f"A{100 + i}",
+      "category": ["plumbing", "electrical", "structural"][i % 3],
+      "description": f"Sample complaint {i + 1}",
+      "severity": "medium",
+      "status": status,
+      "created_at": f"2024-01-{(1 + i)}T10:00:00Z"
+    })
+  
+  mock = {
+    "items": mock_items,
+    "total": len(mock_items),
+    "page": page,
+    "page_size": page_size,
+    "total_pages": 1
+  }
+  logger.info("Returning mock user complaints response: %s", mock)
+  return mock
+
+
 # Small convenience for manual testing
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
