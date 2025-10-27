@@ -65,6 +65,11 @@ _DASHBOARD_DIR = _ROOT / "dashboard"
 if _DASHBOARD_DIR.exists():
     app.mount("/dashboard", StaticFiles(directory=str(_DASHBOARD_DIR), html=True), name="dashboard")
 
+# Serve local uploaded storage when present (development fallback)
+_STORAGE_DIR = _ROOT / "storage"
+if _STORAGE_DIR.exists():
+    app.mount("/storage", StaticFiles(directory=str(_STORAGE_DIR)), name="storage")
+
 # Use auto_error=False so the dependency doesn't automatically raise a 401
 # (which would include a WWW-Authenticate: Basic header and trigger the
 # browser's native login popup). We want the route handler to decide how
@@ -256,6 +261,29 @@ def get_complaint(complaint_id: str, session=Depends(get_session)):
     result = session.exec(statement).first()
     if not result:
         raise HTTPException(status_code=404, detail="Not found")
+    # Attach photo URLs to the complaint payload so the dashboard can
+    # render images directly in the "View Details" modal. Photo records
+    # are stored in the `photos` table; query them and generate
+    # accessible URLs (signed for S3, path for local fallback) using
+    # the storage helper `get_photo_url`.
+    try:
+        photo_stmt = select(Photo).where(Photo.complaint_id == complaint_id).order_by(Photo.created_at.desc())
+        photos = session.exec(photo_stmt).all()
+        photo_urls = []
+        for p in photos:
+            try:
+                # Prefer the storage helper to produce correct accessible URLs
+                url = get_photo_url(complaint_id, p.id, is_thumbnail=False)
+            except Exception:
+                # Fallback to stored file_url if helper fails
+                url = p.file_url
+            photo_urls.append(url)
+        # Mutate the SQLModel instance so FastAPI returns photo_urls in JSON
+        result.photo_urls = photo_urls if photo_urls else None
+    except Exception:
+        # Non-fatal: if photos can't be queried, return the complaint without photos
+        pass
+
     return result
 
 

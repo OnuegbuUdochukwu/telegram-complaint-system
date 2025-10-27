@@ -28,12 +28,14 @@ from merged_constants import (
 )
 
 # Client for backend interactions (mock/stub)
-from client import submit_complaint as client_submit
-from client import get_complaint_status as client_get_status
+from client import submit_complaint as client_submit, get_complaint_status as client_get_status, upload_photo as client_upload_photo
 from merged_constants import STATUS_KEY_TO_LABEL
 
 # Local state for the status-check conversation
 STATUS_WAITING_FOR_ID = 100
+
+# New state for attaching photos after submission
+ATTACH_PHOTOS = 200
 
 # Backwards-compatible variable name expected by existing code
 COMPLAINT_CATEGORIES = CATEGORY_LABELS
@@ -319,13 +321,20 @@ async def submit_complaint_and_end(update: Update, context: ContextTypes.DEFAULT
         complaint_id = response.get("complaint_id") or response.get("id")
 
     if complaint_id:
+        # Store the created complaint id in user_data so subsequent photo uploads attach correctly
+        context.user_data['current_complaint_id'] = complaint_id
+
         await safe_reply_to_update(
             update,
             "✅ Your complaint has been submitted successfully!\n\n"
             f"Complaint ID: `{complaint_id}`\n"
-            "We will notify you when the status changes. Thank you!",
+            "Would you like to attach photos to this complaint? If yes, send the photos now.\n"
+            "When finished, type /done. To skip attachments type /skip.",
             parse_mode='Markdown'
         )
+
+        # Transition to ATTACH_PHOTOS state to accept incoming photos
+        return ATTACH_PHOTOS
     else:
         # Fallback message if backend returned an unexpected response
         await safe_reply_to_update(
@@ -334,10 +343,78 @@ async def submit_complaint_and_end(update: Update, context: ContextTypes.DEFAULT
             "Your complaint has been saved locally for now. Please try again later to get an official ID."
         )
 
-    # Clear data and end conversation
+        # Clear data and end conversation
+        if 'complaint' in context.user_data:
+            del context.user_data['complaint']
+
+        return ConversationHandler.END
+
+
+async def handle_photo_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle incoming photo messages while in ATTACH_PHOTOS state.
+
+    Downloads the largest size of the photo and uploads it to the backend using
+    the `client.upload_photo` helper in a thread to avoid blocking the event loop.
+    """
+    if 'current_complaint_id' not in context.user_data:
+        await safe_reply_to_update(update, "No complaint context found. Start a new report with /report.")
+        return ConversationHandler.END
+
+    complaint_id = context.user_data['current_complaint_id']
+
+    # Telegram sends photos in several sizes - take the largest
+    photo_sizes = update.message.photo
+    if not photo_sizes:
+        await safe_reply_to_update(update, "Could not find photo data in the message.")
+        return ATTACH_PHOTOS
+
+    file_id = photo_sizes[-1].file_id
+    try:
+        file = await context.bot.get_file(file_id)
+        data = await file.download_as_bytearray()
+        # Construct a filename using complaint id and file id
+        filename = f"{complaint_id}_{file_id}.jpg"
+
+        # Call the client upload in a thread
+        try:
+            result = await asyncio.to_thread(client_upload_photo, complaint_id, bytes(data), filename)
+            await safe_reply_to_update(update, f"Uploaded photo: {result.get('id') or result.get('file_url')}")
+        except Exception as exc:
+            logger.exception("Failed to upload photo from bot: %s", exc)
+            await safe_reply_to_update(update, "⚠️ Failed to upload photo to server. Please try again later.")
+
+    except Exception as exc:
+        logger.exception("Error downloading photo from Telegram: %s", exc)
+        await safe_reply_to_update(update, "⚠️ Could not download the photo from Telegram.")
+
+    # Stay in the same state to accept more photos until /done or /skip
+    return ATTACH_PHOTOS
+
+
+async def finish_photo_uploads(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Finish attachment flow and end the conversation."""
+    if 'current_complaint_id' in context.user_data:
+        cid = context.user_data['current_complaint_id']
+        await safe_reply_to_update(update, f"✅ Finished attaching photos to complaint `{cid}`. Thank you!", parse_mode='Markdown')
+        # Clean up
+        del context.user_data['current_complaint_id']
+    else:
+        await safe_reply_to_update(update, "No active complaint context. Start with /report.")
     if 'complaint' in context.user_data:
         del context.user_data['complaint']
+    return ConversationHandler.END
 
+
+async def finish_without_photos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Skip attaching photos and end the conversation."""
+    if 'current_complaint_id' in context.user_data:
+        cid = context.user_data['current_complaint_id']
+        await safe_reply_to_update(update, f"No photos attached. Complaint `{cid}` is complete.", parse_mode='Markdown')
+        del context.user_data['current_complaint_id']
+    else:
+        await safe_reply_to_update(update, "No active complaint context. Start with /report.")
+    if 'complaint' in context.user_data:
+        del context.user_data['complaint']
     return ConversationHandler.END
 
 
@@ -417,6 +494,11 @@ def main():
             GET_DESCRIPTION: [
                 # Expecting a text message for the detailed description
                 MessageHandler(filters.TEXT & ~filters.COMMAND, get_description)
+            ],
+            ATTACH_PHOTOS: [
+                MessageHandler(filters.PHOTO, handle_photo_upload),
+                CommandHandler('done', finish_photo_uploads),
+                CommandHandler('skip', finish_without_photos),
             ],
             
             SUBMIT_COMPLAINT: [

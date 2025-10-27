@@ -165,3 +165,88 @@ if __name__ == "__main__":
     demo = {"telegram_user_id": "123456", "hostel": "A", "room_number": "A101", "category": "plumbing", "description": "Leaking sink"}
     print(submit_complaint(demo))
     print(get_complaint_status("MOCK-12345"))
+
+
+def _get_service_token() -> Optional[str]:
+  """Return a service token to authorize backend uploads.
+
+  Priority:
+  - BACKEND_SERVICE_TOKEN env var (explicit token)
+  - BACKEND_SERVICE_EMAIL & BACKEND_SERVICE_PASSWORD: call /auth/login
+  """
+  token = os.getenv("BACKEND_SERVICE_TOKEN")
+  if token:
+    return token
+
+  email = os.getenv("BACKEND_SERVICE_EMAIL")
+  password = os.getenv("BACKEND_SERVICE_PASSWORD")
+  if BACKEND_URL and email and password:
+    url = BACKEND_URL.rstrip("/") + "/auth/login"
+    try:
+      # The backend expects form data (OAuth2PasswordRequestForm), so post as form
+      client = _client or httpx.Client(timeout=_DEFAULT_TIMEOUT)
+      resp = client.post(url, data={"username": email, "password": password})
+      if resp.status_code == 200:
+        data = resp.json()
+        return data.get("access_token")
+      else:
+        logger.warning("Service login failed with status %s: %s", resp.status_code, resp.text)
+    except Exception as exc:
+      logger.warning("Service login error: %s", exc)
+  return None
+
+
+def upload_photo(complaint_id: str, file_bytes: bytes, filename: str, mime_type: Optional[str] = None) -> Dict[str, Any]:
+  """Upload photo bytes to the backend photos endpoint.
+
+  Returns parsed JSON from the backend on success. If BACKEND_URL is not set,
+  returns a mock response for local testing.
+  """
+  if not BACKEND_URL:
+    # Local/mock fallback: return a synthetic response
+    mock = {
+      "id": f"MOCK-PHOTO-{int(time.time())}",
+      "complaint_id": complaint_id,
+      "file_url": f"/storage/{complaint_id}/{filename}",
+      "thumbnail_url": None,
+      "file_name": filename,
+      "file_size": len(file_bytes),
+    }
+    logger.info("Returning mock upload_photo response: %s", mock)
+    return mock
+
+  url = BACKEND_URL.rstrip("/") + f"/api/v1/complaints/{complaint_id}/photos"
+  token = _get_service_token()
+  headers = {}
+  if token:
+    headers["Authorization"] = f"Bearer {token}"
+
+  # Prepare multipart files payload
+  files = {"file": (filename, file_bytes, mime_type or "application/octet-stream")}
+
+  last_exc: Optional[Exception] = None
+  for attempt in range(1, _MAX_RETRIES + 1):
+    try:
+      client = _client or httpx.Client(timeout=_DEFAULT_TIMEOUT)
+      resp = client.post(url, files=files, headers=headers)
+      if 200 <= resp.status_code < 300:
+        return resp.json()
+      # Treat 4xx as non-retryable
+      if 400 <= resp.status_code < 500:
+        resp.raise_for_status()
+      # 5xx -> retry
+      resp.raise_for_status()
+    except Exception as exc:
+      last_exc = exc
+      response = exc.response if hasattr(exc, "response") else None
+      if attempt == _MAX_RETRIES or not _is_retryable(exc, response):
+        logger.warning("upload_photo to %s failed (attempt %s/%s): %s", url, attempt, _MAX_RETRIES, exc)
+        break
+      backoff = _BACKOFF_FACTOR * (2 ** (attempt - 1))
+      jitter = random.uniform(0, backoff * 0.1)
+      sleep_time = backoff + jitter
+      logger.info("Retrying upload in %.2fs (attempt %s/%s)", sleep_time, attempt + 1, _MAX_RETRIES)
+      time.sleep(sleep_time)
+
+  raise last_exc if last_exc is not None else RuntimeError("upload_photo failed without exception")
+
