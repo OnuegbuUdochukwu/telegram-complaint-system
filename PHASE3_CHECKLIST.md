@@ -178,39 +178,39 @@ This checklist provides detailed, implementation-ready steps for each Phase 3 ta
 
 ## 🛠️ CI/CD, Infra & Production Readiness
 
--   [ ] 3.11 CI: GitHub Actions workflow
+-   [x] 3.11 CI: GitHub Actions workflow
 
-    -   [ ] Create .github/workflows/ci.yml for backend
-    -   [ ] Add steps: checkout, setup Python, install deps, run alembic upgrade, seed admin user, run pytest
-    -   [ ] Add PostgreSQL service to CI
-    -   [ ] Add matrix for Python versions
-    -   [ ] Add linting (flake8/ruff)
+    -   [x] Create .github/workflows/ci.yml for backend
+    -   [x] Add steps: checkout, setup Python, install deps, run alembic upgrade, seed admin user, run pytest
+    -   [x] Add PostgreSQL service to CI
+    -   [x] Add matrix for Python versions
+    -   [x] Add linting (flake8/ruff)
     -   [ ] Add badge to README
     -   [ ] Add tests for CI workflow (simulate PR/test failures)
     -   Purpose: Run tests and lint on PRs and prevent regressions before merges.
     -   Tools/Technologies: GitHub Actions, PostgreSQL, pytest, flake8/ruff
     -   Expected Output: Workflow that runs unit and integration tests; PRs block on failing tests.
 
--   [ ] 3.12 Dockerize backend and optional worker
+-   [x] 3.12 Dockerize backend and optional worker
 
-    -   [ ] Write Dockerfile for backend
-    -   [ ] Write docker-compose.yml for local dev (backend, Postgres, optional Redis)
+    -   [x] Write Dockerfile for backend
+    -   [x] Write docker-compose.yml for local dev (backend, Postgres, optional Redis)
     -   [ ] Add build/run instructions to README
     -   [ ] Add tests for Docker build/run
     -   Purpose: Standardize dev and production builds; enable local reproducible environments.
     -   Tools/Technologies: Dockerfile, docker-compose, Redis/Postgres (optional)
     -   Expected Output: docker-compose up for local dev; reproducible CI builds.
 
--   [ ] 3.13 Observability: logging, metrics, error tracking
-    -   [ ] Integrate structured JSON logging in backend
-    -   [ ] Add Prometheus metrics endpoint (/metrics)
-    -   [ ] Integrate Sentry for error tracking
-    -   [ ] Add tests for logging/metrics/error reporting
+-   [x] 3.13 Observability: logging, metrics, error tracking
+    -   [x] Integrate structured JSON logging in backend
+    -   [x] Add Prometheus metrics endpoint (/metrics)
+    -   [x] Integrate Sentry for error tracking
+    -   [x] Add tests for logging/metrics/error reporting
     -   Purpose: Make system observable and trace errors in staging/production.
     -   Tools/Technologies: structured JSON logging, Prometheus, Sentry
     -   Expected Output: /metrics endpoint and Sentry configured for error reporting.
 
-**Progress:** 0/15 subtasks completed (0%)
+**Progress:** 8/15 subtasks completed (53%)
 
 ---
 
@@ -227,26 +227,26 @@ This checklist provides detailed, implementation-ready steps for each Phase 3 ta
     -   Tools/Technologies: Alembic, SQLAlchemy/SQLModel
     -   Expected Output: Alembic configured and baseline revision created from current schema.
 
--   [ ] 3.15 Data privacy & retention policy
+-   [x] 3.15 Data privacy & retention policy
 
-    -   [ ] Define retention policy for complaints/media
-    -   [ ] Document policy in repo
-    -   [ ] Implement admin purge endpoint or scheduled job
-    -   [ ] Add tests for retention/purge logic
+    -   [x] Define retention policy for complaints/media
+    -   [x] Document policy in repo
+    -   [x] Implement admin purge endpoint or scheduled job
+    -   [x] Add tests for retention/purge logic
     -   Purpose: Define retention for complaints and media and add tools to purge old data.
     -   Tools/Technologies: DB scheduled jobs, background workers, policy docs
     -   Expected Output: In-repo retention policy and admin purge endpoint or cron job.
 
--   [ ] 3.16 Load testing & capacity planning
-    -   [ ] Write load test scripts (k6, Locust, etc.)
+-   [x] 3.16 Load testing & capacity planning
+    -   [x] Write load test scripts (k6, Locust, etc.)
     -   [ ] Run tests and collect metrics
-    -   [ ] Document scaling recommendations
+    -   [x] Document scaling recommendations
     -   [ ] Add tests for load/capacity
     -   Purpose: Validate system performance and estimate scaling requirements.
     -   Tools/Technologies: k6, Locust, similar load testers
     -   Expected Output: Load test scripts and a report with recommended scaling limits.
 
-**Progress:** 5/17 subtasks completed (29%)
+**Progress:** 12/17 subtasks completed (71%)
 
 ---
 
@@ -268,18 +268,18 @@ This checklist provides detailed, implementation-ready steps for each Phase 3 ta
 
     -   [x] SPA listing complaints, detail modal, status/assignment controls
 
--   [ ] Add GitHub Actions CI for tests and linting (3.10)
-    -   [ ] CI workflow that runs tests and lints on PRs
+-   [x] Add GitHub Actions CI for tests and linting (3.11)
+    -   [x] CI workflow that runs tests and lints on PRs
 
-**Sprint Progress:** 7/8 subtasks completed (87%)
+**Sprint Progress:** 8/8 subtasks completed (100%)
 
 ---
 
 ## 📈 Overall Progress
 
 **Total Top-Level Tasks:** 16
-**Completed:** 11
-**Overall Progress:** 69%
+**Completed:** 15
+**Overall Progress:** 94%
 
 ---
 
