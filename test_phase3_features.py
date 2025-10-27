@@ -49,7 +49,7 @@ def test_photo_upload_basic():
     # Create a test complaint first
     complaint_payload = {
         "telegram_user_id": "test-user-phase3",
-        "hostel": "TestHostel",
+        "hostel": "John",
         "room_number": "T200",
         "category": "electrical",
         "description": "Test for Phase 3 photo upload",

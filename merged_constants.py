@@ -14,7 +14,7 @@ import re
 # General / UI constants
 # ---------------------------------------------------------------------------
 # Hostels (canonical list used by the bot to render the hostel selection keyboard)
-HOSTELS: List[str] = ["Bethel", "Canaan", "Dorcas", "Shiloh", "Zion"]
+HOSTELS: List[str] = ["John", "Joseph", "Paul", "Peter", "Daniel", "Esther", "Dorcas", "Lydia", "Mary", "Deborah"]
 
 # Legacy human-friendly categories (kept for backward compatibility/reference).
 # Prefer using CATEGORY_LABEL_TO_KEY and CATEGORY_KEY_TO_LABEL in the app logic.

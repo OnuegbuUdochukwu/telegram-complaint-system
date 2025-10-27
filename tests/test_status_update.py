@@ -33,7 +33,7 @@ def test_update_status_success():
     # Submit a complaint
     payload = {
         "telegram_user_id": "test-user-2",
-        "hostel": "TestHostel",
+        "hostel": "John",
         "room_number": "T102",
         "category": "electric",
         "description": "Integration test: flickering light",
@@ -55,7 +55,7 @@ def test_update_status_invalid_status():
     porter_id, token = _register_and_login(email="porter2@example.com")
     payload = {
         "telegram_user_id": "test-user-3",
-        "hostel": "TestHostel",
+        "hostel": "John",
         "room_number": "T103",
         "category": "cleaning",
         "description": "Integration test: dirty corridor",
@@ -73,7 +73,7 @@ def test_update_status_invalid_status():
 def test_update_status_unauthorized():
     payload = {
         "telegram_user_id": "test-user-4",
-        "hostel": "TestHostel",
+        "hostel": "John",
         "room_number": "T104",
         "category": "pest",
         "description": "Integration test: pest sighting",

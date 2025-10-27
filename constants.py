@@ -4,7 +4,7 @@
 # Constants for data that is frequently accessed or used across modules.
 
 # The current set of Hostels available for selection
-HOSTELS = ["Bethel", "Canaan", "Dorcas", "Shiloh", "Zion"]
+HOSTELS = ["John", "Joseph", "Paul", "Peter", "Daniel", "Esther", "Dorcas", "Lydia", "Mary", "Deborah"]
 
 # The current set of Complaint Categories for facility issues
 COMPLAINT_CATEGORIES = [

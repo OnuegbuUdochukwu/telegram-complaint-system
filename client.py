@@ -139,7 +139,7 @@ def get_user_complaints(telegram_user_id: str, page: int = 1, page_size: int = 2
     mock_items.append({
       "id": f"COMP-{int(time.time())}-{i}",
       "telegram_user_id": telegram_user_id,
-      "hostel": ["Bethel", "Canaan", "Dorcas"][i % 3],
+      "hostel": ["John", "Joseph", "Paul"][i % 3],
       "room_number": f"A{100 + i}",
       "category": ["plumbing", "electrical", "structural"][i % 3],
       "description": f"Sample complaint {i + 1}",

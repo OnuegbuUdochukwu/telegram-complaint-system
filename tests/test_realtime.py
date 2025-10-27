@@ -132,7 +132,7 @@ def test_complaint_submission_with_notifications():
     # Submit a test complaint
     complaint_data = {
         "telegram_user_id": "test_user_123",
-        "hostel": "Test Hostel",
+        "hostel": "John",
         "room_number": "101",
         "category": "plumbing",
         "description": "Test complaint for notification testing",

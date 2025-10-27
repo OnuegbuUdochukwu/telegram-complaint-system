@@ -27,7 +27,7 @@ def test_upload_photo_requires_auth():
     # Create a complaint first
     payload = {
         "telegram_user_id": "test-user-1",
-        "hostel": "TestHostel",
+        "hostel": "John",
         "room_number": "T101",
         "category": "plumbing",
         "description": "Test complaint for photo upload",
@@ -75,7 +75,7 @@ def test_upload_and_list_photos():
     # Create a complaint
     payload = {
         "telegram_user_id": "test-user-photo",
-        "hostel": "TestHostel",
+        "hostel": "John",
         "room_number": "T102",
         "category": "electrical",
         "description": "Test complaint for photo upload",
@@ -134,7 +134,7 @@ def test_photo_validation():
     # Create a complaint
     payload = {
         "telegram_user_id": "test-user-validation",
-        "hostel": "TestHostel",
+        "hostel": "John",
         "room_number": "T103",
         "category": "other",
         "description": "Test validation",

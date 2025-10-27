@@ -49,11 +49,11 @@ The system uses the following status lifecycle:
 
 1. 🔧 In Progress
    ID: abc12345
-   Hostel: Bethel | Category: plumbing
+   Hostel: John | Category: plumbing
 
 2. ✅ Resolved
    ID: def67890
-   Hostel: Canaan | Category: electrical
+   Hostel: Joseph | Category: electrical
 ```
 
 ### 4. Backend API Enhancement
@@ -72,7 +72,7 @@ GET /api/v1/complaints?telegram_user_id={user_id}
     {
       "id": "complaint-uuid",
       "telegram_user_id": "user-id",
-      "hostel": "Bethel",
+      "hostel": "John",
       "room_number": "A101",
       "category": "plumbing",
       "description": "Leaking sink",
@@ -120,10 +120,10 @@ The API allows public access (no authentication required) when filtering by `tel
         📋 Your Complaints
         1. 🔧 In Progress
            ID: abc12345
-           Hostel: Bethel | Category: plumbing
+           Hostel: John | Category: plumbing
         2. ✅ Resolved
            ID: def67890
-           Hostel: Canaan | Category: electrical
+           Hostel: Joseph | Category: electrical
    ```
 
 3. **No complaints:**

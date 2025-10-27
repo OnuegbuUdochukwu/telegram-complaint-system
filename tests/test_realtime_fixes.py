@@ -87,7 +87,7 @@ class TestWebSocketManagerFixes:
         # Test NewComplaintEvent
         event = NewComplaintEvent(
             complaint_id="test-123",
-            hostel="Hostel A",
+            hostel="John",
             category="electrical",
             severity="high"
         )
@@ -167,7 +167,7 @@ class TestTelegramNotifierFixes:
             with patch.object(telegram_notifier.bot, 'send_message', new_callable=AsyncMock) as mock_send:
                 complaint_data = {
                     "id": "test-123",
-                    "hostel": "Hostel A",
+                    "hostel": "John",
                     "category": "electrical",
                     "severity": "high",
                     "description": "Test complaint",
@@ -185,7 +185,7 @@ class TestTelegramNotifierFixes:
             # If no bot configured, ensure function returns False
             complaint_data = {
                 "id": "test-123",
-                "hostel": "Hostel A",
+                "hostel": "John",
                 "category": "electrical",
                 "severity": "high",
                 "description": "Test complaint",
@@ -196,7 +196,7 @@ class TestTelegramNotifierFixes:
             assert result is False
             complaint_data = {
                 "id": "test-123",
-                "hostel": "Hostel A",
+                "hostel": "John",
                 "category": "electrical",
                 "severity": "high",
                 "description": "Test complaint",
@@ -251,7 +251,7 @@ class TestMainIntegrationFixes:
         with patch.object(telegram_notifier, 'send_complaint_alert', new_callable=AsyncMock) as mock_telegram:
             complaint_payload = {
                 "telegram_user_id": "test_user_notifications",
-                "hostel": "Hostel A",
+                "hostel": "John",
                 "room_number": "101",
                 "category": "electrical",
                 "description": "Light not working",
@@ -273,7 +273,7 @@ class TestMainIntegrationFixes:
                 mock_telegram.assert_called_once()
                 call_args = mock_telegram.call_args[0][0]
                 assert call_args["id"] == complaint_id
-                assert call_args["hostel"] == "Hostel A"
+                assert call_args["hostel"] == "John"
                 assert call_args["category"] == "electrical"
                 assert call_args["severity"] == "high"
     
@@ -283,7 +283,7 @@ class TestMainIntegrationFixes:
         # Create a complaint first
         complaint_payload = {
             "telegram_user_id": "test_user_status",
-            "hostel": "Hostel B",
+            "hostel": "Joseph",
             "room_number": "202",
             "category": "plumbing",
             "description": "Leaky faucet",
@@ -379,7 +379,7 @@ class TestEndToEndIntegration:
                 # 1. Submit complaint
                 complaint_payload = {
                     "telegram_user_id": "test_user_e2e",
-                    "hostel": "Hostel C",
+                    "hostel": "Paul",
                     "room_number": "303",
                     "category": "structural",
                     "description": "Crack in wall",
