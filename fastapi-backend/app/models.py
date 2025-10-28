@@ -141,3 +141,58 @@ class Photo(SQLModel, table=True):
     height: Optional[int] = None
     
     created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class AdminInvitation(SQLModel, table=True):
+    """Admin invitation model for secure admin onboarding."""
+    __tablename__ = "admin_invitations"
+    if _USE_PG_UUID:
+        id: Optional[str] = Field(default=None, primary_key=True, sa_column=Column(PG_UUID(as_uuid=False), primary_key=True, server_default=text("gen_random_uuid()")))
+    else:
+        id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    
+    email: str = Field(sa_column_kwargs={"unique": True})
+    
+    # Foreign key to Porter who sent the invitation
+    if _USE_PG_UUID:
+        invited_by: str = Field(foreign_key="porters.id", sa_column=Column(PG_UUID(as_uuid=False)))
+    else:
+        invited_by: str = Field(foreign_key="porters.id")
+    
+    # Secure random token for invitation link
+    token: str = Field(sa_column_kwargs={"unique": True})
+    
+    # Expiration time (default 48 hours)
+    expires_at: datetime
+    
+    used: bool = Field(default=False)
+    
+    created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class OTPToken(SQLModel, table=True):
+    """OTP token model for email verification and password reset."""
+    __tablename__ = "otp_tokens"
+    if _USE_PG_UUID:
+        id: Optional[str] = Field(default=None, primary_key=True, sa_column=Column(PG_UUID(as_uuid=False), primary_key=True, server_default=text("gen_random_uuid()")))
+    else:
+        id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    
+    email: str
+    
+    # Hashed OTP code (like password hashes)
+    code_hash: str
+    
+    # Purpose: 'signup', 'password_reset'
+    purpose: str
+    
+    # Expiration time (default 10 minutes)
+    expires_at: datetime
+    
+    # Rate limiting: track verification attempts
+    attempts: int = Field(default=0)
+    max_attempts: int = Field(default=3)
+    
+    used: bool = Field(default=False)
+    
+    created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))

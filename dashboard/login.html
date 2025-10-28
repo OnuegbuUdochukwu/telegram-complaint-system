@@ -136,6 +136,17 @@
                         </div>
                     </div>
 
+                    <!-- Forgot Password Link -->
+                    <div class="text-right">
+                        <a
+                            href="#"
+                            id="forgotPasswordLink"
+                            class="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                        >
+                            Forgot password?
+                        </a>
+                    </div>
+
                     <!-- Error Message -->
                     <div
                         id="errorMessage"
@@ -332,6 +343,84 @@
             [usernameInput, passwordInput].forEach((input) => {
                 input.addEventListener("input", hideError);
             });
+
+            // Forgot Password Handler
+            document.getElementById("forgotPasswordLink").addEventListener("click", (e) => {
+                e.preventDefault();
+                const email = prompt("Enter your email address:");
+                if (email) {
+                    handleForgotPassword(email);
+                }
+            });
+
+            async function handleForgotPassword(email) {
+                try {
+                    setLoading(true);
+                    hideError();
+
+                    const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({ email }),
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        const otpCode = prompt(
+                            "A verification code has been sent to your email.\n\nEnter the code:"
+                        );
+                        if (otpCode) {
+                            const newPassword = prompt("Enter your new password:");
+                        if (newPassword) {
+                            await handleResetPassword(email, otpCode, newPassword);
+                        }
+                    }
+                } else {
+                    showError(data.detail || "Failed to send password reset code");
+                }
+            } catch (error) {
+                console.error("Forgot password error:", error);
+                showError("An error occurred. Please try again.");
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        async function handleResetPassword(email, otpCode, newPassword) {
+            try {
+                setLoading(true);
+                hideError();
+
+                const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        email,
+                        otp_code: otpCode,
+                        new_password: newPassword,
+                    }),
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert("Password reset successfully! Please login with your new password.");
+                    passwordInput.value = "";
+                } else {
+                    showError(data.detail || "Failed to reset password");
+                }
+            } catch (error) {
+                console.error("Reset password error:", error);
+                showError("An error occurred. Please try again.");
+            } finally {
+                setLoading(false);
+            }
+        }
 
             // Check if already logged in
             if (sessionStorage.getItem("access_token")) {

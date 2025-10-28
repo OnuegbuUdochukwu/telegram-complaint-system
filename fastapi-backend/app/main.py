@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from . import auth
 from typing import List, Optional
 from pydantic import BaseModel, StrictStr
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from sqlmodel import select, func
 from .websocket_manager import manager
 from .telegram_notifier import telegram_notifier
@@ -20,8 +20,12 @@ import json
 
 # Local imports required by route handlers and dependencies
 from .database import get_session, init_db
-from .models import Complaint, Porter, AssignmentAudit, Hostel, Photo
+from .models import Complaint, Porter, AssignmentAudit, Hostel, Photo, AdminInvitation, OTPToken
 from sqlalchemy import text as sa_text
+from .email_service import send_invitation_email, send_otp_email
+from .otp_utils import create_otp_token, verify_otp_token, validate_password_strength
+from email_validator import validate_email, EmailNotValidError
+import secrets
 from .storage import upload_photo, upload_thumbnail, get_photo_url, delete_photo
 from .photo_utils import validate_image, process_image, get_mime_type
 from fastapi import File, UploadFile
@@ -151,6 +155,365 @@ def register_porter(
 
 # NOTE: removed dev-only /auth/dev-token endpoint. Tests use fixtures in
 # tests/conftest.py to create porters and tokens directly.
+
+
+# ============================================================================
+# Admin Invitation and Self-Registration Endpoints
+# ============================================================================
+
+class InviteAdminRequest(BaseModel):
+    email: str
+
+
+@app.post("/auth/admin/invite")
+async def invite_admin(
+    request_data: InviteAdminRequest,
+    user: Porter = Depends(auth.require_role("admin")),
+    session=Depends(get_session),
+):
+    """Admin-only endpoint to send an invitation to a new admin.
+    
+    Creates an invitation record and sends an email with a signup link.
+    """
+    email = request_data.email.lower().strip()
+    
+    # Validate email format
+    try:
+        validated = validate_email(email)
+        email = validated.email
+    except EmailNotValidError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid email address: {str(e)}")
+    
+    # Check if email already exists as a porter
+    existing_porter = session.exec(select(Porter).where(Porter.email == email)).first()
+    if existing_porter:
+        raise HTTPException(status_code=400, detail="A user with this email already exists")
+    
+    # Check if there's already a pending invitation for this email
+    now = datetime.now(timezone.utc)
+    existing_invitation = session.exec(
+        select(AdminInvitation).where(
+            AdminInvitation.email == email,
+            AdminInvitation.used == False,
+            AdminInvitation.expires_at > now
+        )
+    ).first()
+    
+    if existing_invitation:
+        raise HTTPException(status_code=400, detail="An active invitation already exists for this email")
+    
+    # Generate secure invitation token
+    invitation_token = secrets.token_urlsafe(32)
+    
+    # Create invitation (expires in 48 hours)
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=48)
+    invitation = AdminInvitation(
+        email=email,
+        invited_by=user.id,
+        token=invitation_token,
+        expires_at=expires_at,
+        used=False
+    )
+    
+    session.add(invitation)
+    session.commit()
+    session.refresh(invitation)
+    
+    # Send invitation email
+    email_sent = await send_invitation_email(email, invitation_token, user.full_name)
+    
+    if not email_sent:
+        # If email fails in production, we might want to fail the request
+        # For now, log and continue (user can still use the token from the response in dev)
+        logger.warning(f"Failed to send invitation email to {email}, but invitation was created")
+    
+    return {
+        "message": "Invitation sent successfully",
+        "email": email,
+        "expires_at": expires_at.isoformat()
+    }
+
+
+@app.get("/auth/invitation/{token}")
+def validate_invitation_token(token: str, session=Depends(get_session)):
+    """Validate an invitation token and return invitation details."""
+    now = datetime.now(timezone.utc)
+    
+    invitation = session.exec(
+        select(AdminInvitation).where(
+            AdminInvitation.token == token,
+            AdminInvitation.used == False,
+            AdminInvitation.expires_at > now
+        )
+    ).first()
+    
+    if not invitation:
+        raise HTTPException(status_code=404, detail="Invalid or expired invitation token")
+    
+    return {
+        "email": invitation.email,
+        "expires_at": invitation.expires_at.isoformat()
+    }
+
+
+class SignupRequest(BaseModel):
+    invitation_token: str
+    full_name: str
+    password: str
+
+
+@app.post("/auth/signup")
+async def signup(
+    request_data: SignupRequest,
+    session=Depends(get_session),
+):
+    """Complete admin signup with invitation token and OTP verification.
+    
+    Note: OTP verification should be done separately via /auth/verify-otp before calling this.
+    The frontend should handle the two-step flow: verify OTP first, then call signup.
+    """
+    # Validate invitation token
+    now = datetime.now(timezone.utc)
+    invitation = session.exec(
+        select(AdminInvitation).where(
+            AdminInvitation.token == request_data.invitation_token,
+            AdminInvitation.used == False,
+            AdminInvitation.expires_at > now
+        )
+    ).first()
+    
+    if not invitation:
+        raise HTTPException(status_code=400, detail="Invalid or expired invitation token")
+    
+    # Validate password strength
+    is_valid, error_msg = validate_password_strength(request_data.password)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_msg)
+    
+    # Check if OTP was verified (there should be a used OTP token for this email with purpose='signup')
+    verified_otp = session.exec(
+        select(OTPToken).where(
+            OTPToken.email == invitation.email,
+            OTPToken.purpose == "signup",
+            OTPToken.used == True,
+            OTPToken.expires_at > now - timedelta(minutes=10)  # OTP must have been used recently
+        ).order_by(OTPToken.created_at.desc())
+    ).first()
+    
+    if not verified_otp:
+        raise HTTPException(
+            status_code=400,
+            detail="Email verification required. Please verify your email with the OTP code first."
+        )
+    
+    # Check if user already exists
+    existing_porter = session.exec(select(Porter).where(Porter.email == invitation.email)).first()
+    if existing_porter:
+        raise HTTPException(status_code=400, detail="A user with this email already exists")
+    
+    # Create admin porter
+    try:
+        porter = auth.create_porter(
+            session,
+            full_name=request_data.full_name,
+            password=request_data.password,
+            email=invitation.email,
+            role="admin"
+        )
+    except Exception as exc:
+        logger.error(f"Failed to create admin porter: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to create admin account")
+    
+    # Mark invitation as used
+    invitation.used = True
+    session.add(invitation)
+    session.commit()
+    
+    logger.info(f"Admin account created via invitation: {porter.email} (id: {porter.id})")
+    
+    return {
+        "message": "Admin account created successfully",
+        "id": porter.id,
+        "email": porter.email
+    }
+
+
+class SendOTPRequest(BaseModel):
+    email: str
+    purpose: str  # 'signup' or 'password_reset'
+
+
+@app.post("/auth/send-otp")
+async def send_otp(
+    request_data: SendOTPRequest,
+    session=Depends(get_session),
+):
+    """Send an OTP code to the specified email address.
+    
+    For 'signup': requires valid invitation token context (email must match invitation)
+    For 'password_reset': email must belong to an existing user
+    """
+    email = request_data.email.lower().strip()
+    purpose = request_data.purpose.lower()
+    
+    if purpose not in ["signup", "password_reset"]:
+        raise HTTPException(status_code=400, detail="Invalid purpose. Must be 'signup' or 'password_reset'")
+    
+    # Validate email format
+    try:
+        validated = validate_email(email)
+        email = validated.email
+    except EmailNotValidError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid email address: {str(e)}")
+    
+    # For password reset, verify user exists
+    if purpose == "password_reset":
+        existing_user = session.exec(select(Porter).where(Porter.email == email)).first()
+        if not existing_user:
+            # Don't reveal if email exists (security best practice)
+            return {"message": "If the email exists, a verification code will be sent"}
+    
+    # For signup, verify there's a valid invitation
+    elif purpose == "signup":
+        now = datetime.now(timezone.utc)
+        invitation = session.exec(
+            select(AdminInvitation).where(
+                AdminInvitation.email == email,
+                AdminInvitation.used == False,
+                AdminInvitation.expires_at > now
+            )
+        ).first()
+        if not invitation:
+            raise HTTPException(status_code=400, detail="No valid invitation found for this email")
+    
+    # Create and send OTP
+    otp_code, error_msg = await create_otp_token(session, email, purpose)
+    
+    if error_msg:
+        raise HTTPException(status_code=429, detail=error_msg)
+    
+    # Send email
+    email_sent = await send_otp_email(email, otp_code, purpose)
+    
+    if not email_sent:
+        logger.warning(f"Failed to send OTP email to {email}, but OTP was created")
+    
+    # Always return success (don't reveal if email exists for password_reset)
+    return {
+        "message": "Verification code sent to your email",
+        "email": email if purpose == "signup" else None  # Only reveal for signup
+    }
+
+
+class VerifyOTPRequest(BaseModel):
+    email: str
+    otp_code: str
+    purpose: str
+
+
+@app.post("/auth/verify-otp")
+async def verify_otp(
+    request_data: VerifyOTPRequest,
+    session=Depends(get_session),
+):
+    """Verify an OTP code."""
+    email = request_data.email.lower().strip()
+    purpose = request_data.purpose.lower()
+    
+    if purpose not in ["signup", "password_reset"]:
+        raise HTTPException(status_code=400, detail="Invalid purpose")
+    
+    is_valid, error_msg = await verify_otp_token(session, email, request_data.otp_code, purpose)
+    
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_msg)
+    
+    return {
+        "message": "Email verified successfully",
+        "verified": True
+    }
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+@app.post("/auth/forgot-password")
+async def forgot_password(
+    request_data: ForgotPasswordRequest,
+    session=Depends(get_session),
+):
+    """Request a password reset OTP."""
+    email = request_data.email.lower().strip()
+    
+    # Validate email format
+    try:
+        validated = validate_email(email)
+        email = validated.email
+    except EmailNotValidError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid email address: {str(e)}")
+    
+    # Check if user exists (but don't reveal if they don't)
+    existing_user = session.exec(select(Porter).where(Porter.email == email)).first()
+    if not existing_user:
+        # Return success to prevent email enumeration
+        return {"message": "If the email exists, a password reset code will be sent"}
+    
+    # Create and send OTP
+    otp_code, error_msg = await create_otp_token(session, email, "password_reset")
+    
+    if error_msg:
+        raise HTTPException(status_code=429, detail=error_msg)
+    
+    # Send email
+    email_sent = await send_otp_email(email, otp_code, "password_reset")
+    
+    if not email_sent:
+        logger.warning(f"Failed to send password reset email to {email}")
+    
+    # Always return success (security: don't reveal if email exists)
+    return {"message": "If the email exists, a password reset code will be sent"}
+
+
+class ResetPasswordRequest(BaseModel):
+    email: str
+    otp_code: str
+    new_password: str
+
+
+@app.post("/auth/reset-password")
+async def reset_password(
+    request_data: ResetPasswordRequest,
+    session=Depends(get_session),
+):
+    """Reset password using OTP verification."""
+    email = request_data.email.lower().strip()
+    
+    # Validate password strength
+    is_valid, error_msg = validate_password_strength(request_data.new_password)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_msg)
+    
+    # Verify OTP
+    is_valid, error_msg = await verify_otp_token(session, email, request_data.otp_code, "password_reset")
+    
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_msg)
+    
+    # Find user
+    user = session.exec(select(Porter).where(Porter.email == email)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Update password
+    user.password_hash = auth.get_password_hash(request_data.new_password)
+    user.updated_at = datetime.now(timezone.utc)
+    session.add(user)
+    session.commit()
+    
+    logger.info(f"Password reset successful for user: {email}")
+    
+    return {"message": "Password reset successfully"}
 
 
 
