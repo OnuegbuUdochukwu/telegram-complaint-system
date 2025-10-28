@@ -516,6 +516,60 @@ async def reset_password(
     return {"message": "Password reset successfully"}
 
 
+# ============================================================================
+# Profile Management Endpoints
+# ============================================================================
+
+@app.get("/api/v1/profile/me", response_model=PorterPublic)
+def get_current_user_profile(user: Porter = Depends(auth.get_current_user)):
+    """Get current user's profile information."""
+    return PorterPublic(
+        id=user.id,
+        full_name=user.full_name,
+        phone=user.phone,
+        email=user.email,
+        role=user.role
+    )
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@app.post("/api/v1/profile/change-password")
+def change_password(
+    request_data: ChangePasswordRequest,
+    user: Porter = Depends(auth.get_current_user),
+    session=Depends(get_session),
+):
+    """Change user's password.
+    
+    Requires current password for verification.
+    """
+    # Verify current password
+    if not user.password_hash or not auth.verify_password(request_data.current_password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    
+    # Validate new password strength
+    is_valid, error_msg = validate_password_strength(request_data.new_password)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_msg)
+    
+    # Check if new password is different from current
+    if auth.verify_password(request_data.new_password, user.password_hash):
+        raise HTTPException(status_code=400, detail="New password must be different from current password")
+    
+    # Update password
+    user.password_hash = auth.get_password_hash(request_data.new_password)
+    user.updated_at = datetime.now(timezone.utc)
+    session.add(user)
+    session.commit()
+    
+    logger.info(f"Password changed for user: {user.email}")
+    
+    return {"message": "Password changed successfully"}
+
 
 @app.on_event("startup")
 def on_startup():

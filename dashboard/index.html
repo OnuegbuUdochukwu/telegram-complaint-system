@@ -66,6 +66,25 @@
                             class="text-sm text-gray-600"
                         ></span>
                         <button
+                            id="profileButton"
+                            class="text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors duration-200 flex items-center"
+                        >
+                            <svg
+                                class="w-5 h-5 mr-1"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                                ></path>
+                            </svg>
+                            Profile
+                        </button>
+                        <button
                             id="logoutButton"
                             class="text-sm text-gray-500 hover:text-gray-700 transition-colors duration-200"
                         >
@@ -489,6 +508,248 @@
             </div>
         </div>
 
+        <!-- Profile Modal -->
+        <div
+            id="profileModal"
+            class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50"
+        >
+            <div
+                class="relative top-20 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white"
+            >
+                <div class="mt-3">
+                    <!-- Modal Header -->
+                    <div
+                        class="flex items-center justify-between pb-4 border-b border-gray-200"
+                    >
+                        <h3 class="text-lg font-medium text-gray-900">
+                            Admin Profile
+                        </h3>
+                        <button
+                            id="closeProfileModal"
+                            class="text-gray-400 hover:text-gray-600 transition-colors duration-200"
+                        >
+                            <svg
+                                class="w-6 h-6"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M6 18L18 6M6 6l12 12"
+                                ></svg>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Modal Content -->
+                    <div id="profileModalContent" class="mt-6">
+                        <!-- Profile information will be loaded here -->
+                        <div class="space-y-6">
+                            <!-- User Info Section -->
+                            <div>
+                                <h4 class="text-sm font-medium text-gray-900 mb-4">
+                                    Account Information
+                                </h4>
+                                <div class="space-y-4">
+                                    <div>
+                                        <label
+                                            class="block text-sm font-medium text-gray-700 mb-1"
+                                        >
+                                            Email
+                                        </label>
+                                        <input
+                                            type="email"
+                                            id="profileEmail"
+                                            readonly
+                                            class="block w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label
+                                            class="block text-sm font-medium text-gray-700 mb-1"
+                                        >
+                                            Full Name
+                                        </label>
+                                        <input
+                                            type="text"
+                                            id="profileFullName"
+                                            readonly
+                                            class="block w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label
+                                            class="block text-sm font-medium text-gray-700 mb-1"
+                                        >
+                                            Role
+                                        </label>
+                                        <input
+                                            type="text"
+                                            id="profileRole"
+                                            readonly
+                                            class="block w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Change Password Section -->
+                            <div class="border-t border-gray-200 pt-6">
+                                <h4 class="text-sm font-medium text-gray-900 mb-4">
+                                    Change Password
+                                </h4>
+                                <form id="changePasswordForm" class="space-y-4">
+                                    <div>
+                                        <label
+                                            for="currentPassword"
+                                            class="block text-sm font-medium text-gray-700 mb-1"
+                                        >
+                                            Current Password
+                                        </label>
+                                        <input
+                                            type="password"
+                                            id="currentPassword"
+                                            required
+                                            class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors duration-200"
+                                            placeholder="Enter current password"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label
+                                            for="newPassword"
+                                            class="block text-sm font-medium text-gray-700 mb-1"
+                                        >
+                                            New Password
+                                        </label>
+                                        <input
+                                            type="password"
+                                            id="newPassword"
+                                            required
+                                            class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors duration-200"
+                                            placeholder="Enter new password"
+                                        />
+                                        <p class="mt-1 text-xs text-gray-500">
+                                            Must be at least 8 characters with uppercase, lowercase, and a number
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <label
+                                            for="confirmPassword"
+                                            class="block text-sm font-medium text-gray-700 mb-1"
+                                        >
+                                            Confirm New Password
+                                        </label>
+                                        <input
+                                            type="password"
+                                            id="confirmPassword"
+                                            required
+                                            class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors duration-200"
+                                            placeholder="Confirm new password"
+                                        />
+                                    </div>
+                                    <div
+                                        id="passwordChangeMessage"
+                                        class="hidden rounded-lg p-4"
+                                    ></div>
+                                    <button
+                                        type="submit"
+                                        id="changePasswordButton"
+                                        class="w-full bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <span id="changePasswordButtonText">Change Password</span>
+                                        <svg
+                                            id="changePasswordSpinner"
+                                            class="hidden animate-spin inline-block ml-2 h-4 w-4 text-white"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <circle
+                                                class="opacity-25"
+                                                cx="12"
+                                                cy="12"
+                                                r="10"
+                                                stroke="currentColor"
+                                                stroke-width="4"
+                                            ></circle>
+                                            <path
+                                                class="opacity-75"
+                                                fill="currentColor"
+                                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                            ></path>
+                                        </svg>
+                                    </button>
+                                </form>
+                            </div>
+
+                            <!-- Invite Admin Section (Admin Only) -->
+                            <div
+                                id="inviteAdminSection"
+                                class="border-t border-gray-200 pt-6 hidden"
+                            >
+                                <h4 class="text-sm font-medium text-gray-900 mb-4">
+                                    Invite Admin
+                                </h4>
+                                <form id="inviteAdminForm" class="space-y-4">
+                                    <div>
+                                        <label
+                                            for="inviteEmail"
+                                            class="block text-sm font-medium text-gray-700 mb-1"
+                                        >
+                                            Email Address
+                                        </label>
+                                        <input
+                                            type="email"
+                                            id="inviteEmail"
+                                            required
+                                            class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors duration-200"
+                                            placeholder="Enter email address to invite"
+                                        />
+                                        <p class="mt-1 text-xs text-gray-500">
+                                            An invitation email will be sent to this address
+                                        </p>
+                                    </div>
+                                    <div
+                                        id="inviteMessage"
+                                        class="hidden rounded-lg p-4"
+                                    ></div>
+                                    <button
+                                        type="submit"
+                                        id="inviteAdminButton"
+                                        class="w-full bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <span id="inviteAdminButtonText">Send Invitation</span>
+                                        <svg
+                                            id="inviteAdminSpinner"
+                                            class="hidden animate-spin inline-block ml-2 h-4 w-4 text-white"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <circle
+                                                class="opacity-25"
+                                                cx="12"
+                                                cy="12"
+                                                r="10"
+                                                stroke="currentColor"
+                                                stroke-width="4"
+                                            ></circle>
+                                            <path
+                                                class="opacity-75"
+                                                fill="currentColor"
+                                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                            ></path>
+                                        </svg>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <script>
             // API Configuration
             const API_BASE_URL = window.location.origin;
@@ -518,6 +779,10 @@
             const closeModal = document.getElementById("closeModal");
             const logoutButton = document.getElementById("logoutButton");
             const userInfo = document.getElementById("userInfo");
+            const profileButton = document.getElementById("profileButton");
+            const profileModal = document.getElementById("profileModal");
+            const closeProfileModal = document.getElementById("closeProfileModal");
+            const profileModalContent = document.getElementById("profileModalContent");
 
             // Filter Elements
             const statusFilter = document.getElementById("statusFilter");
@@ -1334,8 +1599,7 @@
                 }
 
                 // Set user info
-                const userId = sessionStorage.getItem("user_id");
-                userInfo.textContent = `User ID: ${userId}`;
+                await loadUserProfile();
 
                 // Load initial data
                 await fetchPorters();
@@ -1373,6 +1637,192 @@
                     option.textContent = category;
                     categoryFilter.appendChild(option);
                 });
+            });
+
+            // Profile Management Functions
+            let currentUser = null;
+
+            async function loadUserProfile() {
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/v1/profile/me`, {
+                        headers: getAuthHeaders(),
+                    });
+
+                    if (!response.ok) {
+                        throw new Error("Failed to load user profile");
+                    }
+
+                    currentUser = await response.json();
+                    
+                    // Update user info in header
+                    userInfo.textContent = currentUser.email || `User ID: ${currentUser.id}`;
+                    
+                    // Populate profile modal if it's open
+                    if (!profileModal.classList.contains("hidden")) {
+                        populateProfileModal();
+                    }
+                } catch (error) {
+                    console.error("Failed to load user profile:", error);
+                    const userId = sessionStorage.getItem("user_id");
+                    userInfo.textContent = `User ID: ${userId}`;
+                }
+            }
+
+            function populateProfileModal() {
+                if (!currentUser) return;
+
+                document.getElementById("profileEmail").value = currentUser.email || "";
+                document.getElementById("profileFullName").value = currentUser.full_name || "";
+                document.getElementById("profileRole").value = (currentUser.role || "porter").toUpperCase();
+
+                // Show invite admin section only for admins
+                const inviteAdminSection = document.getElementById("inviteAdminSection");
+                if (currentUser.role === "admin") {
+                    inviteAdminSection.classList.remove("hidden");
+                } else {
+                    inviteAdminSection.classList.add("hidden");
+                }
+            }
+
+            // Profile Modal Event Handlers
+            profileButton.addEventListener("click", async () => {
+                await loadUserProfile();
+                populateProfileModal();
+                profileModal.classList.remove("hidden");
+            });
+
+            closeProfileModal.addEventListener("click", () => {
+                profileModal.classList.add("hidden");
+                // Reset forms
+                document.getElementById("changePasswordForm").reset();
+                document.getElementById("inviteAdminForm").reset();
+                document.getElementById("passwordChangeMessage").classList.add("hidden");
+                document.getElementById("inviteMessage").classList.add("hidden");
+            });
+
+            // Close modal when clicking outside
+            profileModal.addEventListener("click", (e) => {
+                if (e.target === profileModal) {
+                    closeProfileModal.click();
+                }
+            });
+
+            // Change Password Form Handler
+            document.getElementById("changePasswordForm").addEventListener("submit", async (e) => {
+                e.preventDefault();
+                
+                const currentPassword = document.getElementById("currentPassword").value;
+                const newPassword = document.getElementById("newPassword").value;
+                const confirmPassword = document.getElementById("confirmPassword").value;
+                const messageDiv = document.getElementById("passwordChangeMessage");
+                const button = document.getElementById("changePasswordButton");
+                const buttonText = document.getElementById("changePasswordButtonText");
+                const spinner = document.getElementById("changePasswordSpinner");
+
+                // Validate passwords match
+                if (newPassword !== confirmPassword) {
+                    messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
+                    messageDiv.innerHTML = '<p class="text-sm text-red-800">New passwords do not match</p>';
+                    messageDiv.classList.remove("hidden");
+                    return;
+                }
+
+                try {
+                    button.disabled = true;
+                    buttonText.classList.add("hidden");
+                    spinner.classList.remove("hidden");
+                    messageDiv.classList.add("hidden");
+
+                    const response = await fetch(`${API_BASE_URL}/api/v1/profile/change-password`, {
+                        method: "POST",
+                        headers: {
+                            ...getAuthHeaders(),
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                            current_password: currentPassword,
+                            new_password: newPassword,
+                        }),
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        messageDiv.className = "bg-green-50 border border-green-200 rounded-lg p-4";
+                        messageDiv.innerHTML = '<p class="text-sm text-green-800">Password changed successfully!</p>';
+                        document.getElementById("changePasswordForm").reset();
+                    } else {
+                        messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
+                        messageDiv.innerHTML = `<p class="text-sm text-red-800">${data.detail || "Failed to change password"}</p>`;
+                    }
+                    messageDiv.classList.remove("hidden");
+                } catch (error) {
+                    console.error("Password change error:", error);
+                    messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
+                    messageDiv.innerHTML = '<p class="text-sm text-red-800">An error occurred. Please try again.</p>';
+                    messageDiv.classList.remove("hidden");
+                } finally {
+                    button.disabled = false;
+                    buttonText.classList.remove("hidden");
+                    spinner.classList.add("hidden");
+                }
+            });
+
+            // Invite Admin Form Handler
+            document.getElementById("inviteAdminForm").addEventListener("submit", async (e) => {
+                e.preventDefault();
+
+                const email = document.getElementById("inviteEmail").value.trim();
+                const messageDiv = document.getElementById("inviteMessage");
+                const button = document.getElementById("inviteAdminButton");
+                const buttonText = document.getElementById("inviteAdminButtonText");
+                const spinner = document.getElementById("inviteAdminSpinner");
+
+                // Basic email validation
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(email)) {
+                    messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
+                    messageDiv.innerHTML = '<p class="text-sm text-red-800">Please enter a valid email address</p>';
+                    messageDiv.classList.remove("hidden");
+                    return;
+                }
+
+                try {
+                    button.disabled = true;
+                    buttonText.classList.add("hidden");
+                    spinner.classList.remove("hidden");
+                    messageDiv.classList.add("hidden");
+
+                    const response = await fetch(`${API_BASE_URL}/auth/admin/invite`, {
+                        method: "POST",
+                        headers: {
+                            ...getAuthHeaders(),
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({ email }),
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        messageDiv.className = "bg-green-50 border border-green-200 rounded-lg p-4";
+                        messageDiv.innerHTML = `<p class="text-sm text-green-800">Invitation sent successfully to ${email}!</p>`;
+                        document.getElementById("inviteAdminForm").reset();
+                    } else {
+                        messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
+                        messageDiv.innerHTML = `<p class="text-sm text-red-800">${data.detail || "Failed to send invitation"}</p>`;
+                    }
+                    messageDiv.classList.remove("hidden");
+                } catch (error) {
+                    console.error("Invite admin error:", error);
+                    messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
+                    messageDiv.innerHTML = '<p class="text-sm text-red-800">An error occurred. Please try again.</p>';
+                    messageDiv.classList.remove("hidden");
+                } finally {
+                    button.disabled = false;
+                    buttonText.classList.remove("hidden");
+                    spinner.classList.add("hidden");
+                }
             });
 
             // Cleanup on page unload
