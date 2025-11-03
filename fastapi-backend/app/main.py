@@ -6,7 +6,7 @@ from fastapi import Body
 from fastapi.staticfiles import StaticFiles
 from . import auth
 from typing import List, Optional
-from pydantic import BaseModel, StrictStr
+from pydantic import BaseModel, StrictStr, validator
 from datetime import datetime, timezone, timedelta
 from sqlmodel import select, func
 from .websocket_manager import manager
@@ -599,6 +599,17 @@ class ComplaintCreate(BaseModel):
     description: str
     photo_urls: Optional[List[str]] = None
     severity: str
+
+    @validator('room_number')
+    def validate_and_normalize_room_number(cls, v: str) -> str:
+        """Normalize to uppercase and validate canonical format A–H followed by 3 digits."""
+        if not isinstance(v, str):
+            raise ValueError('room_number must be a string')
+        v_norm = v.strip().upper()
+        import re
+        if not re.match(r'^[A-H][0-9]{3}$', v_norm):
+            raise ValueError('Room number must be one letter (A–H) followed by three digits, like A312')
+        return v_norm
 
 
 class PaginatedComplaints(BaseModel):

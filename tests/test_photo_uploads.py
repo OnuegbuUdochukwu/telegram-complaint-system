@@ -28,7 +28,7 @@ def test_upload_photo_requires_auth():
     payload = {
         "telegram_user_id": "test-user-1",
         "hostel": "John",
-        "room_number": "T101",
+        "room_number": "A101",
         "category": "plumbing",
         "description": "Test complaint for photo upload",
         "severity": "low",
@@ -76,7 +76,7 @@ def test_upload_and_list_photos():
     payload = {
         "telegram_user_id": "test-user-photo",
         "hostel": "John",
-        "room_number": "T102",
+        "room_number": "A102",
         "category": "electrical",
         "description": "Test complaint for photo upload",
         "severity": "medium",
@@ -135,7 +135,7 @@ def test_photo_validation():
     payload = {
         "telegram_user_id": "test-user-validation",
         "hostel": "John",
-        "room_number": "T103",
+        "room_number": "A103",
         "category": "other",
         "description": "Test validation",
         "severity": "low",

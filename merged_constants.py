@@ -104,7 +104,9 @@ ALL_STATES: List[int] = [GET_TELEGRAM_ID, SELECT_HOSTEL, GET_ROOM_NUMBER, SELECT
 TELEGRAM_USER_ID_PATTERN = re.compile(r"^[0-9]{3,32}$")
 
 # Room number pattern & example
-ROOM_NUMBER_PATTERN = re.compile(r"^[A-Za-z0-9\-\s]{1,10}$")
+# Enforce canonical room format: one uppercase letter A-H followed by three digits
+# Example: A312
+ROOM_NUMBER_PATTERN = re.compile(r"^[A-H][0-9]{3}$")
 ROOM_NUMBER_EXAMPLE = "A312"
 
 # JSON Schema for complaint payload validation (used in tests and server-side validation)

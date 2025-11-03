@@ -68,11 +68,11 @@ CREATE TABLE IF NOT EXISTS complaints (
 -- Add a room number format check constraint if it does not already exist
 DO $$
 BEGIN
-  IF NOT EXISTS (
+    IF NOT EXISTS (
     SELECT 1 FROM pg_constraint WHERE conname = 'chk_room_number_format'
   ) THEN
     ALTER TABLE complaints
-      ADD CONSTRAINT chk_room_number_format CHECK (room_number ~ '^[A-Za-z0-9\\-\\s]{1,10}$');
+      ADD CONSTRAINT chk_room_number_format CHECK (room_number ~ '^[A-H][0-9]{3}$');
   END IF;
 END$$;
 

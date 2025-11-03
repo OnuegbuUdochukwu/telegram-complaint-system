@@ -18,7 +18,7 @@ def test_admin_assigns_another_porter(admin_token, create_and_token):
     p2_id, p2_token = create_and_token("a2@example.com")
 
     # Submit complaint
-    payload = {"telegram_user_id": "assign-user", "hostel": "H1", "room_number": "R1", "category": "test", "description": "assign test", "severity": "low"}
+    payload = {"telegram_user_id": "assign-user", "hostel": "H1", "room_number": "A101", "category": "test", "description": "assign test", "severity": "low"}
     r = httpx.post(f"{BASE}/api/v1/complaints/submit", json=payload)
     assert r.status_code == 201
     cid = r.json()["complaint_id"]
@@ -34,7 +34,7 @@ def test_porter_assigns_self_then_fails_assign_other(create_and_token, admin_tok
     p_id, token = create_and_token("self@example.com")
     other_id, other_token = create_and_token("other@example.com")
 
-    payload = {"telegram_user_id": "assign-user-2", "hostel": "H1", "room_number": "R2", "category": "test", "description": "assign test 2", "severity": "low"}
+    payload = {"telegram_user_id": "assign-user-2", "hostel": "H1", "room_number": "A102", "category": "test", "description": "assign test 2", "severity": "low"}
     r = httpx.post(f"{BASE}/api/v1/complaints/submit", json=payload)
     assert r.status_code == 201
     cid = r.json()["complaint_id"]

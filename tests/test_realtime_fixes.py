@@ -171,7 +171,7 @@ class TestTelegramNotifierFixes:
                     "category": "electrical",
                     "severity": "high",
                     "description": "Test complaint",
-                    "room_number": "101"
+                    "room_number": "A101"
                 }
 
                 result = await telegram_notifier.send_complaint_alert(complaint_data)
@@ -252,7 +252,7 @@ class TestMainIntegrationFixes:
             complaint_payload = {
                 "telegram_user_id": "test_user_notifications",
                 "hostel": "John",
-                "room_number": "101",
+                    "room_number": "A101",
                 "category": "electrical",
                 "description": "Light not working",
                 "severity": "high"
@@ -284,7 +284,7 @@ class TestMainIntegrationFixes:
         complaint_payload = {
             "telegram_user_id": "test_user_status",
             "hostel": "Joseph",
-            "room_number": "202",
+                    "room_number": "B202",
             "category": "plumbing",
             "description": "Leaky faucet",
             "severity": "medium"
@@ -380,7 +380,7 @@ class TestEndToEndIntegration:
                 complaint_payload = {
                     "telegram_user_id": "test_user_e2e",
                     "hostel": "Paul",
-                    "room_number": "303",
+                        "room_number": "C303",
                     "category": "structural",
                     "description": "Crack in wall",
                     "severity": "high"

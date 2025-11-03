@@ -222,26 +222,22 @@ async def get_room_number(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     """
     Handles and validates room number input (State: GET_ROOM_NUMBER -> SELECT_CATEGORY).
     """
-    room_input = update.message.text.strip()
-    
-    # 1. Validation Logic: Checks for basic alphanumeric format and length
-    if not (3 <= len(room_input) <= 5 and re.match(r'^[A-Za-z0-9]+$', room_input)):
+    # Normalize: uppercase letters so inputs like 'a101' become 'A101'
+    raw_input = (update.message.text or "").strip()
+    room_input = raw_input.upper()
+
+    # Strict validation: one letter A-H followed by three digits (e.g., A312)
+    if not hasattr(__import__('re'), 'match') or not re.match(r'^[A-H][0-9]{3}$', room_input):
         await update.message.reply_text(
-            "⚠️ **Invalid Room Number Format.**\n"
-            "Please enter a valid room number (e.g., A101, B205, 302). It should be 3-5 alphanumeric characters.",
+            "⚠️ Room number must be one letter (A–H) followed by three digits, like A312. "
+            "Please enter a valid room number.",
             parse_mode='Markdown'
         )
-        # Reprompt for the same state
         return GET_ROOM_NUMBER
 
-    # Store the data and derive the wing from the room number when possible
+    # Store the normalized value and derive the wing (first letter)
     context.user_data['complaint']['room_number'] = room_input
-    # Extract leading letters as the wing (e.g., 'A' from 'A312'). If none, set 'N/A'.
-    m = re.match(r'^([A-Za-z]+)(.*)$', room_input)
-    if m:
-        derived_wing = m.group(1)
-    else:
-        derived_wing = 'N/A'
+    derived_wing = room_input[0] if len(room_input) >= 1 else 'N/A'
     context.user_data['complaint']['wing'] = derived_wing
     logger.info(f"Room number stored: {room_input}; derived wing: {derived_wing}")
 
@@ -544,6 +540,65 @@ def main():
         .build()
     )
     
+    # --- Enhanced status check with better UX
+    async def get_my_complaints(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Get all complaints for the current user."""
+        user_id = str(update.effective_user.id)
+        
+        await safe_reply_to_update(update, "⏳ Fetching your complaints...")
+        
+        try:
+            # Call backend to get user's complaints
+            from client import get_user_complaints
+            complaints = await asyncio.to_thread(get_user_complaints, user_id)
+        except Exception as exc:
+            logger.exception("Error fetching complaints for user %s: %s", user_id, exc)
+            await safe_reply_to_update(update, "⚠️ Could not fetch your complaints. Please try again later.")
+            return
+        
+        if not complaints or len(complaints.get('items', [])) == 0:
+            await safe_reply_to_update(update, 
+                "📋 You haven't submitted any complaints yet.\n\n"
+                "Use /report to submit a new complaint.")
+            return
+        
+        # Format the complaints list
+        message_parts = ["📋 **Your Complaints**\n"]
+        
+        items = complaints.get('items', [])
+        for idx, complaint in enumerate(items[:10], 1):  # Show first 10
+            complaint_id = complaint.get('id', 'Unknown')
+            status = complaint.get('status', 'reported')
+            status_emoji = {
+                'reported': '📝',
+                'in_progress': '🔧',
+                'on_hold': '⏸️',
+                'resolved': '✅',
+                'closed': '✔️',
+                'rejected': '❌'
+            }.get(status, '📄')
+            
+            status_label = STATUS_KEY_TO_LABEL.get(status, status.title())
+            hostel = complaint.get('hostel', 'Unknown')
+            category = complaint.get('category', 'Unknown')
+            created_at = complaint.get('created_at', '')
+            
+            message_parts.append(
+                f"{idx}. {status_emoji} *{status_label}*\n"
+                f"   ID: `{complaint_id[:8]}`\n"
+                f"   Hostel: {hostel} | Category: {category[:20]}\n"
+            )
+        
+        if len(items) > 10:
+            message_parts.append(f"\n_...and {len(items) - 10} more_")
+        
+        await safe_reply_to_update(update, "\n".join(message_parts), parse_mode='Markdown')
+
+    # Status check command - shows all complaints with status in a nice format
+    async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Show user's complaints with status in a nice format."""
+        await get_my_complaints(update, context)
+
     # --- Conversation Handler Definition ---
     complaint_conversation_handler = ConversationHandler(
         entry_points=[CommandHandler('report', report_entry)],
@@ -590,10 +645,19 @@ def main():
             ]
         },
 
-        # Fallbacks to exit the conversation cleanly
+        # Fallbacks to exit the conversation cleanly and allow global commands
+        # to be used at *any point* during the conversation (e.g. /skip, /done,
+        # /status, /mycomplaints). Adding them here ensures they will be
+        # handled even when the ConversationHandler is active.
         fallbacks=[
             CommandHandler('cancel', cancel_handler),
             CallbackQueryHandler(cancel_handler, pattern='^cancel$'),
+            # Allow skipping or finishing photo attachments from any state
+            CommandHandler('skip', finish_without_photos),
+            CommandHandler('done', finish_photo_uploads),
+            # Allow users to check status or list complaints while mid-flow
+            CommandHandler('status', status_command),
+            CommandHandler('mycomplaints', get_my_complaints),
         ]
     )
     
@@ -601,7 +665,9 @@ def main():
     application.add_handler(complaint_conversation_handler)
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(MessageHandler(filters.COMMAND, unknown_command))
+    # NOTE: don't add a global unknown_command handler yet — add it after all
+    # specific command handlers (status, mycomplaints) so it doesn't swallow
+    # legitimate commands registered later.
 
     # --- Enhanced status check with better UX
     async def get_my_complaints(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -664,6 +730,9 @@ def main():
     
     application.add_handler(CommandHandler('status', status_command))
     application.add_handler(CommandHandler('mycomplaints', get_my_complaints))
+
+    # Finally add a global unknown-command handler as a last-resort fallback.
+    application.add_handler(MessageHandler(filters.COMMAND, unknown_command))
 
     # Global error handler to catch unexpected exceptions in handlers and
     # prevent the application from crashing. We also attempt to notify the
