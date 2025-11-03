@@ -16,7 +16,7 @@ def test_submit_and_get_complaint():
     payload = {
         "telegram_user_id": "test-user-1",
         "hostel": "John",
-        "room_number": "T101",
+        "room_number": "A101",
         "category": "plumbing",
         "description": "Integration test: leaking pipe",
         "severity": "low",

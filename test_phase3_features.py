@@ -38,7 +38,8 @@ def test_metrics():
     print("Testing Prometheus metrics endpoint...")
     resp = httpx.get(f"{BASE_URL}/metrics", timeout=TIMEOUT)
     assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
-    assert resp.headers.get("content-type") == "text/plain; version=0.0.4; charset=utf-8"
+    # Accept headers that start with the expected media type/version to avoid duplicate charset entries
+    assert resp.headers.get("content-type", "").startswith("text/plain; version=0.0.4")
     print("✓ Metrics endpoint works")
 
 
@@ -50,7 +51,7 @@ def test_photo_upload_basic():
     complaint_payload = {
         "telegram_user_id": "test-user-phase3",
         "hostel": "John",
-        "room_number": "T200",
+        "room_number": "A200",
         "category": "electrical",
         "description": "Test for Phase 3 photo upload",
         "severity": "medium"

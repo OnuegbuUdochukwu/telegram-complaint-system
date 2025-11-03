@@ -34,7 +34,7 @@ def test_update_status_success():
     payload = {
         "telegram_user_id": "test-user-2",
         "hostel": "John",
-        "room_number": "T102",
+        "room_number": "A102",
         "category": "electric",
         "description": "Integration test: flickering light",
         "severity": "medium",
@@ -56,7 +56,7 @@ def test_update_status_invalid_status():
     payload = {
         "telegram_user_id": "test-user-3",
         "hostel": "John",
-        "room_number": "T103",
+        "room_number": "A103",
         "category": "cleaning",
         "description": "Integration test: dirty corridor",
         "severity": "low",
@@ -74,7 +74,7 @@ def test_update_status_unauthorized():
     payload = {
         "telegram_user_id": "test-user-4",
         "hostel": "John",
-        "room_number": "T104",
+        "room_number": "A104",
         "category": "pest",
         "description": "Integration test: pest sighting",
         "severity": "high",

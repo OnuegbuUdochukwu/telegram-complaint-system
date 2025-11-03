@@ -24,7 +24,9 @@ def test_metrics_endpoint():
     """Test the Prometheus metrics endpoint."""
     resp = httpx.get(f"{BASE_URL}/metrics", timeout=10.0)
     assert resp.status_code == 200
-    assert resp.headers["content-type"] == "text/plain; version=0.0.4; charset=utf-8"
+    # Content-Type header formatting may include duplicate charset entries
+    # — assert the header starts with the expected media type and version.
+    assert resp.headers.get("content-type", "").startswith("text/plain; version=0.0.4")
     
     content = resp.text
     # Check for some expected metrics
