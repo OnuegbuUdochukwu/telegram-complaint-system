@@ -89,8 +89,13 @@ SELECT_CATEGORY = 3
 GET_DESCRIPTION = 4
 SUBMIT_COMPLAINT = 5
 CANCEL = 6
+# Additional conversation states added to require explicit user input for all fields
+GET_TELEGRAM_ID = 0
+GET_WING = 7  # retained for backward-compatibility but not used in the active flow
+SELECT_SEVERITY = 8
 
-ALL_STATES: List[int] = [SELECT_HOSTEL, GET_ROOM_NUMBER, SELECT_CATEGORY, GET_DESCRIPTION, SUBMIT_COMPLAINT]
+# Active conversation flow states (GET_WING is no longer used; wing is derived from room number)
+ALL_STATES: List[int] = [GET_TELEGRAM_ID, SELECT_HOSTEL, GET_ROOM_NUMBER, SELECT_CATEGORY, GET_DESCRIPTION, SELECT_SEVERITY, SUBMIT_COMPLAINT]
 
 # ---------------------------------------------------------------------------
 # Validation patterns and small helpers
@@ -146,6 +151,8 @@ __all__ = [
     "GET_ROOM_NUMBER",
     "SELECT_CATEGORY",
     "GET_DESCRIPTION",
+    "GET_TELEGRAM_ID",
+    "SELECT_SEVERITY",
     "SUBMIT_COMPLAINT",
     "CANCEL",
     "ALL_STATES",

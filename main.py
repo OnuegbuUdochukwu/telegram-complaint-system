@@ -17,14 +17,19 @@ from telegram.ext import (
 
 # Import all required constants from the unified constants module
 from merged_constants import (
+    GET_TELEGRAM_ID,
     SELECT_HOSTEL,
     GET_ROOM_NUMBER,
     SELECT_CATEGORY,
     GET_DESCRIPTION,
+    SELECT_SEVERITY,
     SUBMIT_COMPLAINT,
     HOSTELS,
     CATEGORY_LABELS,
     CATEGORY_LABEL_TO_KEY,
+    SEVERITY_KEYS,
+    SEVERITY_LABELS,
+    TELEGRAM_USER_ID_PATTERN,
 )
 
 # Client for backend interactions (mock/stub)
@@ -137,7 +142,34 @@ async def report_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     """
     Entry point for the conversation. Prompts for the Hostel choice (State: SELECT_HOSTEL).
     """
-    # Build the inline keyboard dynamically from the HOSTELS list
+    # Initialize the temporary complaint data without any pre-filled values
+    # Per requirement: do not populate telegram_user_id or any other field automatically.
+    context.user_data['complaint'] = {}
+
+    # Prompt the user to enter their Telegram user id manually
+    await update.message.reply_text(
+        "**REPORTING SYSTEM: 0 of 6**\n\nPlease enter your *Telegram user id* (digits only).\n"
+        "If you don't know it, open Telegram -> Settings -> tap your profile to see your numeric id.",
+        parse_mode='Markdown'
+    )
+
+    return GET_TELEGRAM_ID
+
+
+async def get_telegram_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """
+    Validate and store the Telegram user id provided by the user, then prompt for hostel selection.
+    """
+    text = (update.message.text or "").strip()
+    if not TELEGRAM_USER_ID_PATTERN.match(text):
+        await update.message.reply_text(
+            "⚠️ Invalid Telegram user id format. Please enter the numeric id shown in your Telegram profile (digits only)."
+        )
+        return GET_TELEGRAM_ID
+
+    context.user_data['complaint']['telegram_user_id'] = text
+
+    # Build and show hostel keyboard after collecting telegram id
     keyboard = []
     for i in range(0, len(HOSTELS), 2):
         row = []
@@ -145,20 +177,15 @@ async def report_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         if i + 1 < len(HOSTELS):
             row.append(InlineKeyboardButton(HOSTELS[i+1], callback_data=f"hostel_{HOSTELS[i+1]}"))
         keyboard.append(row)
-    
     keyboard.append([InlineKeyboardButton("❌ Cancel Report", callback_data='cancel')])
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # Initialize the temporary complaint data
-    context.user_data['complaint'] = {} 
-    context.user_data['complaint']['telegram_user_id'] = update.effective_user.id
-    
     await update.message.reply_text(
-        "**REPORTING SYSTEM: 1 of 4**\n\nPlease select the hostel where the issue is located:",
+        "**REPORTING SYSTEM: 1 of 6**\n\nPlease select the hostel where the issue is located:",
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
-    
+
     return SELECT_HOSTEL
 
 
@@ -177,15 +204,18 @@ async def select_hostel_callback(update: Update, context: ContextTypes.DEFAULT_T
     
     logger.info(f"User {query.from_user.id} selected hostel: {hostel_name}")
 
-    # Prompt for the next step: Room Number
+    # Prompt for the next step: Wing (explicit user input)
     await query.edit_message_text(
         f"Hostel selected: **{hostel_name}**\n\n"
-        "**REPORTING SYSTEM: 2 of 4**\n\nPlease enter the **Room Number** (e.g., B201, 305):",
+        "**REPORTING SYSTEM: 2 of 6**\n\nPlease enter the **Room Number** (e.g., A312, B201, 305):",
         parse_mode='Markdown',
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel Report", callback_data='cancel')]])
     )
-    
+
     return GET_ROOM_NUMBER
+
+
+
 
 
 async def get_room_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -204,9 +234,16 @@ async def get_room_number(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         # Reprompt for the same state
         return GET_ROOM_NUMBER
 
-    # Store the data
+    # Store the data and derive the wing from the room number when possible
     context.user_data['complaint']['room_number'] = room_input
-    logger.info(f"Room number stored: {room_input}")
+    # Extract leading letters as the wing (e.g., 'A' from 'A312'). If none, set 'N/A'.
+    m = re.match(r'^([A-Za-z]+)(.*)$', room_input)
+    if m:
+        derived_wing = m.group(1)
+    else:
+        derived_wing = 'N/A'
+    context.user_data['complaint']['wing'] = derived_wing
+    logger.info(f"Room number stored: {room_input}; derived wing: {derived_wing}")
 
     # Build the inline keyboard for the next step: Category Selection
     keyboard = []
@@ -219,7 +256,7 @@ async def get_room_number(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     await update.message.reply_text(
         f"Room number confirmed: **{room_input}**\n\n"
-        "**REPORTING SYSTEM: 3 of 4**\n\nPlease select the **Type of Issue**:",
+        "**REPORTING SYSTEM: 3 of 6**\n\nPlease select the **Type of Issue**:",
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
@@ -245,13 +282,13 @@ async def select_category_callback(update: Update, context: ContextTypes.DEFAULT
     # Prompt for the next step: Detailed Description
     await query.edit_message_text(
         f"Issue type selected: **{category_name}**\n\n"
-        "**REPORTING SYSTEM: 4 of 4 (Final Step)**\n\n"
+        "**REPORTING SYSTEM: 5 of 6**\n\n"
         "Please provide a **detailed description** of the problem.\n"
         "_Minimum 10 characters, Maximum 500 characters._",
         parse_mode='Markdown',
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel Report", callback_data='cancel')]])
     )
-    
+
     return GET_DESCRIPTION
 
 
@@ -284,8 +321,37 @@ async def get_description(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     # Store the data
     context.user_data['complaint']['description'] = description_input
     
-    # Proceed to the final submission state (logic placeholder for D.2)
-    return await submit_complaint_and_end(update, context) 
+    # Prompt the user to select severity explicitly
+    keyboard = []
+    for i, key in enumerate(SEVERITY_KEYS):
+        label = SEVERITY_LABELS[i] if i < len(SEVERITY_LABELS) else key.title()
+        keyboard.append([InlineKeyboardButton(label, callback_data=f"severity_{key}")])
+    keyboard.append([InlineKeyboardButton("❌ Cancel Report", callback_data='cancel')])
+
+    await update.message.reply_text(
+        "**REPORTING SYSTEM: 6 of 6 (Final Step)**\n\nPlease select the severity of the issue:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode='Markdown'
+    )
+
+    return SELECT_SEVERITY
+
+
+async def select_severity_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle severity selection and then submit the complaint."""
+    query = update.callback_query
+    await query.answer()
+
+    severity_key = query.data.split('_', 1)[1]
+    if severity_key not in SEVERITY_KEYS:
+        await query.edit_message_text("⚠️ Invalid severity selection. Please try again.")
+        return SELECT_SEVERITY
+
+    context.user_data['complaint']['severity'] = severity_key
+
+    # Proceed to submit now that all fields have been collected from the user
+    await query.edit_message_text("Severity recorded. Submitting your complaint...")
+    return await submit_complaint_and_end(update, context)
 
 
 async def submit_complaint_and_end(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -296,15 +362,21 @@ async def submit_complaint_and_end(update: Update, context: ContextTypes.DEFAULT
     logger.info(f"*** FINAL DATA COLLECTED (Submission): {final_data} ***")
 
     # Build payload expected by the backend/schema
+    # Validate that all required fields were provided by the user
+    missing = [k for k in ("telegram_user_id", "hostel", "wing", "room_number", "category", "description", "severity") if not final_data.get(k)]
+    if missing:
+        await safe_reply_to_update(update, f"⚠️ Missing required fields: {', '.join(missing)}. Please restart the report with /report and provide the requested values.")
+        return ConversationHandler.END
+
     payload = {
-        "telegram_user_id": str(final_data.get('telegram_user_id', '')),
+        "telegram_user_id": str(final_data.get('telegram_user_id')),
         "hostel": final_data.get('hostel'),
+        "wing": final_data.get('wing'),
         "room_number": final_data.get('room_number'),
         # Convert display label to storage key when possible
         "category": CATEGORY_LABEL_TO_KEY.get(final_data.get('category'), final_data.get('category')),
         "description": final_data.get('description'),
-        # Use a default severity for now if not provided
-        "severity": final_data.get('severity', 'medium'),
+        "severity": final_data.get('severity'),
     }
 
     # Call the synchronous client stub in a thread to avoid blocking the event loop
@@ -478,31 +550,42 @@ def main():
 
         # Define all states and the expected handlers for each
         states={
+            GET_TELEGRAM_ID: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, get_telegram_id)
+            ],
+
             SELECT_HOSTEL: [
                 CallbackQueryHandler(select_hostel_callback, pattern=r'^hostel_.*')
             ],
-            
+
+            # GET_WING removed: wing is now derived from room number input
+
             GET_ROOM_NUMBER: [
                 # Expecting a text message, passing it to the validation function
                 MessageHandler(filters.TEXT & ~filters.COMMAND, get_room_number)
             ],
-            
+
             SELECT_CATEGORY: [
                 CallbackQueryHandler(select_category_callback, pattern=r'^category_.*')
             ],
-            
+
             GET_DESCRIPTION: [
                 # Expecting a text message for the detailed description
                 MessageHandler(filters.TEXT & ~filters.COMMAND, get_description)
             ],
+
+            SELECT_SEVERITY: [
+                CallbackQueryHandler(select_severity_callback, pattern=r'^severity_.*')
+            ],
+
             ATTACH_PHOTOS: [
                 MessageHandler(filters.PHOTO, handle_photo_upload),
                 CommandHandler('done', finish_photo_uploads),
                 CommandHandler('skip', finish_without_photos),
             ],
-            
+
             SUBMIT_COMPLAINT: [
-                # This state is handled internally by get_description calling submit_complaint_and_end
+                # This state is handled internally by select_severity_callback calling submit_complaint_and_end
                 # No external handlers needed here.
             ]
         },
