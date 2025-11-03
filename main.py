@@ -144,16 +144,33 @@ async def report_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     """
     # Initialize the temporary complaint data without any pre-filled values
     # Per requirement: do not populate telegram_user_id or any other field automatically.
+    # Initialize complaint data and auto-capture the Telegram user id from the incoming update
+    # (use effective_user.id to avoid manual-entry mismatches)
     context.user_data['complaint'] = {}
+    try:
+        context.user_data['complaint']['telegram_user_id'] = str(update.effective_user.id)
+    except Exception:
+        # Fallback: if effective_user is not available for some reason, leave blank
+        context.user_data['complaint']['telegram_user_id'] = None
 
-    # Prompt the user to enter their Telegram user id manually
+    # Prompt the user to select their hostel next (we skip manual Telegram id entry)
+    keyboard = []
+    for i in range(0, len(HOSTELS), 2):
+        row = []
+        row.append(InlineKeyboardButton(HOSTELS[i], callback_data=f"hostel_{HOSTELS[i]}"))
+        if i + 1 < len(HOSTELS):
+            row.append(InlineKeyboardButton(HOSTELS[i+1], callback_data=f"hostel_{HOSTELS[i+1]}"))
+        keyboard.append(row)
+    keyboard.append([InlineKeyboardButton("❌ Cancel Report", callback_data='cancel')])
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
     await update.message.reply_text(
-        "**REPORTING SYSTEM: 0 of 6**\n\nPlease enter your *Telegram user id* (digits only).\n"
-        "If you don't know it, open Telegram -> Settings -> tap your profile to see your numeric id.",
+        "**REPORTING SYSTEM: 1 of 6**\n\nPlease select the hostel where the issue is located:",
+        reply_markup=reply_markup,
         parse_mode='Markdown'
     )
 
-    return GET_TELEGRAM_ID
+    return SELECT_HOSTEL
 
 
 async def get_telegram_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:

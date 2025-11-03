@@ -15,6 +15,7 @@ from .observability import (
     setup_logging, init_sentry, setup_metrics_middleware,
     metrics_endpoint, get_health_check
 )
+from prometheus_client import Counter
 import logging
 import json
 
@@ -79,6 +80,83 @@ if _STORAGE_DIR.exists():
 # browser's native login popup). We want the route handler to decide how
 # to respond and return a JSON 401 when appropriate.
 security = HTTPBasic(auto_error=False)
+
+# Prometheus counters for photo upload instrumentation
+UPLOAD_ATTEMPTS = Counter(
+    "upload_photo_attempts_total",
+    "Total number of photo upload attempts"
+)
+UPLOAD_SUCCESSES = Counter(
+    "upload_photo_success_total",
+    "Total number of successful photo uploads"
+)
+UPLOAD_FAILURES = Counter(
+    "upload_photo_failure_total",
+    "Total number of failed photo uploads"
+)
+UPLOAD_AUTH_FAILURES = Counter(
+    "upload_photo_auth_failures_total",
+    "Total number of photo upload attempts that failed authentication"
+)
+
+
+def get_authenticated_user_or_service(request: Request, session=Depends(get_session)):
+    """
+    Dependency that accepts either a regular porter JWT Bearer token (decoded
+    with auth.decode_access_token) or the BACKEND_SERVICE_TOKEN (an opaque
+    token configured in the environment for trusted services like the bot).
+
+    Returns a Porter-like object on success. If a service token is used, a
+    synthetic Porter object with id 'service-token' and role 'service' is
+    returned so route handlers can treat it as an authenticated caller.
+    """
+    import os
+
+    auth_header = request.headers.get("authorization")
+    svc_token = os.environ.get("BACKEND_SERVICE_TOKEN")
+
+    # No auth header at all
+    if not auth_header:
+        UPLOAD_AUTH_FAILURES.inc()
+        raise HTTPException(status_code=401, detail="Not authenticated", headers={"X-Auth-Reason": "Missing bearer token"})
+
+    # Expect 'Bearer <token>'
+    if not auth_header.lower().startswith("bearer "):
+        UPLOAD_AUTH_FAILURES.inc()
+        raise HTTPException(status_code=401, detail="Invalid authentication header")
+
+    token = auth_header.split(None, 1)[1]
+
+    # If token matches configured service token, return synthetic service user
+    if svc_token and token == svc_token:
+        # Lightweight synthetic Porter object; avoid DB operations here
+        try:
+            from .models import Porter as PorterModel
+            svc = PorterModel(id="service-token", full_name="service-token", role="service")
+            return svc
+        except Exception:
+            # Fallback to a simple namespace object
+            class _S:
+                id = "service-token"
+                full_name = "service-token"
+                role = "service"
+            return _S()
+
+    # Otherwise try to decode as regular JWT and fetch the Porter from DB
+    try:
+        payload = auth.decode_access_token(token)
+    except HTTPException:
+        UPLOAD_AUTH_FAILURES.inc()
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    porter_id = payload.sub
+    # Load Porter from DB
+    porter = session.get(Porter, porter_id)
+    if not porter:
+        # Token subject doesn't map to a real porter
+        UPLOAD_AUTH_FAILURES.inc()
+        raise HTTPException(status_code=401, detail="Invalid token subject")
+    return porter
 
 
 @app.post("/auth/login", response_model=dict)
@@ -1052,7 +1130,7 @@ def list_assignments(complaint_id: str, user: Porter = Depends(auth.get_current_
 async def upload_photo_to_complaint(
     complaint_id: str,
     file: UploadFile = File(...),
-    user: Porter = Depends(auth.get_current_user),
+    user: Porter = Depends(get_authenticated_user_or_service),
     session=Depends(get_session)
 ):
     """
@@ -1063,37 +1141,40 @@ async def upload_photo_to_complaint(
     """
     import uuid
     import io
-    
-    # Validate complaint exists
-    statement = select(Complaint).where(Complaint.id == complaint_id)
-    complaint = session.exec(statement).first()
-    if not complaint:
-        raise HTTPException(status_code=404, detail="Complaint not found")
-    
-    # Generate photo ID
-    photo_id = str(uuid.uuid4())
-    
-    # Read file data
-    file_data = await file.read()
-    
-    # Validate image
-    is_valid, error_msg = validate_image(file_data, file.filename)
-    if not is_valid:
-        raise HTTPException(status_code=400, detail=error_msg)
-    
-    # Process image (optimize and generate thumbnail)
+
+    # Instrumentation: count attempts
+    UPLOAD_ATTEMPTS.inc()
+
     try:
+        # Validate complaint exists
+        statement = select(Complaint).where(Complaint.id == complaint_id)
+        complaint = session.exec(statement).first()
+        if not complaint:
+            raise HTTPException(status_code=404, detail="Complaint not found")
+
+        # Generate photo ID
+        photo_id = str(uuid.uuid4())
+
+        # Read file data
+        file_data = await file.read()
+
+        # Validate image
+        is_valid, error_msg = validate_image(file_data, file.filename)
+        if not is_valid:
+            raise HTTPException(status_code=400, detail=error_msg)
+
+        # Process image (optimize and generate thumbnail)
         optimized_data, thumbnail_data, width, height, mime_type = process_image(file_data, file.filename)
-        
+
         # Upload to storage
         file_url, thumbnail_url = upload_photo(optimized_data, complaint_id, photo_id, mime_type)
-        
+
         # Upload thumbnail
         if thumbnail_data:
             thumbnail_storage_url = upload_thumbnail(thumbnail_data, complaint_id, photo_id)
             if thumbnail_storage_url:
                 thumbnail_url = thumbnail_storage_url
-        
+
         # Create photo record in database
         photo = Photo(
             id=photo_id,
@@ -1106,13 +1187,16 @@ async def upload_photo_to_complaint(
             width=width,
             height=height
         )
-        
+
         session.add(photo)
         session.commit()
         session.refresh(photo)
-        
+
         logger.info(f"Uploaded photo {photo_id} for complaint {complaint_id}")
-        
+
+        # Success metric
+        UPLOAD_SUCCESSES.inc()
+
         return {
             "id": photo.id,
             "complaint_id": photo.complaint_id,
@@ -1124,8 +1208,13 @@ async def upload_photo_to_complaint(
             "height": photo.height,
             "created_at": photo.created_at.isoformat() if photo.created_at else None
         }
-        
+
+    except HTTPException as he:
+        # Auth or validation related HTTPException
+        UPLOAD_FAILURES.inc()
+        raise he
     except Exception as e:
+        UPLOAD_FAILURES.inc()
         logger.error(f"Failed to upload photo: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to upload photo: {str(e)}")
 
@@ -1133,7 +1222,7 @@ async def upload_photo_to_complaint(
 @app.get("/api/v1/complaints/{complaint_id}/photos")
 def list_complaint_photos(
     complaint_id: str,
-    user: Porter = Depends(auth.get_current_user),
+    user: Porter = Depends(get_authenticated_user_or_service),
     session=Depends(get_session)
 ):
     """Get all photos for a complaint."""
@@ -1168,7 +1257,7 @@ def list_complaint_photos(
 def delete_complaint_photo(
     complaint_id: str,
     photo_id: str,
-    user: Porter = Depends(auth.get_current_user),
+    user: Porter = Depends(get_authenticated_user_or_service),
     session=Depends(get_session)
 ):
     """Delete a photo from a complaint."""
@@ -1325,6 +1414,31 @@ def websocket_health_check():
     }
 
 
+@app.get("/api/v1/admin/service-token-status")
+def service_token_status(user: Porter = Depends(auth.get_current_user)):
+    """Admin-only endpoint returning the service-token rollout status and short instructions.
+
+    This helps operators verify whether the opaque BACKEND_SERVICE_TOKEN is set and
+    gives a short, copy-paste rollout note for configuring the bot.
+    """
+    # Only admins allowed
+    if (user.role or "porter").lower() != "admin":
+        raise HTTPException(status_code=403, detail="Insufficient privileges")
+
+    import os
+    svc = os.environ.get("BACKEND_SERVICE_TOKEN")
+    present = bool(svc)
+    instructions = (
+        "1) Generate a strong opaque token (e.g. `openssl rand -base64 32`).\n"
+        "2) Set BACKEND_SERVICE_TOKEN in the bot process environment before starting the bot.\n"
+        "   Example: BACKEND_SERVICE_TOKEN=\"<token>\" BOT_ENV=... systemd/env file or export in shell.\n"
+        "3) The bot should send the token as a Bearer Authorization header (same header used for JWTs).\n"
+        "4) Once the bot is configured and tested, revoke old tokens by restarting services without the old token."
+    )
+
+    return {"service_token_configured": present, "instructions": instructions}
+
+
 class PurgeRequest(BaseModel):
     """Request model for admin purge endpoint."""
     complaint_status: Optional[str] = None
@@ -1446,6 +1560,13 @@ async def startup_event():
     logger.info("Starting up complaint system...")
     # WebSocket manager is already initialized as a global instance
     logger.info("WebSocket manager initialized")
+    # Log service-token rollout status for operators
+    import os
+    svc = os.environ.get("BACKEND_SERVICE_TOKEN")
+    if svc:
+        logger.info("BACKEND_SERVICE_TOKEN is configured — endpoints that accept service tokens will allow trusted callers (e.g. bot) to authenticate using this opaque token")
+    else:
+        logger.info("No BACKEND_SERVICE_TOKEN configured — only regular JWT bearer tokens are accepted")
 
 
 @app.on_event("shutdown")
