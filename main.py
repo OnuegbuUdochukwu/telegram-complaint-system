@@ -52,6 +52,11 @@ load_dotenv()
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
+# Optional: point the bot to the backend API (when set the client will call the real API)
+BACKEND_URL = os.getenv("BACKEND_URL")
+# Optional service token the bot can use to authenticate to the backend when uploading photos
+BACKEND_SERVICE_TOKEN = os.getenv("BACKEND_SERVICE_TOKEN")
+
 if not TELEGRAM_BOT_TOKEN:
     raise ValueError("TELEGRAM_BOT_TOKEN not found in .env file. Ensure it is set and the file is named '.env'.")
 
@@ -61,6 +66,17 @@ logging.basicConfig(
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+# Log backend configuration so operators know whether the bot will use the real API
+if BACKEND_URL:
+    logger.info("Bot configured to use backend at %s", BACKEND_URL)
+else:
+    logger.info("No BACKEND_URL configured — bot will use mock/fallback responses from client.py")
+
+if BACKEND_SERVICE_TOKEN:
+    logger.info("BACKEND_SERVICE_TOKEN is set — bot will attempt service-authenticated uploads to the backend")
+else:
+    logger.info("No BACKEND_SERVICE_TOKEN configured — uploads will rely on interactive auth or fall back as configured")
 
 
 async def safe_reply_to_update(update: Update | object, text: str, **kwargs) -> None:

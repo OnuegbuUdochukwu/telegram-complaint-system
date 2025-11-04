@@ -88,3 +88,6 @@ dist/
 
 # Sensitive/Local Files
 .env
+
+# Storage directory 
+storage/
