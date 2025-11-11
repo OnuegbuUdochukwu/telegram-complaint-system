@@ -1567,6 +1567,34 @@ async def startup_event():
         logger.info("BACKEND_SERVICE_TOKEN is configured — endpoints that accept service tokens will allow trusted callers (e.g. bot) to authenticate using this opaque token")
     else:
         logger.info("No BACKEND_SERVICE_TOKEN configured — only regular JWT bearer tokens are accepted")
+    # Ensure hostels in DB match the canonical list used by the bot.
+    try:
+        # Import here to avoid circular import at module load time
+        from .database import engine
+        from sqlmodel import Session, select
+        from .models import Hostel
+        import merged_constants
+
+        with Session(engine) as session:
+            # Load existing display names
+            existing = session.exec(select(Hostel)).all()
+            existing_names = {h.display_name for h in existing}
+
+            to_add = []
+            for cname in getattr(merged_constants, 'HOSTELS', []):
+                if cname not in existing_names:
+                    slug = cname.lower().replace(' ', '-')
+                    to_add.append(Hostel(slug=slug, display_name=cname))
+
+            if to_add:
+                for h in to_add:
+                    session.add(h)
+                session.commit()
+                logger.info(f"Seeded {len(to_add)} hostels from merged_constants into DB: {[h.display_name for h in to_add]}")
+            else:
+                logger.info("Hostels table already contains canonical entries; no seeding required")
+    except Exception as e:
+        logger.error(f"Failed to ensure canonical hostels in DB on startup: {e}")
 
 
 @app.on_event("shutdown")

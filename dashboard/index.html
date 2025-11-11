@@ -143,6 +143,17 @@
                             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                         >
                             <option value="">All Hostels</option>
+                            <!-- Permanent hostel list (matches bot canonical HOSTELS) -->
+                            <option value="John">John</option>
+                            <option value="Joseph">Joseph</option>
+                            <option value="Paul">Paul</option>
+                            <option value="Peter">Peter</option>
+                            <option value="Daniel">Daniel</option>
+                            <option value="Esther">Esther</option>
+                            <option value="Dorcas">Dorcas</option>
+                            <option value="Lydia">Lydia</option>
+                            <option value="Mary">Mary</option>
+                            <option value="Deborah">Deborah</option>
                         </select>
                     </div>
 
@@ -1609,34 +1620,40 @@
                 connectWebSocket();
 
                 // Populate filter options
-                // This would ideally come from the API, but for now we'll use common values
-                const hostels = [
-                    "Hostel A",
-                    "Hostel B",
-                    "Hostel C",
-                    "Hostel D",
-                ];
-                const categories = [
-                    "Plumbing",
-                    "Electrical",
-                    "Cleaning",
-                    "Maintenance",
-                    "Security",
-                ];
+                // Fetch hostels and categories from the API so the dashboard stays
+                // in sync with the backend and the bot's canonical list.
+                async function fetchHostelsAndCategories() {
+                    // Hostels are embedded in the HTML as a permanent list to match the bot's
+                    // canonical `HOSTELS`. We keep that static so the dashboard dropdown
+                    // is always populated even before authentication.
 
-                hostels.forEach((hostel) => {
-                    const option = document.createElement("option");
-                    option.value = hostel;
-                    option.textContent = hostel;
-                    hostelFilter.appendChild(option);
-                });
+                    // Populate categories dynamically (public endpoint). Keep a small
+                    // fallback list if the call fails.
+                    try {
+                        const cRes = await fetch(`${API_BASE_URL}/api/v1/categories`);
+                        if (cRes && cRes.ok) {
+                            const categories = await cRes.json();
+                            categories.forEach((category) => {
+                                const option = document.createElement("option");
+                                option.value = category.name;
+                                option.textContent = category.name;
+                                categoryFilter.appendChild(option);
+                            });
+                        } else {
+                            ["Plumbing", "Electrical", "Cleaning", "Maintenance", "Security"].forEach((category) => {
+                                const option = document.createElement("option");
+                                option.value = category;
+                                option.textContent = category;
+                                categoryFilter.appendChild(option);
+                            });
+                        }
+                    } catch (err) {
+                        console.error("Error fetching categories:", err);
+                    }
+                }
 
-                categories.forEach((category) => {
-                    const option = document.createElement("option");
-                    option.value = category;
-                    option.textContent = category;
-                    categoryFilter.appendChild(option);
-                });
+                // Populate filters from API
+                fetchHostelsAndCategories();
             });
 
             // Profile Management Functions
