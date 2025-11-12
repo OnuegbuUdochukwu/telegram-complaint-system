@@ -1638,29 +1638,52 @@
                     // canonical `HOSTELS`. We keep that static so the dashboard dropdown
                     // is always populated even before authentication.
 
-                    // Populate categories dynamically (public endpoint). Keep a small
-                    // fallback list if the call fails.
+                    // Populate categories using the canonical CATEGORY_KEY_TO_LABEL mapping
+                    // so the dashboard matches the bot exactly in label text and order.
+                    // We still attempt to fetch the server categories to include any
+                    // server-side-only categories, but we render in the canonical order.
                     try {
+                        let serverCategories = [];
                         const cRes = await fetch(`${API_BASE_URL}/api/v1/categories`);
                         if (cRes && cRes.ok) {
-                            const categories = await cRes.json();
-                            categories.forEach((category) => {
-                                const option = document.createElement("option");
-                                option.value = category.name;
-                                // Map storage key to friendly label when available
-                                option.textContent = CATEGORY_KEY_TO_LABEL[category.name] || category.name;
-                                categoryFilter.appendChild(option);
-                            });
-                        } else {
-                            ["Plumbing", "Electrical", "Cleaning", "Maintenance", "Security"].forEach((category) => {
-                                const option = document.createElement("option");
-                                option.value = category;
-                                option.textContent = category;
-                                categoryFilter.appendChild(option);
+                            serverCategories = await cRes.json();
+                        }
+
+                        // Build a map of server category keys for quick lookup
+                        const serverKeys = new Set((serverCategories || []).map(c => c.name));
+
+                        // First, add canonical categories in the order defined in CATEGORY_KEY_TO_LABEL
+                        Object.keys(CATEGORY_KEY_TO_LABEL).forEach((storageKey) => {
+                            const option = document.createElement("option");
+                            option.value = storageKey;
+                            option.textContent = CATEGORY_KEY_TO_LABEL[storageKey];
+                            categoryFilter.appendChild(option);
+                            // Mark as seen so we don't duplicate later
+                            if (serverKeys.has(storageKey)) serverKeys.delete(storageKey);
+                        });
+
+                        // Append any server-side-only categories that are not in our canonical mapping
+                        // Place them after the canonical list so admins can still see additional types.
+                        if (serverCategories && serverCategories.length) {
+                            serverCategories.forEach((category) => {
+                                if (!Object.prototype.hasOwnProperty.call(CATEGORY_KEY_TO_LABEL, category.name)) {
+                                    const option = document.createElement("option");
+                                    option.value = category.name;
+                                    option.textContent = category.display_name || category.name;
+                                    categoryFilter.appendChild(option);
+                                }
                             });
                         }
                     } catch (err) {
                         console.error("Error fetching categories:", err);
+
+                        // Fall back to canonical mapping if fetch fails
+                        Object.keys(CATEGORY_KEY_TO_LABEL).forEach((storageKey) => {
+                            const option = document.createElement("option");
+                            option.value = storageKey;
+                            option.textContent = CATEGORY_KEY_TO_LABEL[storageKey];
+                            categoryFilter.appendChild(option);
+                        });
                     }
                 }
 
