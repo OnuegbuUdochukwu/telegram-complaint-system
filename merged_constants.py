@@ -21,7 +21,7 @@ HOSTELS: List[str] = ["John", "Joseph", "Paul", "Peter", "Daniel", "Esther", "Do
 LEGACY_COMPLAINT_CATEGORIES: List[str] = [
     "Plumbing Issue",
     "Electrical Fault",
-    "Structural Damage",
+    "Carpentry",
     "HVAC/Fan Repair",
     "Cleaning/Sanitation",
     "Other",
@@ -36,14 +36,14 @@ LEGACY_COMPLAINT_CATEGORIES: List[str] = [
 CATEGORY_LABEL_TO_KEY: Dict[str, str] = {
     "Plumbing / Water": "plumbing",
     "Electrical / Lighting": "electrical",
-    "Structural / Furniture": "structural",
+    "Carpentry": "structural",
     "Pest Control": "pest",
-    "Common Area / Facility": "common_area",
+    "Metalworks/Bunks": "common_area",
     "Other / Not Listed": "other",
     # Legacy labels mapped to canonical storage keys
     "Plumbing Issue": "plumbing",
     "Electrical Fault": "electrical",
-    "Structural Damage": "structural",
+    "Carpentry": "structural",
     "HVAC/Fan Repair": "other",
     "Cleaning/Sanitation": "common_area",
     "Other": "other",
@@ -54,9 +54,9 @@ CATEGORY_KEY_TO_LABEL: Dict[str, str] = {
     key: label for label, key in CATEGORY_LABEL_TO_KEY.items() if label in (
         "Plumbing / Water",
         "Electrical / Lighting",
-        "Structural / Furniture",
+        "Carpentry",
         "Pest Control",
-        "Common Area / Facility",
+        "Metalworks/Bunks",
         "Other / Not Listed",
     )
 }

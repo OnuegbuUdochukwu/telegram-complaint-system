@@ -10,9 +10,9 @@ from typing import Dict, List
 CATEGORY_LABEL_TO_KEY: Dict[str, str] = {
     "Plumbing / Water": "plumbing",
     "Electrical / Lighting": "electrical",
-    "Structural / Furniture": "structural",
+    "Carpentry": "structural",
     "Pest Control": "pest",
-    "Common Area / Facility": "common_area",
+    "Metalworks/Bunks": "common_area",
     "Other / Not Listed": "other",
 }
 

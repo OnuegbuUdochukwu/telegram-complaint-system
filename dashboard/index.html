@@ -765,6 +765,17 @@
             // API Configuration
             const API_BASE_URL = window.location.origin;
 
+            // Mapping storage key -> display label for categories.
+            // Keep keys in sync with backend storage keys (no DB migration required).
+            const CATEGORY_KEY_TO_LABEL = {
+                "plumbing": "Plumbing / Water",
+                "electrical": "Electrical / Lighting",
+                "structural": "Carpentry",
+                "pest": "Pest Control",
+                "common_area": "Metalworks/Bunks",
+                "other": "Other / Not Listed"
+            };
+
             // State Management
             let currentPage = 1;
             let pageSize = 20;
@@ -1636,7 +1647,8 @@
                             categories.forEach((category) => {
                                 const option = document.createElement("option");
                                 option.value = category.name;
-                                option.textContent = category.name;
+                                // Map storage key to friendly label when available
+                                option.textContent = CATEGORY_KEY_TO_LABEL[category.name] || category.name;
                                 categoryFilter.appendChild(option);
                             });
                         } else {

@@ -32,6 +32,10 @@ from merged_constants import (
     TELEGRAM_USER_ID_PATTERN,
 )
 
+# Compile a module-level regex for known commands so the unknown handler
+# can double-check and avoid replying when a valid command was sent.
+KNOWN_COMMANDS_RE = re.compile(r'^/(?:start|report|status|mycomplaints|help|cancel|skip|done)(?:@[^\s@/]+)?\b', re.IGNORECASE)
+
 # Client for backend interactions (mock/stub)
 from client import submit_complaint as client_submit, get_complaint_status as client_get_status, upload_photo as client_upload_photo
 from merged_constants import STATUS_KEY_TO_LABEL
@@ -146,10 +150,36 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def unknown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles unknown commands."""
-    await update.message.reply_text(
-        "Sorry, I didn't recognize that command. "
-        "Please use /report to log a complaint or /help to see available commands."
-    )
+    # Log the unknown command for debugging (helps diagnose why commands are missed)
+    try:
+        logger.info("unknown_command invoked. update_type=%s message=%s callback_data=%s",
+                    type(update).__name__,
+                    getattr(update, 'message', None) and getattr(update.message, 'text', None),
+                    getattr(update, 'callback_query', None) and getattr(update.callback_query, 'data', None)
+                   )
+    except Exception:
+        logger.exception("Failed to log unknown command details")
+
+    # If the text matches one of our known commands (may include @botname),
+    # do nothing — the specific CommandHandler already handled it. This
+    # prevents the fallback from replying after a valid command runs.
+    try:
+        msg_text = getattr(update, 'message', None) and getattr(update.message, 'text', None)
+        if msg_text and KNOWN_COMMANDS_RE.match(msg_text):
+            logger.debug("unknown_command: received known command '%s' — skipping fallback reply", msg_text)
+            return
+    except Exception:
+        logger.debug("unknown_command: failed to evaluate message text for known-command check")
+
+    # Friendly guidance to the user for truly unknown commands
+    if getattr(update, 'message', None):
+        await update.message.reply_text(
+            "Sorry, I didn't recognize that command. "
+            "Please use /report to log a complaint or /help to see available commands."
+        )
+    else:
+        # If there's no message (e.g. callback), try a safe reply path
+        await safe_reply_to_update(update, "Sorry, I didn't recognize that command. Please use /report or /help.")
 
 
 # --- Conversation Handlers (Task C.2 & C.3 Implementation) ---
@@ -698,6 +728,12 @@ def main():
     application.add_handler(complaint_conversation_handler)
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
+    # Also register a top-level /report command handler to ensure the
+    # reporting flow can be started even if ConversationHandler entry
+    # registration misses the update (some Telegram updates may not
+    # include command entities reliably). This is a safe idempotent
+    # registration — ConversationHandler will still manage the flow.
+    application.add_handler(CommandHandler("report", report_entry))
     # NOTE: don't add a global unknown_command handler yet — add it after all
     # specific command handlers (status, mycomplaints) so it doesn't swallow
     # legitimate commands registered later.
@@ -765,7 +801,15 @@ def main():
     application.add_handler(CommandHandler('mycomplaints', get_my_complaints))
 
     # Finally add a global unknown-command handler as a last-resort fallback.
-    application.add_handler(MessageHandler(filters.COMMAND, unknown_command))
+    # Only trigger this fallback for commands that are not one of the
+    # explicitly-registered commands. We exclude the bot username suffix
+    # (e.g. /report@MyBot) so users addressing a specific bot still match.
+    # This prevents valid commands (registered above) from being followed by
+    # the fallback when both handlers run for the same update.
+    known_cmds_pattern = r'^/(?:start|report|status|mycomplaints|help|cancel|skip|done)(?:@[^\s@/]+)?\b'
+    known_cmds_re = re.compile(known_cmds_pattern, re.IGNORECASE)
+    unknown_filter = filters.COMMAND & ~filters.Regex(known_cmds_re)
+    application.add_handler(MessageHandler(unknown_filter, unknown_command), group=99)
 
     # Global error handler to catch unexpected exceptions in handlers and
     # prevent the application from crashing. We also attempt to notify the

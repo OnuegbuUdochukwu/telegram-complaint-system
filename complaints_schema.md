@@ -44,21 +44,22 @@ These lists will be used to populate inline keyboards in Phase 1 and to constrai
 
 -   Plumbing / Water
 -   Electrical / Lighting
--   Structural / Furniture
+-   Carpentry
 -   Pest Control
--   Common Area / Facility
+-   Carpentry
+-   Metalworks/Bunks
 -   Other / Not Listed
 
 Recommendation: store compact storage keys in the DB and use human-friendly labels in the UI. Example mapping (display label -> storage key):
 
-| Display Label          | Storage Key |
-| ---------------------- | ----------- |
-| Plumbing / Water       | plumbing    |
-| Electrical / Lighting  | electrical  |
-| Structural / Furniture | structural  |
-| Pest Control           | pest        |
-| Common Area / Facility | common_area |
-| Other / Not Listed     | other       |
+| Display Label         | Storage Key |
+| --------------------- | ----------- |
+| Plumbing / Water      | plumbing    |
+| Electrical / Lighting | electrical  |
+| Carpentry             | structural  |
+| Pest Control          | pest        |
+| Metalworks/Bunks      | common_area |
+| Other / Not Listed    | other       |
 
 ### Complaint Severity (Telegram selection)
 
