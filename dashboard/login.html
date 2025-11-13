@@ -218,6 +218,10 @@
 
         <script>
             // API Configuration
+            // Use the current origin so the dashboard works when served by the
+            // backend (e.g. http://localhost:8001) or when hosted elsewhere.
+            // If you run the static server on a different port during development
+            // make sure the backend is reachable from that origin.
             const API_BASE_URL = window.location.origin;
 
             // DOM Elements
@@ -345,26 +349,31 @@
             });
 
             // Forgot Password Handler
-            document.getElementById("forgotPasswordLink").addEventListener("click", (e) => {
-                e.preventDefault();
-                const email = prompt("Enter your email address:");
-                if (email) {
-                    handleForgotPassword(email);
-                }
-            });
+            document
+                .getElementById("forgotPasswordLink")
+                .addEventListener("click", (e) => {
+                    e.preventDefault();
+                    const email = prompt("Enter your email address:");
+                    if (email) {
+                        handleForgotPassword(email);
+                    }
+                });
 
             async function handleForgotPassword(email) {
                 try {
                     setLoading(true);
                     hideError();
 
-                    const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify({ email }),
-                    });
+                    const response = await fetch(
+                        `${API_BASE_URL}/auth/forgot-password`,
+                        {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                            },
+                            body: JSON.stringify({ email }),
+                        }
+                    );
 
                     const data = await response.json();
 
@@ -373,54 +382,67 @@
                             "A verification code has been sent to your email.\n\nEnter the code:"
                         );
                         if (otpCode) {
-                            const newPassword = prompt("Enter your new password:");
-                        if (newPassword) {
-                            await handleResetPassword(email, otpCode, newPassword);
+                            const newPassword = prompt(
+                                "Enter your new password:"
+                            );
+                            if (newPassword) {
+                                await handleResetPassword(
+                                    email,
+                                    otpCode,
+                                    newPassword
+                                );
+                            }
                         }
+                    } else {
+                        showError(
+                            data.detail || "Failed to send password reset code"
+                        );
                     }
-                } else {
-                    showError(data.detail || "Failed to send password reset code");
+                } catch (error) {
+                    console.error("Forgot password error:", error);
+                    showError("An error occurred. Please try again.");
+                } finally {
+                    setLoading(false);
                 }
-            } catch (error) {
-                console.error("Forgot password error:", error);
-                showError("An error occurred. Please try again.");
-            } finally {
-                setLoading(false);
             }
-        }
 
-        async function handleResetPassword(email, otpCode, newPassword) {
-            try {
-                setLoading(true);
-                hideError();
+            async function handleResetPassword(email, otpCode, newPassword) {
+                try {
+                    setLoading(true);
+                    hideError();
 
-                const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        email,
-                        otp_code: otpCode,
-                        new_password: newPassword,
-                    }),
-                });
+                    const response = await fetch(
+                        `${API_BASE_URL}/auth/reset-password`,
+                        {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                            },
+                            body: JSON.stringify({
+                                email,
+                                otp_code: otpCode,
+                                new_password: newPassword,
+                            }),
+                        }
+                    );
 
-                const data = await response.json();
+                    const data = await response.json();
 
-                if (response.ok) {
-                    alert("Password reset successfully! Please login with your new password.");
-                    passwordInput.value = "";
-                } else {
-                    showError(data.detail || "Failed to reset password");
+                    if (response.ok) {
+                        alert(
+                            "Password reset successfully! Please login with your new password."
+                        );
+                        passwordInput.value = "";
+                    } else {
+                        showError(data.detail || "Failed to reset password");
+                    }
+                } catch (error) {
+                    console.error("Reset password error:", error);
+                    showError("An error occurred. Please try again.");
+                } finally {
+                    setLoading(false);
                 }
-            } catch (error) {
-                console.error("Reset password error:", error);
-                showError("An error occurred. Please try again.");
-            } finally {
-                setLoading(false);
             }
-        }
 
             // Check if already logged in
             if (sessionStorage.getItem("access_token")) {

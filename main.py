@@ -37,6 +37,11 @@ from merged_constants import (
 KNOWN_COMMANDS_RE = re.compile(r'^/(?:start|report|status|mycomplaints|help|cancel|skip|done)(?:@[^\s@/]+)?\b', re.IGNORECASE)
 
 # Client for backend interactions (mock/stub)
+# Ensure .env is loaded before importing `client` so BACKEND_URL and other
+# env vars are available when `client` reads them at import time.
+load_dotenv()
+
+# Import the client after loading .env
 from client import submit_complaint as client_submit, get_complaint_status as client_get_status, upload_photo as client_upload_photo
 from merged_constants import STATUS_KEY_TO_LABEL
 
@@ -51,9 +56,7 @@ COMPLAINT_CATEGORIES = CATEGORY_LABELS
 
 # --- Configuration and Setup ---
 
-# Load environment variables from .env file
-load_dotenv()
-
+# Environment variables are loaded above before importing the client
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 # Optional: point the bot to the backend API (when set the client will call the real API)

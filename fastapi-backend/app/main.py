@@ -114,6 +114,11 @@ def get_authenticated_user_or_service(request: Request, session=Depends(get_sess
 
     auth_header = request.headers.get("authorization")
     svc_token = os.environ.get("BACKEND_SERVICE_TOKEN")
+    # Normalize stored token by stripping common quoting/whitespace to avoid
+    # mismatches when operators put quotes in env files. Do not modify the
+    # actual value used for comparison beyond stripping surrounding quotes.
+    if isinstance(svc_token, str):
+        svc_token = svc_token.strip().strip('"\'')
 
     # No auth header at all
     if not auth_header:
@@ -128,7 +133,10 @@ def get_authenticated_user_or_service(request: Request, session=Depends(get_sess
     token = auth_header.split(None, 1)[1]
 
     # If token matches configured service token, return synthetic service user
-    if svc_token and token == svc_token:
+    # Also accept tokens that may have been provided with surrounding quotes
+    # by resiliently normalizing the incoming token before comparison.
+    incoming_token = token.strip().strip('"\'') if isinstance(token, str) else token
+    if svc_token and incoming_token == svc_token:
         # Lightweight synthetic Porter object; avoid DB operations here
         try:
             from .models import Porter as PorterModel
@@ -1562,6 +1570,32 @@ async def startup_event():
     logger.info("WebSocket manager initialized")
     # Log service-token rollout status for operators
     import os
+    # Load .env values into process env if present but not already exported. This
+    # helps local dev where operators place configuration in the repository
+    # `.env` file but may not export them into the shell before starting uvicorn.
+    try:
+        from dotenv import dotenv_values
+        from pathlib import Path
+        _env_path = Path(__file__).resolve().parents[2] / ".env"
+        logger.info(f"Looking for .env at {_env_path}")
+        cfg = dotenv_values(str(_env_path))
+        if cfg:
+            logger.info(f".env contains {len(cfg)} keys (masked display)")
+        # Only set keys that are not already present in os.environ
+        for k, v in (cfg.items() if cfg else []):
+            if v is None:
+                continue
+            if k not in os.environ:
+                os.environ[k] = v
+                logger.info(f"Loaded {k} from .env into process environment (dev only)")
+        if cfg and 'BACKEND_SERVICE_TOKEN' in cfg:
+            sval = cfg.get('BACKEND_SERVICE_TOKEN') or ''
+            masked = (sval[:6] + '...' + sval[-4:]) if len(sval) > 12 else '(<short>)'
+            logger.info(f".env BACKEND_SERVICE_TOKEN present (masked): {masked}")
+    except Exception as e:
+        # Non-fatal if dotenv missing
+        logger.error(f"Error loading .env during startup: {e}")
+
     svc = os.environ.get("BACKEND_SERVICE_TOKEN")
     if svc:
         logger.info("BACKEND_SERVICE_TOKEN is configured — endpoints that accept service tokens will allow trusted callers (e.g. bot) to authenticate using this opaque token")

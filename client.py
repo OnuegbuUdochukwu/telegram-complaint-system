@@ -26,6 +26,10 @@ import httpx
 logger = logging.getLogger(__name__)
 
 BACKEND_URL = os.getenv("BACKEND_URL")  # e.g. http://localhost:8000
+# Allow an operator/dev to explicitly enable mock fallback even when BACKEND_URL
+# is set. This should be OFF in production. Accepts truthy strings: 1/true/yes
+_ALLOW_MOCK_ENV = os.getenv("BACKEND_ALLOW_MOCK", "false").lower()
+ALLOW_MOCK_FALLBACK = _ALLOW_MOCK_ENV in ("1", "true", "yes")
 
 # HTTP client defaults
 _DEFAULT_TIMEOUT = httpx.Timeout(10.0, connect=5.0)
@@ -91,8 +95,14 @@ def submit_complaint(data: Dict[str, Any]) -> Dict[str, Any]:
       return _attempt_request("POST", url, json=data)
     except Exception as exc:  # pragma: no cover - network fallback
       logger.warning("Backend POST to %s failed after retries: %s", url, exc)
+      # If operator explicitly allows mock fallback (dev only), return a mock
+      # ID; otherwise propagate the error so the caller can surface it and
+      # avoid creating misleading MOCK- IDs in production workflows.
+      if not ALLOW_MOCK_FALLBACK:
+        raise
+      logger.warning("BACKEND_ALLOW_MOCK is enabled; falling back to mock complaint id")
 
-  # fallback mock response
+  # fallback mock response (either BACKEND_URL not set or fallback allowed)
   mock = {"status": "success", "complaint_id": _mock_complaint_id()}
   logger.info("Returning mock submit response: %s", mock)
   return mock
