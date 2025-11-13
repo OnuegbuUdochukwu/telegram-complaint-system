@@ -763,16 +763,17 @@
 
         <script>
             // API Configuration
-            const API_BASE_URL = window.location.origin;
+            // Point dashboard to backend API during local development.
+            const API_BASE_URL = "http://localhost:8000";
 
             // Mapping storage key -> display label for categories.
             // Keep keys in sync with backend storage keys (no DB migration required).
             const CATEGORY_KEY_TO_LABEL = {
                 "plumbing": "Plumbing / Water",
                 "electrical": "Electrical / Lighting",
-                "structural": "Carpentry",
+                "carpentry": "Carpentry",
                 "pest": "Pest Control",
-                "common_area": "Metalworks/Bunks",
+                "metalworks": "Metalworks/Bunks",
                 "other": "Other / Not Listed"
             };
 

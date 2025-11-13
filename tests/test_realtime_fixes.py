@@ -284,7 +284,7 @@ class TestMainIntegrationFixes:
         complaint_payload = {
             "telegram_user_id": "test_user_status",
             "hostel": "Joseph",
-                    "room_number": "B202",
+            "room_number": "B202",
             "category": "plumbing",
             "description": "Leaky faucet",
             "severity": "medium"
@@ -381,7 +381,7 @@ class TestEndToEndIntegration:
                     "telegram_user_id": "test_user_e2e",
                     "hostel": "Paul",
                         "room_number": "C303",
-                    "category": "structural",
+                    "category": "carpentry",
                     "description": "Crack in wall",
                     "severity": "high"
                 }
@@ -418,7 +418,7 @@ class TestEndToEndIntegration:
                 assert complaint is not None
                 assert complaint.status == "in_progress"
                 assert complaint.hostel == "Hostel C"
-                assert complaint.category == "structural"
+                assert complaint.category == "carpentry"
                 assert complaint.severity == "high"
 
 

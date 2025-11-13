@@ -26,8 +26,8 @@ END$$;
 -- ENUM types (compact storage keys)
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'complaint_category') THEN
-        CREATE TYPE complaint_category AS ENUM ('plumbing','electrical','structural','pest','common_area','other');
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'complaint_category') THEN
+    CREATE TYPE complaint_category AS ENUM ('plumbing','electrical','carpentry','pest','metalworks','other');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'complaint_severity') THEN
         CREATE TYPE complaint_severity AS ENUM ('low','medium','high');

@@ -56,9 +56,9 @@ Recommendation: store compact storage keys in the DB and use human-friendly labe
 | --------------------- | ----------- |
 | Plumbing / Water      | plumbing    |
 | Electrical / Lighting | electrical  |
-| Carpentry             | structural  |
+| Carpentry             | carpentry   |
 | Pest Control          | pest        |
-| Metalworks/Bunks      | common_area |
+| Metalworks/Bunks      | metalworks  |
 | Other / Not Listed    | other       |
 
 ### Complaint Severity (Telegram selection)
@@ -126,9 +126,9 @@ Below is a proposed JSON Schema you can use server-side or for unit tests in Pha
             "enum": [
                 "plumbing",
                 "electrical",
-                "structural",
+                "carpentry",
                 "pest",
-                "common_area",
+                "metalworks",
                 "other"
             ]
         },

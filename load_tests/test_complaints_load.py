@@ -67,7 +67,7 @@ class ComplaintUser(HttpUser):
     def list_complaints_with_filters(self):
         """List complaints with filters."""
         statuses = ["reported", "in_progress", "resolved", "closed"]
-        categories = ["plumbing", "electrical", "structural", "pest"]
+    categories = ["plumbing", "electrical", "carpentry", "pest"]
         
         params = {
             "page": 1,

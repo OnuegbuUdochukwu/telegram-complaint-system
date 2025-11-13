@@ -36,16 +36,16 @@ LEGACY_COMPLAINT_CATEGORIES: List[str] = [
 CATEGORY_LABEL_TO_KEY: Dict[str, str] = {
     "Plumbing / Water": "plumbing",
     "Electrical / Lighting": "electrical",
-    "Carpentry": "structural",
+    "Carpentry": "carpentry",
     "Pest Control": "pest",
-    "Metalworks/Bunks": "common_area",
+    "Metalworks/Bunks": "metalworks",
     "Other / Not Listed": "other",
     # Legacy labels mapped to canonical storage keys
     "Plumbing Issue": "plumbing",
     "Electrical Fault": "electrical",
-    "Carpentry": "structural",
+    "Carpentry": "carpentry",
     "HVAC/Fan Repair": "other",
-    "Cleaning/Sanitation": "common_area",
+    "Cleaning/Sanitation": "metalworks",
     "Other": "other",
 }
 

@@ -708,7 +708,7 @@ async def submit_complaint(payload: ComplaintCreate, session=Depends(get_session
     # Map validated Pydantic payload into SQLModel Complaint for persistence
     data = payload.dict()
     # Validate category and severity to avoid writing invalid ENUM values into Postgres
-    allowed_categories = {"plumbing", "electrical", "structural", "pest", "common_area", "other"}
+    allowed_categories = {"plumbing", "electrical", "carpentry", "pest", "metalworks", "other"}
     allowed_severities = {"low", "medium", "high"}
     if data.get("category") not in allowed_categories:
         # Map unknown categories to 'other' to keep DB enum compatibility
