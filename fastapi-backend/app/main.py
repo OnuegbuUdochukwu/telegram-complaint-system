@@ -15,7 +15,6 @@ from .observability import (
     setup_logging, init_sentry, setup_metrics_middleware,
     metrics_endpoint, get_health_check
 )
-from prometheus_client import Counter
 import logging
 import json
 
@@ -27,10 +26,14 @@ from .email_service import send_invitation_email, send_otp_email
 from .otp_utils import create_otp_token, verify_otp_token, validate_password_strength
 from email_validator import validate_email, EmailNotValidError
 import secrets
-from .storage import upload_photo, upload_thumbnail, get_photo_url, delete_photo
-from .photo_utils import validate_image, process_image, get_mime_type
-from fastapi import File, UploadFile
-from fastapi.responses import StreamingResponse
+from .storage import get_photo_url, delete_photo
+from .dependencies import get_authenticated_user_or_service
+from .upload_metrics import (
+    UPLOAD_ATTEMPTS,
+    UPLOAD_FAILURES,
+    UPLOAD_SUCCESSES,
+)
+from .routes import photos as photos_routes
 
 # Setup observability
 setup_logging()
@@ -62,6 +65,7 @@ app = FastAPI(title="Complaint Management API")
 
 # Setup metrics middleware
 setup_metrics_middleware(app)
+app.include_router(photos_routes.router)
 
 # Serve the static dashboard files from the repository's `dashboard/` folder
 from pathlib import Path
@@ -80,92 +84,6 @@ if _STORAGE_DIR.exists():
 # browser's native login popup). We want the route handler to decide how
 # to respond and return a JSON 401 when appropriate.
 security = HTTPBasic(auto_error=False)
-
-# Prometheus counters for photo upload instrumentation
-UPLOAD_ATTEMPTS = Counter(
-    "upload_photo_attempts_total",
-    "Total number of photo upload attempts"
-)
-UPLOAD_SUCCESSES = Counter(
-    "upload_photo_success_total",
-    "Total number of successful photo uploads"
-)
-UPLOAD_FAILURES = Counter(
-    "upload_photo_failure_total",
-    "Total number of failed photo uploads"
-)
-UPLOAD_AUTH_FAILURES = Counter(
-    "upload_photo_auth_failures_total",
-    "Total number of photo upload attempts that failed authentication"
-)
-
-
-def get_authenticated_user_or_service(request: Request, session=Depends(get_session)):
-    """
-    Dependency that accepts either a regular porter JWT Bearer token (decoded
-    with auth.decode_access_token) or the BACKEND_SERVICE_TOKEN (an opaque
-    token configured in the environment for trusted services like the bot).
-
-    Returns a Porter-like object on success. If a service token is used, a
-    synthetic Porter object with id 'service-token' and role 'service' is
-    returned so route handlers can treat it as an authenticated caller.
-    """
-    import os
-
-    auth_header = request.headers.get("authorization")
-    svc_token = os.environ.get("BACKEND_SERVICE_TOKEN")
-    # Normalize stored token by stripping common quoting/whitespace to avoid
-    # mismatches when operators put quotes in env files. Do not modify the
-    # actual value used for comparison beyond stripping surrounding quotes.
-    if isinstance(svc_token, str):
-        svc_token = svc_token.strip().strip('"\'')
-
-    # No auth header at all
-    if not auth_header:
-        UPLOAD_AUTH_FAILURES.inc()
-        raise HTTPException(status_code=401, detail="Not authenticated", headers={"X-Auth-Reason": "Missing bearer token"})
-
-    # Expect 'Bearer <token>'
-    if not auth_header.lower().startswith("bearer "):
-        UPLOAD_AUTH_FAILURES.inc()
-        raise HTTPException(status_code=401, detail="Invalid authentication header")
-
-    token = auth_header.split(None, 1)[1]
-
-    # If token matches configured service token, return synthetic service user
-    # Also accept tokens that may have been provided with surrounding quotes
-    # by resiliently normalizing the incoming token before comparison.
-    incoming_token = token.strip().strip('"\'') if isinstance(token, str) else token
-    if svc_token and incoming_token == svc_token:
-        # Lightweight synthetic Porter object; avoid DB operations here
-        try:
-            from .models import Porter as PorterModel
-            svc = PorterModel(id="service-token", full_name="service-token", role="service")
-            return svc
-        except Exception:
-            # Fallback to a simple namespace object
-            class _S:
-                id = "service-token"
-                full_name = "service-token"
-                role = "service"
-            return _S()
-
-    # Otherwise try to decode as regular JWT and fetch the Porter from DB
-    try:
-        payload = auth.decode_access_token(token)
-    except HTTPException:
-        UPLOAD_AUTH_FAILURES.inc()
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-    porter_id = payload.sub
-    # Load Porter from DB
-    porter = session.get(Porter, porter_id)
-    if not porter:
-        # Token subject doesn't map to a real porter
-        UPLOAD_AUTH_FAILURES.inc()
-        raise HTTPException(status_code=401, detail="Invalid token subject")
-    return porter
-
 
 @app.post("/auth/login", response_model=dict)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), session=Depends(get_session)):
@@ -1132,165 +1050,6 @@ def list_assignments(complaint_id: str, user: Porter = Depends(auth.get_current_
     rows = session.exec(stmt).all()
     # Map to simple dicts for the test expectations
     return [ {"id": r.id, "complaint_id": r.complaint_id, "assigned_by": r.assigned_by, "assigned_to": r.assigned_to, "created_at": r.created_at.isoformat() if r.created_at else None} for r in rows ]
-
-
-@app.post("/api/v1/complaints/{complaint_id}/photos")
-async def upload_photo_to_complaint(
-    complaint_id: str,
-    file: UploadFile = File(...),
-    user: Porter = Depends(get_authenticated_user_or_service),
-    session=Depends(get_session)
-):
-    """
-    Upload a photo to a complaint.
-    
-    Requires authentication. Validates file size, type, and dimensions.
-    Processes the image and generates a thumbnail.
-    """
-    import uuid
-    import io
-
-    # Instrumentation: count attempts
-    UPLOAD_ATTEMPTS.inc()
-
-    try:
-        # Validate complaint exists
-        statement = select(Complaint).where(Complaint.id == complaint_id)
-        complaint = session.exec(statement).first()
-        if not complaint:
-            raise HTTPException(status_code=404, detail="Complaint not found")
-
-        # Generate photo ID
-        photo_id = str(uuid.uuid4())
-
-        # Read file data
-        file_data = await file.read()
-
-        # Validate image
-        is_valid, error_msg = validate_image(file_data, file.filename)
-        if not is_valid:
-            raise HTTPException(status_code=400, detail=error_msg)
-
-        # Process image (optimize and generate thumbnail)
-        optimized_data, thumbnail_data, width, height, mime_type = process_image(file_data, file.filename)
-
-        # Upload to storage
-        file_url, thumbnail_url = upload_photo(optimized_data, complaint_id, photo_id, mime_type)
-
-        # Upload thumbnail
-        if thumbnail_data:
-            thumbnail_storage_url = upload_thumbnail(thumbnail_data, complaint_id, photo_id)
-            if thumbnail_storage_url:
-                thumbnail_url = thumbnail_storage_url
-
-        # Create photo record in database
-        photo = Photo(
-            id=photo_id,
-            complaint_id=complaint_id,
-            file_url=file_url,
-            thumbnail_url=thumbnail_url,
-            file_name=file.filename,
-            file_size=len(optimized_data),
-            mime_type=mime_type,
-            width=width,
-            height=height
-        )
-
-        session.add(photo)
-        session.commit()
-        session.refresh(photo)
-
-        logger.info(f"Uploaded photo {photo_id} for complaint {complaint_id}")
-
-        # Success metric
-        UPLOAD_SUCCESSES.inc()
-
-        return {
-            "id": photo.id,
-            "complaint_id": photo.complaint_id,
-            "file_url": photo.file_url,
-            "thumbnail_url": photo.thumbnail_url,
-            "file_name": photo.file_name,
-            "file_size": photo.file_size,
-            "width": photo.width,
-            "height": photo.height,
-            "created_at": photo.created_at.isoformat() if photo.created_at else None
-        }
-
-    except HTTPException as he:
-        # Auth or validation related HTTPException
-        UPLOAD_FAILURES.inc()
-        raise he
-    except Exception as e:
-        UPLOAD_FAILURES.inc()
-        logger.error(f"Failed to upload photo: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to upload photo: {str(e)}")
-
-
-@app.get("/api/v1/complaints/{complaint_id}/photos")
-def list_complaint_photos(
-    complaint_id: str,
-    user: Porter = Depends(get_authenticated_user_or_service),
-    session=Depends(get_session)
-):
-    """Get all photos for a complaint."""
-    # Validate complaint exists
-    statement = select(Complaint).where(Complaint.id == complaint_id)
-    complaint = session.exec(statement).first()
-    if not complaint:
-        raise HTTPException(status_code=404, detail="Complaint not found")
-    
-    # Get all photos for this complaint
-    statement = select(Photo).where(Photo.complaint_id == complaint_id).order_by(Photo.created_at.desc())
-    photos = session.exec(statement).all()
-    
-    return [
-        {
-            "id": photo.id,
-            "complaint_id": photo.complaint_id,
-            "file_url": photo.file_url,
-            "thumbnail_url": photo.thumbnail_url,
-            "file_name": photo.file_name,
-            "file_size": photo.file_size,
-            "mime_type": photo.mime_type,
-            "width": photo.width,
-            "height": photo.height,
-            "created_at": photo.created_at.isoformat() if photo.created_at else None
-        }
-        for photo in photos
-    ]
-
-
-@app.delete("/api/v1/complaints/{complaint_id}/photos/{photo_id}")
-def delete_complaint_photo(
-    complaint_id: str,
-    photo_id: str,
-    user: Porter = Depends(get_authenticated_user_or_service),
-    session=Depends(get_session)
-):
-    """Delete a photo from a complaint."""
-    # Validate complaint exists
-    statement = select(Complaint).where(Complaint.id == complaint_id)
-    complaint = session.exec(statement).first()
-    if not complaint:
-        raise HTTPException(status_code=404, detail="Complaint not found")
-    
-    # Get photo
-    statement = select(Photo).where(Photo.id == photo_id, Photo.complaint_id == complaint_id)
-    photo = session.exec(statement).first()
-    if not photo:
-        raise HTTPException(status_code=404, detail="Photo not found")
-    
-    # Delete from storage
-    delete_photo(complaint_id, photo_id)
-    
-    # Delete from database
-    session.delete(photo)
-    session.commit()
-    
-    logger.info(f"Deleted photo {photo_id} from complaint {complaint_id}")
-    
-    return {"message": "Photo deleted successfully"}
 
 
 @app.get("/api/v1/porters", response_model=List[PorterPublic])

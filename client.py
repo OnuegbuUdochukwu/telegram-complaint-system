@@ -22,6 +22,7 @@ import random
 from typing import Any, Dict, Optional
 
 import httpx
+import mimetypes
 
 logger = logging.getLogger(__name__)
 
@@ -207,56 +208,63 @@ def _get_service_token() -> Optional[str]:
 
 
 def upload_photo(complaint_id: str, file_bytes: bytes, filename: str, mime_type: Optional[str] = None) -> Dict[str, Any]:
-  """Upload photo bytes to the backend photos endpoint.
+    """Upload photo bytes using the presigned S3 pipeline."""
+    if not BACKEND_URL:
+        mock = {
+            "id": f"MOCK-PHOTO-{int(time.time())}",
+            "complaint_id": complaint_id,
+            "file_url": f"/storage/{complaint_id}/{filename}",
+            "thumbnail_url": None,
+            "file_name": filename,
+            "file_size": len(file_bytes),
+        }
+        logger.info("Returning mock upload_photo response: %s", mock)
+        return mock
 
-  Returns parsed JSON from the backend on success. If BACKEND_URL is not set,
-  returns a mock response for local testing.
-  """
-  if not BACKEND_URL:
-    # Local/mock fallback: return a synthetic response
-    mock = {
-      "id": f"MOCK-PHOTO-{int(time.time())}",
-      "complaint_id": complaint_id,
-      "file_url": f"/storage/{complaint_id}/{filename}",
-      "thumbnail_url": None,
-      "file_name": filename,
-      "file_size": len(file_bytes),
+    token = _get_service_token()
+    if not token:
+        raise RuntimeError("Service token required for photo uploads; set BACKEND_SERVICE_TOKEN.")
+
+    mime = mime_type or mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    headers = {"Authorization": f"Bearer {token}"}
+    base = BACKEND_URL.rstrip("/")
+
+    # Step 1: Request presigned URL
+    presign_payload = {
+        "filename": filename,
+        "content_type": mime,
+        "content_length": len(file_bytes),
     }
-    logger.info("Returning mock upload_photo response: %s", mock)
-    return mock
+    presign = _attempt_request(
+        "POST",
+        f"{base}/api/v1/complaints/{complaint_id}/photos/presign",
+        json=presign_payload,
+        headers=headers,
+    )
 
-  url = BACKEND_URL.rstrip("/") + f"/api/v1/complaints/{complaint_id}/photos"
-  token = _get_service_token()
-  headers = {}
-  if token:
-    headers["Authorization"] = f"Bearer {token}"
+    # Step 2: PUT to S3
+    method = presign.get("method", "PUT").upper()
+    upload_url = presign["url"]
+    client = _client or httpx.Client(timeout=_DEFAULT_TIMEOUT)
+    if method != "PUT":
+        raise RuntimeError(f"Unsupported presign method {method}")
 
-  # Prepare multipart files payload
-  files = {"file": (filename, file_bytes, mime_type or "application/octet-stream")}
+    put_headers = {"Content-Type": mime}
+    resp = client.put(upload_url, content=file_bytes, headers=put_headers)
+    resp.raise_for_status()
 
-  last_exc: Optional[Exception] = None
-  for attempt in range(1, _MAX_RETRIES + 1):
-    try:
-      client = _client or httpx.Client(timeout=_DEFAULT_TIMEOUT)
-      resp = client.post(url, files=files, headers=headers)
-      if 200 <= resp.status_code < 300:
-        return resp.json()
-      # Treat 4xx as non-retryable
-      if 400 <= resp.status_code < 500:
-        resp.raise_for_status()
-      # 5xx -> retry
-      resp.raise_for_status()
-    except Exception as exc:
-      last_exc = exc
-      response = exc.response if hasattr(exc, "response") else None
-      if attempt == _MAX_RETRIES or not _is_retryable(exc, response):
-        logger.warning("upload_photo to %s failed (attempt %s/%s): %s", url, attempt, _MAX_RETRIES, exc)
-        break
-      backoff = _BACKOFF_FACTOR * (2 ** (attempt - 1))
-      jitter = random.uniform(0, backoff * 0.1)
-      sleep_time = backoff + jitter
-      logger.info("Retrying upload in %.2fs (attempt %s/%s)", sleep_time, attempt + 1, _MAX_RETRIES)
-      time.sleep(sleep_time)
-
-  raise last_exc if last_exc is not None else RuntimeError("upload_photo failed without exception")
+    # Step 3: Confirm upload back to backend
+    confirm_payload = {
+        "photo_id": presign["photo_id"],
+        "s3_key": presign["s3_key"],
+        "file_size": len(file_bytes),
+        "content_type": mime,
+    }
+    confirmation = _attempt_request(
+        "POST",
+        f"{base}/api/v1/complaints/{complaint_id}/photos/confirm",
+        json=confirm_payload,
+        headers=headers,
+    )
+    return confirmation
 
