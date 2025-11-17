@@ -1,0 +1,20 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowOACRead",
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "cloudfront.amazonaws.com"
+      },
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::${S3_BUCKET}/complaints/*",
+      "Condition": {
+        "StringEquals": {
+          "AWS:SourceArn": "${CLOUDFRONT_DISTRIBUTION_ARN}"
+        }
+      }
+    }
+  ]
+}
+
