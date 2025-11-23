@@ -155,7 +155,10 @@ def confirm_upload(
             raise HTTPException(status_code=404, detail="Upload record not found")
 
         now = datetime.now(timezone.utc)
-        if upload.expires_at < now:
+        expiry = upload.expires_at or now
+        if expiry.tzinfo is None:
+            expiry = expiry.replace(tzinfo=timezone.utc)
+        if expiry < now:
             raise HTTPException(status_code=410, detail="Presigned upload expired")
 
         head = s3.head_object(payload.s3_key)

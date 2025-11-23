@@ -73,19 +73,21 @@ def test_retention_purge():
     print("Testing purge endpoint...")
     
     # First, ensure we're authenticated as admin
-    # Register admin user
+    # Use the admin user that's already created in conftest (admin-purge@test.com)
+    # or register a new one if needed
     register_payload = {
         "full_name": "Admin Test User",
-        "email": "admin-retention-test@example.com",
-        "password": "testpass123"
+        "email": "admin-purge@test.com",  # This email is in AUTO_ADMIN_EMAILS
+        "password": "adminpass123"
     }
     
+    # Try to register (may fail if user exists, that's OK)
     httpx.post(f"{BASE_URL}/auth/register", json=register_payload, timeout=TIMEOUT)
     
     # Login
     login_resp = httpx.post(
         f"{BASE_URL}/auth/login",
-        data={"username": "admin-retention-test@example.com", "password": "testpass123"},
+        data={"username": "admin-purge@test.com", "password": "adminpass123"},
         timeout=TIMEOUT
     )
     

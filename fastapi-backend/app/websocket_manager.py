@@ -11,6 +11,8 @@ from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
+from .hostel_utils import get_hostel_display_name
+
 
 class WebSocketEvent(BaseModel):
     """Base model for WebSocket events."""
@@ -32,7 +34,7 @@ class NewComplaintEvent(WebSocketEvent):
     def __init__(self, complaint_id: str, hostel: str, category: str, severity: str, **kwargs):
         data = {
             "id": complaint_id,  # Fixed: should be "id" not "complaint_id"
-            "hostel": hostel,
+            "hostel": get_hostel_display_name(hostel),
             "category": category,
             "severity": severity
         }

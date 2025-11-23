@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Request, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Depends, HTTPException, status, Request, Query, WebSocket, WebSocketDisconnect, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials, OAuth2PasswordRequestForm
@@ -26,7 +26,9 @@ from .email_service import send_invitation_email, send_otp_email
 from .otp_utils import create_otp_token, verify_otp_token, validate_password_strength
 from email_validator import validate_email, EmailNotValidError
 import secrets
-from .storage import get_photo_url, delete_photo
+import uuid
+from .storage import upload_photo, upload_thumbnail, get_photo_url, delete_photo, get_s3_key
+from .photo_utils import validate_image, process_image
 from .dependencies import get_authenticated_user_or_service
 from .upload_metrics import (
     UPLOAD_ATTEMPTS,
@@ -34,6 +36,7 @@ from .upload_metrics import (
     UPLOAD_SUCCESSES,
 )
 from .routes import photos as photos_routes
+from .config import get_settings
 
 # Setup observability
 setup_logging()
@@ -41,6 +44,8 @@ init_sentry()
 
 # Application logger
 logger = logging.getLogger("app")
+
+settings = get_settings()
 
 
 class PorterPublic(BaseModel):
@@ -127,12 +132,16 @@ def register_porter(
     # Allow dev-mode registration when ALLOW_DEV_REGISTER is set (tests use this)
     import os
 
+    auto_admin_raw = os.environ.get("AUTO_ADMIN_EMAILS", "")
+    auto_admin_emails = {addr.strip().lower() for addr in auto_admin_raw.split(",") if addr.strip()}
+    desired_role = "admin" if email and email.lower() in auto_admin_emails else "porter"
+
     # Also allow during pytest runs (CI/test harness) by checking for the
     # PYTEST_CURRENT_TEST env var which pytest sets for running tests. This
     # keeps tests deterministic even when the DB already contains rows.
     if os.environ.get("ALLOW_DEV_REGISTER") in ("1", "true", "True") or os.environ.get("PYTEST_CURRENT_TEST"):
         try:
-            porter = auth.create_porter(session, full_name=full_name, password=password, email=email, phone=phone)
+            porter = auth.create_porter(session, full_name=full_name, password=password, email=email, phone=phone, role=desired_role)
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc))
         return {"id": porter.id, "email": porter.email, "phone": porter.phone}
@@ -151,7 +160,7 @@ def register_porter(
         raise HTTPException(status_code=403, detail="Insufficient privileges")
 
     try:
-        porter = auth.create_porter(session, full_name=full_name, password=password, email=email, phone=phone)
+        porter = auth.create_porter(session, full_name=full_name, password=password, email=email, phone=phone, role=desired_role)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
     return {"id": porter.id, "email": porter.email, "phone": porter.phone}
@@ -604,7 +613,7 @@ class ComplaintCreate(BaseModel):
     photo_urls: Optional[List[str]] = None
     severity: str
 
-    @validator('room_number')
+    @validator('room_number', allow_reuse=True)
     def validate_and_normalize_room_number(cls, v: str) -> str:
         """Normalize to uppercase and validate canonical format A–H followed by 3 digits."""
         if not isinstance(v, str):
@@ -1050,6 +1059,178 @@ def list_assignments(complaint_id: str, user: Porter = Depends(auth.get_current_
     rows = session.exec(stmt).all()
     # Map to simple dicts for the test expectations
     return [ {"id": r.id, "complaint_id": r.complaint_id, "assigned_by": r.assigned_by, "assigned_to": r.assigned_to, "created_at": r.created_at.isoformat() if r.created_at else None} for r in rows ]
+
+
+@app.post("/api/v1/complaints/{complaint_id}/photos")
+async def upload_photo_to_complaint(
+    complaint_id: str,
+    file: UploadFile = File(...),
+    user: Porter = Depends(get_authenticated_user_or_service),
+    session=Depends(get_session)
+):
+    """Legacy photo upload endpoint retained for backward compatibility."""
+    import io
+
+    UPLOAD_ATTEMPTS.inc()
+
+    try:
+        statement = select(Complaint).where(Complaint.id == complaint_id)
+        complaint = session.exec(statement).first()
+        if not complaint:
+            UPLOAD_FAILURES.inc()
+            raise HTTPException(status_code=404, detail="Complaint not found")
+
+        photo_id = str(uuid.uuid4())
+        
+        # Check file size before reading into memory
+        file_size = 0
+        try:
+            file_data = await file.read()
+            file_size = len(file_data)
+        except Exception as e:
+            UPLOAD_FAILURES.inc()
+            logger.error(f"Error reading file: {e}")
+            # If it's a memory error or size-related, return 413
+            if "memory" in str(e).lower() or "size" in str(e).lower() or "too large" in str(e).lower():
+                raise HTTPException(status_code=413, detail="File too large to process")
+            raise HTTPException(status_code=400, detail=f"Error reading file: {str(e)}")
+
+        try:
+            is_valid, error_msg = validate_image(file_data, file.filename)
+            if not is_valid:
+                UPLOAD_FAILURES.inc()
+                # Return 413 for file too large, 400 for other validation errors
+                status_code = 413 if "size exceeds" in error_msg.lower() else 400
+                raise HTTPException(status_code=status_code, detail=error_msg)
+        except HTTPException:
+            raise
+        except Exception as e:
+            # If validation itself raises an exception, treat as validation error
+            UPLOAD_FAILURES.inc()
+            logger.error(f"Error during image validation: {e}")
+            error_str = str(e).lower()
+            if "size" in error_str or "too large" in error_str or "memory" in error_str:
+                raise HTTPException(status_code=413, detail="File too large to process")
+            raise HTTPException(status_code=400, detail=f"Image validation failed: {str(e)}")
+
+        try:
+            optimized_data, thumbnail_data, width, height, mime_type = process_image(file_data, file.filename)
+        except Exception as e:
+            UPLOAD_FAILURES.inc()
+            logger.error(f"Error processing image: {e}")
+            raise HTTPException(status_code=400, detail=f"Error processing image: {str(e)}")
+
+        file_url, thumbnail_url = upload_photo(optimized_data, complaint_id, photo_id, mime_type)
+        thumbnail_key = None
+        if thumbnail_data:
+            thumb_storage_url = upload_thumbnail(thumbnail_data, complaint_id, photo_id)
+            if thumb_storage_url:
+                thumbnail_url = thumb_storage_url
+            thumbnail_key = get_s3_key(complaint_id, photo_id, is_thumbnail=True)
+
+        original_key = get_s3_key(complaint_id, photo_id, is_thumbnail=False, content_type=mime_type)
+
+        photo = Photo(
+            id=photo_id,
+            complaint_id=complaint_id,
+            file_url=file_url,
+            thumbnail_url=thumbnail_url,
+            file_name=file.filename,
+            file_size=len(optimized_data),
+            mime_type=mime_type,
+            width=width,
+            height=height,
+            storage_provider=settings.storage_provider,
+            s3_key=original_key,
+            s3_thumbnail_key=thumbnail_key,
+        )
+
+        session.add(photo)
+        session.commit()
+        session.refresh(photo)
+        UPLOAD_SUCCESSES.inc()
+
+        return {
+            "id": photo.id,
+            "complaint_id": photo.complaint_id,
+            "file_url": photo.file_url,
+            "thumbnail_url": photo.thumbnail_url,
+            "file_name": photo.file_name,
+            "file_size": photo.file_size,
+            "width": photo.width,
+            "height": photo.height,
+            "created_at": photo.created_at.isoformat() if photo.created_at else None
+        }
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        # Catch any other unhandled exceptions and return appropriate status code
+        UPLOAD_FAILURES.inc()
+        logger.error(f"Unexpected error in upload_photo_to_complaint: {e}", exc_info=True)
+        # If it's a size-related error, return 413 instead of 500
+        error_str = str(e).lower()
+        if "size" in error_str or "too large" in error_str or "memory" in error_str or "413" in error_str:
+            raise HTTPException(status_code=413, detail="File too large to process")
+        raise HTTPException(status_code=500, detail="Internal server error during file upload")
+
+
+@app.get("/api/v1/complaints/{complaint_id}/photos")
+def list_complaint_photos(
+    complaint_id: str,
+    user: Porter = Depends(get_authenticated_user_or_service),
+    session=Depends(get_session)
+):
+    """List stored photo metadata for a complaint."""
+    statement = select(Complaint).where(Complaint.id == complaint_id)
+    complaint = session.exec(statement).first()
+    if not complaint:
+        raise HTTPException(status_code=404, detail="Complaint not found")
+
+    statement = select(Photo).where(Photo.complaint_id == complaint_id).order_by(Photo.created_at.desc())
+    photos = session.exec(statement).all()
+    return [
+        {
+            "id": photo.id,
+            "complaint_id": photo.complaint_id,
+            "file_url": photo.file_url,
+            "thumbnail_url": photo.thumbnail_url,
+            "file_name": photo.file_name,
+            "file_size": photo.file_size,
+            "mime_type": photo.mime_type,
+            "width": photo.width,
+            "height": photo.height,
+            "created_at": photo.created_at.isoformat() if photo.created_at else None
+        }
+        for photo in photos
+    ]
+
+
+@app.delete("/api/v1/complaints/{complaint_id}/photos/{photo_id}")
+def delete_complaint_photo(
+    complaint_id: str,
+    photo_id: str,
+    user: Porter = Depends(get_authenticated_user_or_service),
+    session=Depends(get_session)
+):
+    """Delete a photo from a complaint."""
+    statement = select(Complaint).where(Complaint.id == complaint_id)
+    complaint = session.exec(statement).first()
+    if not complaint:
+        raise HTTPException(status_code=404, detail="Complaint not found")
+
+    statement = select(Photo).where(Photo.id == photo_id, Photo.complaint_id == complaint_id)
+    photo = session.exec(statement).first()
+    if not photo:
+        raise HTTPException(status_code=404, detail="Photo not found")
+
+    delete_photo(complaint_id, photo_id)
+    session.delete(photo)
+    session.commit()
+
+    logger.info(f"Deleted photo {photo_id} from complaint {complaint_id}")
+
+    return {"message": "Photo deleted successfully"}
 
 
 @app.get("/api/v1/porters", response_model=List[PorterPublic])

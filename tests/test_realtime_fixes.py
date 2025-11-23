@@ -417,7 +417,7 @@ class TestEndToEndIntegration:
                 complaint = session.exec(select(Complaint).where(Complaint.id == complaint_id)).first()
                 assert complaint is not None
                 assert complaint.status == "in_progress"
-                assert complaint.hostel == "Hostel C"
+                assert complaint.hostel == "Paul"  # Database stores canonical name
                 assert complaint.category == "carpentry"
                 assert complaint.severity == "high"
 

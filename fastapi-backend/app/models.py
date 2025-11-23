@@ -23,7 +23,7 @@ class Hostel(SQLModel, table=True):
     if _USE_PG_UUID:
         id: Optional[str] = Field(default=None, primary_key=True, sa_column=Column(PG_UUID(as_uuid=False), primary_key=True, server_default=text("gen_random_uuid()")))
     else:
-        id: Optional[str] = Field(default=None, primary_key=True)
+        id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
     slug: str = Field(sa_column_kwargs={"unique": True})
     display_name: str
     created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
