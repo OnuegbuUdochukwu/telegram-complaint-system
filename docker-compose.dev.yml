@@ -1,96 +1,99 @@
 version: "3.9"
 
 services:
-  postgres:
-    image: postgres:15
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: cms_user
-      POSTGRES_PASSWORD: cms_password
-      POSTGRES_DB: cms_db
-    ports:
-      - "5434:5432"
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
+    postgres:
+        image: postgres:15
+        restart: unless-stopped
+        environment:
+            POSTGRES_USER: cms_user
+            POSTGRES_PASSWORD: cms_password
+            POSTGRES_DB: cms_db
+        ports:
+            - "5434:5432"
+        volumes:
+            - postgres-data:/var/lib/postgresql/data
 
-  redis:
-    image: redis:7
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
+    redis:
+        image: redis:7
+        restart: unless-stopped
+        ports:
+            - "6379:6379"
 
-  minio:
-    image: quay.io/minio/minio:RELEASE.2024-10-13T13-34-11Z
-    restart: unless-stopped
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: "${MINIO_ROOT_USER:-minioadmin}"
-      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD:-minioadmin}"
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - minio-data:/data
+    minio:
+        image: minio/minio:latest
+        restart: unless-stopped
+        command: server /data --console-address ":9001"
+        environment:
+            MINIO_ROOT_USER: "${MINIO_ROOT_USER:-minioadmin}"
+            MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD:-minioadmin}"
+        ports:
+            - "9000:9000"
+            - "9001:9001"
+        volumes:
+            - minio-data:/data
 
-  minio-setup:
-    image: quay.io/minio/mc:RELEASE.2024-10-13T21-55-23Z
-    depends_on:
-      - minio
-    entrypoint: >
-      /bin/sh -c "
-        sleep 5 &&
-        mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin} &&
-        mc mb --ignore-existing local/complaint-photos &&
-        mc anonymous set private local/complaint-photos
-      "
+    minio-setup:
+        image: minio/mc:latest
+        depends_on:
+            - minio
+        entrypoint: >
+            /bin/sh -c "
+              sleep 5 &&
+              mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin} &&
+              mc mb --ignore-existing local/complaint-photos &&
+              mc anonymous set private local/complaint-photos
+            "
 
-  backend:
-    build:
-      context: ./fastapi-backend
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-    environment:
-      DATABASE_URL: postgresql+psycopg2://cms_user:cms_password@postgres:5432/cms_db
-      STORAGE_PROVIDER: s3
-      S3_BUCKET: complaint-photos
-      S3_REGION: us-east-1
-      S3_ENDPOINT: http://minio:9000
-      S3_USE_SSL: "false"
-      S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
-      S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
-      BACKEND_SERVICE_TOKEN: ${BACKEND_SERVICE_TOKEN:-local-service-token}
-      REDIS_URL: redis://redis:6379/0
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CELERY_RESULT_BACKEND: redis://redis:6379/0
-    ports:
-      - "8001:8000"
-    volumes:
-      - ./fastapi-backend:/app
-    depends_on:
-      - postgres
-      - redis
-      - minio
+    backend:
+        build:
+            context: ./fastapi-backend
+        command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+        env_file:
+            - ./fastapi-backend/.env
+        environment:
+            DATABASE_URL: postgresql+psycopg2://cms_user:cms_password@postgres:5432/cms_db
+            STORAGE_PROVIDER: s3
+            S3_BUCKET: complaint-photos
+            S3_REGION: us-east-1
+            S3_ENDPOINT: http://minio:9000
+            S3_USE_SSL: "false"
+            S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+            S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+            BACKEND_SERVICE_TOKEN: ${BACKEND_SERVICE_TOKEN:-local-service-token}
+            REDIS_URL: redis://redis:6379/0
+            CELERY_BROKER_URL: redis://redis:6379/0
+            CELERY_RESULT_BACKEND: redis://redis:6379/0
+        ports:
+            - "8001:8000"
+        volumes:
+            - ./fastapi-backend:/app
+        depends_on:
+            - postgres
+            - redis
+            - minio
 
-  worker:
-    build:
-      context: ./fastapi-backend
-    command: celery -A app.photo_processing.celery_app worker --loglevel=info
-    environment:
-      DATABASE_URL: postgresql+psycopg2://cms_user:cms_password@postgres:5432/cms_db
-      STORAGE_PROVIDER: s3
-      S3_BUCKET: complaint-photos
-      S3_REGION: us-east-1
-      S3_ENDPOINT: http://minio:9000
-      S3_USE_SSL: "false"
-      S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
-      S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
-      REDIS_URL: redis://redis:6379/0
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CELERY_RESULT_BACKEND: redis://redis:6379/0
-    depends_on:
-      - backend
-      - redis
+    worker:
+        build:
+            context: ./fastapi-backend
+        command: celery -A app.photo_processing.celery_app worker --loglevel=info
+        env_file:
+            - ./fastapi-backend/.env
+        environment:
+            DATABASE_URL: postgresql+psycopg2://cms_user:cms_password@postgres:5432/cms_db
+            STORAGE_PROVIDER: s3
+            S3_BUCKET: complaint-photos
+            S3_REGION: us-east-1
+            S3_ENDPOINT: http://minio:9000
+            S3_USE_SSL: "false"
+            S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+            S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+            REDIS_URL: redis://redis:6379/0
+            CELERY_BROKER_URL: redis://redis:6379/0
+            CELERY_RESULT_BACKEND: redis://redis:6379/0
+        depends_on:
+            - backend
+            - redis
 
 volumes:
-  postgres-data:
-  minio-data:
-
+    postgres-data:
+    minio-data:

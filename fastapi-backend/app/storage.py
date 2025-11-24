@@ -17,8 +17,18 @@ logger = logging.getLogger("app.storage")
 
 SETTINGS = get_settings()
 
-LOCAL_STORAGE_PATH = Path(__file__).resolve().parents[2] / "storage"
-LOCAL_STORAGE_PATH.mkdir(exist_ok=True)
+# Place local storage inside the project workspace (e.g. /app/storage in container)
+# Using parents[1] resolves to the project root when the app is located at /app/app
+LOCAL_STORAGE_PATH = Path(__file__).resolve().parents[1] / "storage"
+try:
+    LOCAL_STORAGE_PATH.mkdir(exist_ok=True)
+except PermissionError:
+    # If the runtime user can't create the directory (e.g., running as non-root),
+    # fall back to a writable temp directory to avoid crashing the app.
+    import tempfile
+    tmp = Path(tempfile.mkdtemp(prefix="cms_storage_"))
+    LOCAL_STORAGE_PATH = tmp
+    logger.warning("Could not create %s; falling back to temp storage %s", Path(__file__).resolve().parents[1] / "storage", LOCAL_STORAGE_PATH)
 
 _s3: Optional[S3Storage] = None
 if SETTINGS.storage_provider.lower() == "s3":
