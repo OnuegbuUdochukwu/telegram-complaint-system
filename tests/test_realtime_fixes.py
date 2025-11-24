@@ -11,6 +11,13 @@ import pytest
 import websockets
 import json
 import httpx
+import os
+
+# Set environment variables BEFORE importing app modules
+os.environ.setdefault("JWT_SECRET", "test-secret-key-for-pytest-only-12345")
+os.environ.setdefault("DATABASE_URL", "sqlite://")
+os.environ.setdefault("STORAGE_PROVIDER", "local")
+
 from fastapi.testclient import TestClient
 from app.main import app
 from app.websocket_manager import manager, NewComplaintEvent, StatusUpdateEvent, AssignmentEvent

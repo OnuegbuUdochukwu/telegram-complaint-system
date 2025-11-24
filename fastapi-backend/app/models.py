@@ -14,7 +14,14 @@ import os
 # Prefer environment variable override (useful for tests/CI), fall back to .env file.
 _env_path = Path(__file__).resolve().parents[2] / ".env"
 _env = dotenv_values(str(_env_path))
-_DATABASE_URL = os.environ.get("DATABASE_URL", "") or _env.get("DATABASE_URL", "") or ""
+_DATABASE_URL = os.environ.get("DATABASE_URL", "") or _env.get("DATABASE_URL", "")
+
+if not _DATABASE_URL:
+    # In some test scenarios (like unit tests using sqlite in memory), models might be imported
+    # without a full DB url. However, for the app to run, we need it.
+    # We'll allow empty string at module level but main.py/database.py should enforce it on startup.
+    pass
+
 _USE_PG_UUID = any(x in _DATABASE_URL for x in ("postgres://", "postgresql://", "psycopg2"))
 
 

@@ -25,9 +25,15 @@ if not logger.handlers:
 
 _env_path = Path(__file__).resolve().parents[2] / ".env"
 config = dotenv_values(str(_env_path))
-SECRET_KEY = config.get("JWT_SECRET") or "change-me-in-prod"
+
+SECRET_KEY = config.get("JWT_SECRET") or os.environ.get("JWT_SECRET")
+if not SECRET_KEY:
+    # Fallback for CI/Test environments where .env might not exist but env vars are set
+    # If still missing, we must fail securely rather than using a default.
+    raise ValueError("JWT_SECRET not found in environment or .env file.")
+
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = int(config.get("JWT_ACCESS_MINUTES") or 60)
+ACCESS_TOKEN_EXPIRE_MINUTES = int(config.get("JWT_ACCESS_MINUTES") or os.environ.get("JWT_ACCESS_MINUTES") or 60)
 
 # Use pbkdf2_sha256 here to avoid requiring a working bcrypt C-extension
 # in test environments. It's secure and avoids the bcrypt/packaging issues

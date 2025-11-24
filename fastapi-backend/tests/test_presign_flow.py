@@ -15,6 +15,8 @@ os.environ.setdefault("S3_BUCKET", "test-complaint-bucket")
 os.environ.setdefault("S3_REGION", "us-east-1")
 os.environ.setdefault("S3_ACCESS_KEY_ID", "testing")
 os.environ.setdefault("S3_SECRET_ACCESS_KEY", "testing")
+os.environ.setdefault("JWT_SECRET", "test-secret-key-for-pytest-only-12345")
+os.environ.setdefault("DATABASE_URL", "sqlite://")
 
 from app.main import app, init_db  # noqa: E402
 from app.database import engine  # noqa: E402
@@ -27,6 +29,12 @@ def test_client(tmp_path, monkeypatch):
     db_url = f"sqlite:///{tmp_path/'test.db'}"
     monkeypatch.setenv("DATABASE_URL", db_url)
     init_db()
+    
+    # Patch storage to be S3Storage so _ensure_s3 passes
+    from app.storage_s3 import S3Storage
+    from app.routes import photos
+    monkeypatch.setattr(photos, "storage", S3Storage())
+    
     photos_router.enqueue_thumbnail_job = lambda *a, **k: None
     return TestClient(app)
 
