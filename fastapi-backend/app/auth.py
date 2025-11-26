@@ -84,10 +84,11 @@ def decode_access_token(token: str) -> TokenPayload:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials", headers={"X-Auth-Reason": "Invalid token"}) from exc
 
 
-def authenticate_porter(username: str, password: str, session) -> Optional[Porter]:
+async def authenticate_porter(username: str, password: str, session) -> Optional[Porter]:
     # Allow login by email or phone
     statement = select(Porter).where((Porter.email == username) | (Porter.phone == username))
-    porter = session.exec(statement).first()
+    result = await session.exec(statement)
+    porter = result.first()
     if not porter or not porter.password_hash:
         return None
     if not verify_password(password, porter.password_hash):
@@ -100,7 +101,7 @@ def authenticate_porter(username: str, password: str, session) -> Optional[Porte
     return porter
 
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), session=Depends(get_session)) -> Porter:
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), session=Depends(get_session)) -> Porter:
     # HTTPBearer(auto_error=False) returns None when no credentials were provided
     if not credentials or not getattr(credentials, "credentials", None):
         # Normalize to a consistent 401 for the callers
@@ -129,7 +130,8 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     logger.info("[auth.debug] Token subject (sub) value: %r (type=%s)", porter_id, type(porter_id))
     logger.debug("[auth.debug] Token subject (sub) value: %r (type=%s)", porter_id, type(porter_id))
     statement = select(Porter).where(Porter.id == porter_id)
-    porter = session.exec(statement).first()
+    result = await session.exec(statement)
+    porter = result.first()
     if not porter:
         # Token subject did not map to a valid porter
         logger.info("[auth.debug] No porter found matching id: %r", porter_id)
@@ -139,7 +141,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
 
 
 def require_role(required_role: str):
-    def role_checker(user: Porter = Depends(get_current_user)) -> Porter:
+    async def role_checker(user: Porter = Depends(get_current_user)) -> Porter:
         # Use explicit role column stored on Porter model
         user_role = (user.role or "porter").lower()
         if required_role == "admin" and user_role != "admin":
@@ -161,7 +163,7 @@ def get_token_subject(credentials: HTTPAuthorizationCredentials = Depends(securi
     return payload.sub
 
 
-def create_porter(session, full_name: str, password: str, email: Optional[str] = None, phone: Optional[str] = None, role: Optional[str] = "porter") -> Porter:
+async def create_porter(session, full_name: str, password: str, email: Optional[str] = None, phone: Optional[str] = None, role: Optional[str] = "porter") -> Porter:
     """Helper to create a porter with hashed password. Returns the created Porter."""
     # If a porter with the same email or phone already exists, return it
     # to avoid creating duplicate rows which can make login/registration
@@ -169,10 +171,12 @@ def create_porter(session, full_name: str, password: str, email: Optional[str] =
     existing = None
     if email:
         stmt = select(Porter).where(Porter.email == email)
-        existing = session.exec(stmt).first()
+        result = await session.exec(stmt)
+        existing = result.first()
     if not existing and phone:
         stmt = select(Porter).where(Porter.phone == phone)
-        existing = session.exec(stmt).first()
+        result = await session.exec(stmt)
+        existing = result.first()
     if existing:
         updated = False
         if password:
@@ -186,8 +190,8 @@ def create_porter(session, full_name: str, password: str, email: Optional[str] =
         if updated:
             existing.updated_at = datetime.now(timezone.utc)
             session.add(existing)
-            session.commit()
-            session.refresh(existing)
+            await session.commit()
+            await session.refresh(existing)
         return existing
 
     ph = get_password_hash(password)
@@ -199,8 +203,8 @@ def create_porter(session, full_name: str, password: str, email: Optional[str] =
         data["phone"] = phone
     porter = Porter(**data)
     session.add(porter)
-    session.commit()
-    session.refresh(porter)
+    await session.commit()
+    await session.refresh(porter)
     return porter
 
 

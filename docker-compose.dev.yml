@@ -67,6 +67,7 @@ services:
             - "8001:8000"
         volumes:
             - ./fastapi-backend:/app
+            - ./dashboard:/dashboard
         depends_on:
             - postgres
             - redis

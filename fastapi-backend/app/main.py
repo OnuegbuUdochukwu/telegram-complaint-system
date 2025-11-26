@@ -37,6 +37,7 @@ from .upload_metrics import (
 )
 from .routes import photos as photos_routes
 from .config import get_settings
+from sqlalchemy.ext.asyncio import AsyncSession
 
 # Setup observability
 setup_logging()
@@ -91,9 +92,9 @@ if _STORAGE_DIR.exists():
 security = HTTPBasic(auto_error=False)
 
 @app.post("/auth/login", response_model=dict)
-def login(form_data: OAuth2PasswordRequestForm = Depends(), session=Depends(get_session)):
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), session=Depends(get_session)):
     # Validate credentials against porters table (email or phone as username)
-    porter = auth.authenticate_porter(form_data.username, form_data.password, session)
+    porter = await auth.authenticate_porter(form_data.username, form_data.password, session)
     if not porter:
         raise HTTPException(status_code=401, detail="Invalid username or password")
     # Use the stored Porter.role when issuing JWT so admin/porter is consistent
@@ -103,7 +104,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), session=Depends(get_
 
 
 @app.post("/auth/register", response_model=dict)
-def register_porter(
+async def register_porter(
     request: Request,
     full_name: str = Body(...),
     email: Optional[str] = Body(None),
@@ -120,11 +121,12 @@ def register_porter(
     # Allow initial bootstrap: if no porters exist, allow first registration
     from sqlmodel import select
 
-    existing = session.exec(select(auth.Porter)).first()
+    result = await session.exec(select(auth.Porter))
+    existing = result.first()
     # Allow initial bootstrap: if no porters exist, allow first registration as admin
     if existing is None:
         try:
-            porter = auth.create_porter(session, full_name=full_name, password=password, email=email, phone=phone, role="admin")
+            porter = await auth.create_porter(session, full_name=full_name, password=password, email=email, phone=phone, role="admin")
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc))
         return {"id": porter.id, "email": porter.email, "phone": porter.phone}
@@ -141,7 +143,7 @@ def register_porter(
     # keeps tests deterministic even when the DB already contains rows.
     if os.environ.get("ALLOW_DEV_REGISTER") in ("1", "true", "True") or os.environ.get("PYTEST_CURRENT_TEST"):
         try:
-            porter = auth.create_porter(session, full_name=full_name, password=password, email=email, phone=phone, role=desired_role)
+            porter = await auth.create_porter(session, full_name=full_name, password=password, email=email, phone=phone, role=desired_role)
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc))
         return {"id": porter.id, "email": porter.email, "phone": porter.phone}
@@ -160,7 +162,7 @@ def register_porter(
         raise HTTPException(status_code=403, detail="Insufficient privileges")
 
     try:
-        porter = auth.create_porter(session, full_name=full_name, password=password, email=email, phone=phone, role=desired_role)
+        porter = await auth.create_porter(session, full_name=full_name, password=password, email=email, phone=phone, role=desired_role)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
     return {"id": porter.id, "email": porter.email, "phone": porter.phone}
@@ -198,19 +200,21 @@ async def invite_admin(
         raise HTTPException(status_code=400, detail=f"Invalid email address: {str(e)}")
     
     # Check if email already exists as a porter
-    existing_porter = session.exec(select(Porter).where(Porter.email == email)).first()
+    result = await session.exec(select(Porter).where(Porter.email == email))
+    existing_porter = result.first()
     if existing_porter:
         raise HTTPException(status_code=400, detail="A user with this email already exists")
     
     # Check if there's already a pending invitation for this email
     now = datetime.now(timezone.utc)
-    existing_invitation = session.exec(
+    result = await session.exec(
         select(AdminInvitation).where(
             AdminInvitation.email == email,
             AdminInvitation.used == False,
             AdminInvitation.expires_at > now
         )
-    ).first()
+    )
+    existing_invitation = result.first()
     
     if existing_invitation:
         raise HTTPException(status_code=400, detail="An active invitation already exists for this email")
@@ -229,8 +233,8 @@ async def invite_admin(
     )
     
     session.add(invitation)
-    session.commit()
-    session.refresh(invitation)
+    await session.commit()
+    await session.refresh(invitation)
     
     # Send invitation email
     email_sent = await send_invitation_email(email, invitation_token, user.full_name)
@@ -248,17 +252,18 @@ async def invite_admin(
 
 
 @app.get("/auth/invitation/{token}")
-def validate_invitation_token(token: str, session=Depends(get_session)):
+async def validate_invitation_token(token: str, session=Depends(get_session)):
     """Validate an invitation token and return invitation details."""
     now = datetime.now(timezone.utc)
     
-    invitation = session.exec(
+    result = await session.exec(
         select(AdminInvitation).where(
             AdminInvitation.token == token,
             AdminInvitation.used == False,
             AdminInvitation.expires_at > now
         )
-    ).first()
+    )
+    invitation = result.first()
     
     if not invitation:
         raise HTTPException(status_code=404, detail="Invalid or expired invitation token")
@@ -287,13 +292,14 @@ async def signup(
     """
     # Validate invitation token
     now = datetime.now(timezone.utc)
-    invitation = session.exec(
+    result = await session.exec(
         select(AdminInvitation).where(
             AdminInvitation.token == request_data.invitation_token,
             AdminInvitation.used == False,
             AdminInvitation.expires_at > now
         )
-    ).first()
+    )
+    invitation = result.first()
     
     if not invitation:
         raise HTTPException(status_code=400, detail="Invalid or expired invitation token")
@@ -304,14 +310,15 @@ async def signup(
         raise HTTPException(status_code=400, detail=error_msg)
     
     # Check if OTP was verified (there should be a used OTP token for this email with purpose='signup')
-    verified_otp = session.exec(
+    result = await session.exec(
         select(OTPToken).where(
             OTPToken.email == invitation.email,
             OTPToken.purpose == "signup",
             OTPToken.used == True,
             OTPToken.expires_at > now - timedelta(minutes=10)  # OTP must have been used recently
         ).order_by(OTPToken.created_at.desc())
-    ).first()
+    )
+    verified_otp = result.first()
     
     if not verified_otp:
         raise HTTPException(
@@ -320,13 +327,14 @@ async def signup(
         )
     
     # Check if user already exists
-    existing_porter = session.exec(select(Porter).where(Porter.email == invitation.email)).first()
+    result = await session.exec(select(Porter).where(Porter.email == invitation.email))
+    existing_porter = result.first()
     if existing_porter:
         raise HTTPException(status_code=400, detail="A user with this email already exists")
     
     # Create admin porter
     try:
-        porter = auth.create_porter(
+        porter = await auth.create_porter(
             session,
             full_name=request_data.full_name,
             password=request_data.password,
@@ -340,7 +348,7 @@ async def signup(
     # Mark invitation as used
     invitation.used = True
     session.add(invitation)
-    session.commit()
+    await session.commit()
     
     logger.info(f"Admin account created via invitation: {porter.email} (id: {porter.id})")
     
@@ -381,7 +389,8 @@ async def send_otp(
     
     # For password reset, verify user exists
     if purpose == "password_reset":
-        existing_user = session.exec(select(Porter).where(Porter.email == email)).first()
+        result = await session.exec(select(Porter).where(Porter.email == email))
+        existing_user = result.first()
         if not existing_user:
             # Don't reveal if email exists (security best practice)
             return {"message": "If the email exists, a verification code will be sent"}
@@ -389,13 +398,14 @@ async def send_otp(
     # For signup, verify there's a valid invitation
     elif purpose == "signup":
         now = datetime.now(timezone.utc)
-        invitation = session.exec(
+        result = await session.exec(
             select(AdminInvitation).where(
                 AdminInvitation.email == email,
                 AdminInvitation.used == False,
                 AdminInvitation.expires_at > now
             )
-        ).first()
+        )
+        invitation = result.first()
         if not invitation:
             raise HTTPException(status_code=400, detail="No valid invitation found for this email")
     
@@ -467,7 +477,8 @@ async def forgot_password(
         raise HTTPException(status_code=400, detail=f"Invalid email address: {str(e)}")
     
     # Check if user exists (but don't reveal if they don't)
-    existing_user = session.exec(select(Porter).where(Porter.email == email)).first()
+    result = await session.exec(select(Porter).where(Porter.email == email))
+    existing_user = result.first()
     if not existing_user:
         # Return success to prevent email enumeration
         return {"message": "If the email exists, a password reset code will be sent"}
@@ -514,7 +525,8 @@ async def reset_password(
         raise HTTPException(status_code=400, detail=error_msg)
     
     # Find user
-    user = session.exec(select(Porter).where(Porter.email == email)).first()
+    result = await session.exec(select(Porter).where(Porter.email == email))
+    user = result.first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
@@ -522,7 +534,7 @@ async def reset_password(
     user.password_hash = auth.get_password_hash(request_data.new_password)
     user.updated_at = datetime.now(timezone.utc)
     session.add(user)
-    session.commit()
+    await session.commit()
     
     logger.info(f"Password reset successful for user: {email}")
     
@@ -551,7 +563,7 @@ class ChangePasswordRequest(BaseModel):
 
 
 @app.post("/api/v1/profile/change-password")
-def change_password(
+async def change_password(
     request_data: ChangePasswordRequest,
     user: Porter = Depends(auth.get_current_user),
     session=Depends(get_session),
@@ -577,7 +589,7 @@ def change_password(
     user.password_hash = auth.get_password_hash(request_data.new_password)
     user.updated_at = datetime.now(timezone.utc)
     session.add(user)
-    session.commit()
+    await session.commit()
     
     logger.info(f"Password changed for user: {user.email}")
     
@@ -585,8 +597,8 @@ def change_password(
 
 
 @app.on_event("startup")
-def on_startup():
-    init_db()
+async def on_startup():
+    await init_db()
 
 
 @app.get("/health")
@@ -654,8 +666,8 @@ async def submit_complaint(payload: ComplaintCreate, session=Depends(get_session
 
     complaint = Complaint(**data)
     session.add(complaint)
-    session.commit()
-    session.refresh(complaint)
+    await session.commit()
+    await session.refresh(complaint)
     
     # Broadcast new complaint event to WebSocket clients
     try:
@@ -688,7 +700,7 @@ async def submit_complaint(payload: ComplaintCreate, session=Depends(get_session
 
 
 @app.get("/api/v1/complaints/{complaint_id}")
-def get_complaint(complaint_id: str, session=Depends(get_session)):
+async def get_complaint(complaint_id: str, session=Depends(get_session)):
     # Complaint.id is stored as UUID in the DB. Guard against invalid
     # UUID text being used in the query which causes a DB-level DataError.
     import re
@@ -699,8 +711,9 @@ def get_complaint(complaint_id: str, session=Depends(get_session)):
         raise HTTPException(status_code=404, detail="Not found")
 
     statement = select(Complaint).where(Complaint.id == complaint_id)
-    result = session.exec(statement).first()
-    if not result:
+    result = await session.exec(statement)
+    complaint_result = result.first()
+    if not complaint_result:
         raise HTTPException(status_code=404, detail="Not found")
     # Attach photo URLs to the complaint payload so the dashboard can
     # render images directly in the "View Details" modal. Photo records
@@ -709,7 +722,8 @@ def get_complaint(complaint_id: str, session=Depends(get_session)):
     # the storage helper `get_photo_url`.
     try:
         photo_stmt = select(Photo).where(Photo.complaint_id == complaint_id).order_by(Photo.created_at.desc())
-        photos = session.exec(photo_stmt).all()
+        result = await session.exec(photo_stmt)
+        photos = result.all()
         photo_urls = []
         for p in photos:
             try:
@@ -720,16 +734,16 @@ def get_complaint(complaint_id: str, session=Depends(get_session)):
                 url = p.file_url
             photo_urls.append(url)
         # Mutate the SQLModel instance so FastAPI returns photo_urls in JSON
-        result.photo_urls = photo_urls if photo_urls else None
+        complaint_result.photo_urls = photo_urls if photo_urls else None
     except Exception:
         # Non-fatal: if photos can't be queried, return the complaint without photos
         pass
 
-    return result
+    return complaint_result
 
 
 @app.get("/api/v1/complaints", response_model=PaginatedComplaints)
-def list_complaints(
+async def list_complaints(
     request: Request, 
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -815,8 +829,11 @@ def list_complaints(
     statement = statement.order_by(Complaint.created_at.desc())
 
     # Execute queries
-    total = session.exec(count_statement).one()
-    results = session.exec(statement).all()
+    total_result = await session.exec(count_statement)
+    total = total_result.one()
+    
+    results_result = await session.exec(statement)
+    results = results_result.all()
     
     # Calculate total pages
     total_pages = (total + page_size - 1) // page_size
@@ -835,7 +852,7 @@ class StatusUpdateSchema(BaseModel):
 
 
 @app.patch("/api/v1/complaints/{complaint_id}/status", response_model=Complaint)
-def update_complaint_status(
+async def update_complaint_status(
     complaint_id: str,
     body: StatusUpdateSchema,
     user: Porter = Depends(auth.get_current_user),
@@ -855,7 +872,8 @@ def update_complaint_status(
 
     # Fetch complaint
     statement = select(Complaint).where(Complaint.id == complaint_id)
-    complaint = session.exec(statement).first()
+    result = await session.exec(statement)
+    complaint = result.first()
     if not complaint:
         raise HTTPException(status_code=404, detail="Not found")
 
@@ -872,8 +890,8 @@ def update_complaint_status(
     complaint.status = body.status
     complaint.updated_at = datetime.now(timezone.utc)
     session.add(complaint)
-    session.commit()
-    session.refresh(complaint)
+    await session.commit()
+    await session.refresh(complaint)
     return complaint
 
 
@@ -902,7 +920,8 @@ async def update_complaint(
 
     # Validate complaint exists
     statement = select(Complaint).where(Complaint.id == complaint_id)
-    complaint = session.exec(statement).first()
+    result = await session.exec(statement)
+    complaint = result.first()
     if not complaint:
         raise HTTPException(status_code=404, detail="Not found")
 
@@ -928,7 +947,8 @@ async def update_complaint(
     if body.assigned_porter_id is not None:
         # Validate the target porter exists
         statement = select(Porter).where(Porter.id == body.assigned_porter_id)
-        target = session.exec(statement).first()
+        result = await session.exec(statement)
+        target = result.first()
         if not target:
             raise HTTPException(status_code=404, detail="Porter not found")
 
@@ -950,8 +970,8 @@ async def update_complaint(
             audit = AssignmentAudit(complaint_id=complaint.id, assigned_by=user.id, assigned_to=body.assigned_porter_id)
             session.add(audit)
         
-        session.commit()
-        session.refresh(complaint)
+        await session.commit()
+        await session.refresh(complaint)
         
         # Broadcast events and send notifications
         try:
@@ -993,7 +1013,7 @@ async def update_complaint(
 
 
 @app.patch("/api/v1/complaints/{complaint_id}/assign", response_model=Complaint)
-def assign_complaint(
+async def assign_complaint(
     complaint_id: str,
     body: AssignmentSchema,
     user: Porter = Depends(auth.get_current_user),
@@ -1007,14 +1027,16 @@ def assign_complaint(
     """
     # Validate complaint exists
     statement = select(Complaint).where(Complaint.id == complaint_id)
-    complaint = session.exec(statement).first()
+    result = await session.exec(statement)
+    complaint = result.first()
     if not complaint:
         raise HTTPException(status_code=404, detail="Not found")
 
     # Validate the target porter exists
     target_id = body.assigned_porter_id
     statement = select(Porter).where(Porter.id == target_id)
-    target = session.exec(statement).first()
+    result = await session.exec(statement)
+    target = result.first()
     if not target:
         raise HTTPException(status_code=404, detail="Porter not found")
 
@@ -1042,13 +1064,13 @@ def assign_complaint(
     from .models import AssignmentAudit
     audit = AssignmentAudit(complaint_id=complaint.id, assigned_by=user.id, assigned_to=target.id)
     session.add(audit)
-    session.commit()
-    session.refresh(complaint)
+    await session.commit()
+    await session.refresh(complaint)
     return complaint
 
 
 @app.get("/api/v1/complaints/{complaint_id}/assignments")
-def list_assignments(complaint_id: str, user: Porter = Depends(auth.get_current_user), session=Depends(get_session)):
+async def list_assignments(complaint_id: str, user: Porter = Depends(auth.get_current_user), session=Depends(get_session)):
     """Return assignment audit rows for a complaint. Admin-only."""
     # Only admin allowed
     if (user.role or "porter").lower() != "admin":
@@ -1056,7 +1078,8 @@ def list_assignments(complaint_id: str, user: Porter = Depends(auth.get_current_
 
     from .models import AssignmentAudit
     stmt = select(AssignmentAudit).where(AssignmentAudit.complaint_id == complaint_id).order_by(AssignmentAudit.created_at.desc())
-    rows = session.exec(stmt).all()
+    result = await session.exec(stmt)
+    rows = result.all()
     # Map to simple dicts for the test expectations
     return [ {"id": r.id, "complaint_id": r.complaint_id, "assigned_by": r.assigned_by, "assigned_to": r.assigned_to, "created_at": r.created_at.isoformat() if r.created_at else None} for r in rows ]
 
@@ -1075,7 +1098,8 @@ async def upload_photo_to_complaint(
 
     try:
         statement = select(Complaint).where(Complaint.id == complaint_id)
-        complaint = session.exec(statement).first()
+        result = await session.exec(statement)
+        complaint = result.first()
         if not complaint:
             UPLOAD_FAILURES.inc()
             raise HTTPException(status_code=404, detail="Complaint not found")
@@ -1146,8 +1170,8 @@ async def upload_photo_to_complaint(
         )
 
         session.add(photo)
-        session.commit()
-        session.refresh(photo)
+        await session.commit()
+        await session.refresh(photo)
         UPLOAD_SUCCESSES.inc()
 
         return {
@@ -1176,19 +1200,21 @@ async def upload_photo_to_complaint(
 
 
 @app.get("/api/v1/complaints/{complaint_id}/photos")
-def list_complaint_photos(
+async def list_complaint_photos(
     complaint_id: str,
     user: Porter = Depends(get_authenticated_user_or_service),
     session=Depends(get_session)
 ):
     """List stored photo metadata for a complaint."""
     statement = select(Complaint).where(Complaint.id == complaint_id)
-    complaint = session.exec(statement).first()
+    result = await session.exec(statement)
+    complaint = result.first()
     if not complaint:
         raise HTTPException(status_code=404, detail="Complaint not found")
 
     statement = select(Photo).where(Photo.complaint_id == complaint_id).order_by(Photo.created_at.desc())
-    photos = session.exec(statement).all()
+    result = await session.exec(statement)
+    photos = result.all()
     return [
         {
             "id": photo.id,
@@ -1207,7 +1233,7 @@ def list_complaint_photos(
 
 
 @app.delete("/api/v1/complaints/{complaint_id}/photos/{photo_id}")
-def delete_complaint_photo(
+async def delete_complaint_photo(
     complaint_id: str,
     photo_id: str,
     user: Porter = Depends(get_authenticated_user_or_service),
@@ -1215,18 +1241,20 @@ def delete_complaint_photo(
 ):
     """Delete a photo from a complaint."""
     statement = select(Complaint).where(Complaint.id == complaint_id)
-    complaint = session.exec(statement).first()
+    result = await session.exec(statement)
+    complaint = result.first()
     if not complaint:
         raise HTTPException(status_code=404, detail="Complaint not found")
 
     statement = select(Photo).where(Photo.id == photo_id, Photo.complaint_id == complaint_id)
-    photo = session.exec(statement).first()
+    result = await session.exec(statement)
+    photo = result.first()
     if not photo:
         raise HTTPException(status_code=404, detail="Photo not found")
 
     delete_photo(complaint_id, photo_id)
-    session.delete(photo)
-    session.commit()
+    await session.delete(photo)
+    await session.commit()
 
     logger.info(f"Deleted photo {photo_id} from complaint {complaint_id}")
 
@@ -1234,22 +1262,22 @@ def delete_complaint_photo(
 
 
 @app.get("/api/v1/porters", response_model=List[PorterPublic])
-def list_porters(user: Porter = Depends(auth.get_current_user), session=Depends(get_session)):
+async def list_porters(user: Porter = Depends(auth.get_current_user), session=Depends(get_session)):
     """Get list of porters for assignment dropdown.
 
     This endpoint intentionally returns a public view of Porters and excludes
     sensitive fields like password_hash.
     """
     statement = select(Porter).where(Porter.active == True)
-    results = session.exec(statement).all()
+    result = await session.exec(statement)
+    results = result.all()
     # Map to PorterPublic
     public = [PorterPublic(id=r.id, full_name=r.full_name, phone=r.phone, email=r.email, role=r.role) for r in results]
     return public
 
 
-
 @app.get("/api/v1/hostels", response_model=List[HostelPublic])
-def list_hostels(user: Porter = Depends(auth.get_current_user), session=Depends(get_session)):
+async def list_hostels(user: Porter = Depends(auth.get_current_user), session=Depends(get_session)):
     """Return configured hostels for dashboard filter population."""
     # Use a raw SQL query to return simple tuples so SQLAlchemy/SQLModel
     # don't attempt to parse the stored `created_at` strings into
@@ -1257,17 +1285,19 @@ def list_hostels(user: Porter = Depends(auth.get_current_user), session=Depends(
     # that cause the ORM layer to raise on fetch). This keeps the
     # endpoint robust against minor serialization differences in local
     # seeded DB files.
-    rows = session.exec(sa_text("SELECT id, slug, display_name FROM hostels")).all()
+    result = await session.exec(sa_text("SELECT id, slug, display_name FROM hostels"))
+    rows = result.all()
     # rows are tuples: (id, slug, display_name)
     return [HostelPublic(id=r[0], slug=r[1], display_name=r[2]) for r in rows]
 
 
 @app.get("/api/v1/categories", response_model=List[CategoryPublic])
-def list_categories(session=Depends(get_session)):
+async def list_categories(session=Depends(get_session)):
     """Return the set of categories observed in complaints (simple dedupe)."""
     # Read-only; no auth required for now since categories are public
     stmt = select(func.distinct(Complaint.category))
-    results = session.exec(stmt).all()
+    result = await session.exec(stmt)
+    results = result.all()
     # results is list of tuples in some DB drivers; normalize
     names = [r[0] if isinstance(r, tuple) else r for r in results]
     return [CategoryPublic(name=n) for n in names if n]
@@ -1394,7 +1424,7 @@ class PurgeRequest(BaseModel):
 
 
 @app.delete("/api/v1/admin/purge")
-def purge_old_data(
+async def purge_old_data(
     user: Porter = Depends(auth.require_role("admin")),
     session=Depends(get_session),
     request: PurgeRequest = None
@@ -1446,7 +1476,8 @@ def purge_old_data(
             Complaint.status.in_(["resolved", "closed", "rejected"])
         )
     
-    complaints_to_purge = session.exec(base_statement).all()
+    result = await session.exec(base_statement)
+    complaints_to_purge = result.all()
     
     if not complaints_to_purge:
         return {
@@ -1462,7 +1493,8 @@ def purge_old_data(
     for complaint in complaints_to_purge:
         # Get associated photos
         photo_statement = select(Photo).where(Photo.complaint_id == complaint.id)
-        photos = session.exec(photo_statement).all()
+        result = await session.exec(photo_statement)
+        photos = result.all()
         
         # Delete photos from storage and database
         for photo in photos:
@@ -1472,17 +1504,17 @@ def purge_old_data(
             except Exception as e:
                 logger.error(f"Failed to delete photo {photo.id}: {e}")
             
-            session.delete(photo)
+            await session.delete(photo)
             photos_deleted += 1
         
         # Delete complaint
         purged_complaint_ids.append(complaint.id)
-        session.delete(complaint)
+        await session.delete(complaint)
         
         logger.info(f"Purging complaint {complaint.id} (status: {complaint.status}, age: {(datetime.now(timezone.utc) - complaint.updated_at).days} days)")
     
     # Commit all deletions
-    session.commit()
+    await session.commit()
     
     return {
         "message": f"Successfully purged {len(purged_complaint_ids)} complaints and {photos_deleted} photos",
@@ -1544,14 +1576,15 @@ async def startup_event():
     # Ensure hostels in DB match the canonical list used by the bot.
     try:
         # Import here to avoid circular import at module load time
-        from .database import engine
-        from sqlmodel import Session, select
+        from .database import async_session_maker
+        from sqlmodel import select
         from .models import Hostel
         import merged_constants
 
-        with Session(engine) as session:
+        async with async_session_maker() as session:
             # Load existing display names
-            existing = session.exec(select(Hostel)).all()
+            result = await session.exec(select(Hostel))
+            existing = result.all()
             existing_names = {h.display_name for h in existing}
 
             to_add = []
@@ -1563,7 +1596,7 @@ async def startup_event():
             if to_add:
                 for h in to_add:
                     session.add(h)
-                session.commit()
+                await session.commit()
                 logger.info(f"Seeded {len(to_add)} hostels from merged_constants into DB: {[h.display_name for h in to_add]}")
             else:
                 logger.info("Hostels table already contains canonical entries; no seeding required")

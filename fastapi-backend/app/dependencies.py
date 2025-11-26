@@ -1,7 +1,7 @@
 """Common FastAPI dependencies."""
 
 from fastapi import Depends, HTTPException, Request
-from sqlmodel import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 
 from .database import get_session
@@ -11,9 +11,9 @@ from .upload_metrics import UPLOAD_AUTH_FAILURES
 from .config import get_settings
 
 
-def get_authenticated_user_or_service(
+async def get_authenticated_user_or_service(
     request: Request,
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ) -> Porter:
     """
     Accepts either a porter JWT bearer token or the opaque BACKEND_SERVICE_TOKEN.
@@ -40,7 +40,7 @@ def get_authenticated_user_or_service(
         UPLOAD_AUTH_FAILURES.inc()
         raise
 
-    porter = session.get(Porter, payload.sub)
+    porter = await session.get(Porter, payload.sub)
     if not porter:
         UPLOAD_AUTH_FAILURES.inc()
         raise HTTPException(status_code=401, detail="Invalid token subject")
