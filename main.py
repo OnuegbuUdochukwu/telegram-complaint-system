@@ -441,9 +441,9 @@ async def submit_complaint_and_end(update: Update, context: ContextTypes.DEFAULT
         "severity": final_data.get('severity'),
     }
 
-    # Call the synchronous client stub in a thread to avoid blocking the event loop
+    # Call the asynchronous client stub directly
     try:
-        response = await asyncio.to_thread(client_submit, payload)
+        response = await client_submit(payload)
     except Exception as exc:
         logger.exception("Error when calling client.submit_complaint: %s", exc)
         await safe_reply_to_update(update, "⚠️ There was an error submitting your complaint. Please try again later.")
@@ -488,7 +488,7 @@ async def handle_photo_upload(update: Update, context: ContextTypes.DEFAULT_TYPE
     """Handle incoming photo messages while in ATTACH_PHOTOS state.
 
     Downloads the largest size of the photo and uploads it to the backend using
-    the `client.upload_photo` helper in a thread to avoid blocking the event loop.
+    the `client.upload_photo` helper.
     """
     if 'current_complaint_id' not in context.user_data:
         await safe_reply_to_update(update, "No complaint context found. Start a new report with /report.")
@@ -509,9 +509,9 @@ async def handle_photo_upload(update: Update, context: ContextTypes.DEFAULT_TYPE
         # Construct a filename using complaint id and file id
         filename = f"{complaint_id}_{file_id}.jpg"
 
-        # Call the client upload in a thread
+        # Call the client upload directly
         try:
-            result = await asyncio.to_thread(client_upload_photo, complaint_id, bytes(data), filename)
+            result = await client_upload_photo(complaint_id, bytes(data), filename)
             await safe_reply_to_update(update, f"Uploaded photo: {result.get('id') or result.get('file_url')}")
         except Exception as exc:
             logger.exception("Failed to upload photo from bot: %s", exc)
@@ -616,7 +616,7 @@ def main():
         try:
             # Call backend to get user's complaints
             from client import get_user_complaints
-            complaints = await asyncio.to_thread(get_user_complaints, user_id)
+            complaints = await get_user_complaints(user_id)
         except Exception as exc:
             logger.exception("Error fetching complaints for user %s: %s", user_id, exc)
             await safe_reply_to_update(update, "⚠️ Could not fetch your complaints. Please try again later.")

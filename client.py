@@ -3,7 +3,7 @@
 This module provides lightweight stubs for backend interactions so the bot
 can be tested end-to-end without a real API. If the environment variable
 `BACKEND_URL` is set, the stubs will attempt a real HTTP call using
-`requests` and fall back to deterministic mock responses on error or when
+`httpx.AsyncClient` and fall back to deterministic mock responses on error or when
 `BACKEND_URL` is not provided.
 
 Public API:
@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import os
 import time
+import asyncio
 import logging
 import random
 from typing import Any, Dict, Optional
@@ -38,9 +39,13 @@ _MAX_RETRIES = 3
 _BACKOFF_FACTOR = 0.5
 
 # Reuse a global client for connection pooling when BACKEND_URL is set
-_client: Optional[httpx.Client] = None
-if BACKEND_URL:
-  _client = httpx.Client(timeout=_DEFAULT_TIMEOUT)
+_client: Optional[httpx.AsyncClient] = None
+
+def _get_client() -> httpx.AsyncClient:
+    global _client
+    if _client is None:
+        _client = httpx.AsyncClient(timeout=_DEFAULT_TIMEOUT)
+    return _client
 
 
 def _mock_complaint_id() -> str:
@@ -56,12 +61,12 @@ def _is_retryable(exc: Exception, response: Optional[httpx.Response]) -> bool:
   return False
 
 
-def _attempt_request(method: str, url: str, **kwargs) -> Dict[str, Any]:
+async def _attempt_request(method: str, url: str, **kwargs) -> Dict[str, Any]:
   last_exc: Optional[Exception] = None
   for attempt in range(1, _MAX_RETRIES + 1):
     try:
-      client = _client or httpx.Client(timeout=_DEFAULT_TIMEOUT)
-      resp = client.request(method, url, **kwargs)
+      client = _get_client()
+      resp = await client.request(method, url, **kwargs)
       # Treat 4xx as non-retryable client error
       if 400 <= resp.status_code < 500:
         resp.raise_for_status()
@@ -80,12 +85,12 @@ def _attempt_request(method: str, url: str, **kwargs) -> Dict[str, Any]:
       jitter = random.uniform(0, backoff * 0.1)
       sleep_time = backoff + jitter
       logger.info("Retrying %s in %.2fs (attempt %s/%s)", url, sleep_time, attempt + 1, _MAX_RETRIES)
-      time.sleep(sleep_time)
+      await asyncio.sleep(sleep_time)
 
   raise last_exc if last_exc is not None else RuntimeError("Request failed without exception")
 
 
-def submit_complaint(data: Dict[str, Any]) -> Dict[str, Any]:
+async def submit_complaint(data: Dict[str, Any]) -> Dict[str, Any]:
   """Submit complaint to backend with retries and fallback to mock.
 
   Returns a dict with at least 'status' and 'complaint_id' keys on success.
@@ -93,7 +98,7 @@ def submit_complaint(data: Dict[str, Any]) -> Dict[str, Any]:
   if BACKEND_URL:
     url = BACKEND_URL.rstrip("/") + "/api/v1/complaints/submit"
     try:
-      return _attempt_request("POST", url, json=data)
+      return await _attempt_request("POST", url, json=data)
     except Exception as exc:  # pragma: no cover - network fallback
       logger.warning("Backend POST to %s failed after retries: %s", url, exc)
       # If operator explicitly allows mock fallback (dev only), return a mock
@@ -109,12 +114,12 @@ def submit_complaint(data: Dict[str, Any]) -> Dict[str, Any]:
   return mock
 
 
-def get_complaint_status(complaint_id: str) -> Dict[str, Any]:
+async def get_complaint_status(complaint_id: str) -> Dict[str, Any]:
   """Get complaint status from backend with retries and mock fallback."""
   if BACKEND_URL:
     url = BACKEND_URL.rstrip("/") + f"/api/v1/complaints/{complaint_id}"
     try:
-      return _attempt_request("GET", url)
+      return await _attempt_request("GET", url)
     except Exception as exc:  # pragma: no cover - network fallback
       logger.warning("Backend GET %s failed after retries: %s", url, exc)
 
@@ -127,7 +132,7 @@ def get_complaint_status(complaint_id: str) -> Dict[str, Any]:
   return mock
 
 
-def get_user_complaints(telegram_user_id: str, page: int = 1, page_size: int = 20) -> Dict[str, Any]:
+async def get_user_complaints(telegram_user_id: str, page: int = 1, page_size: int = 20) -> Dict[str, Any]:
   """Get all complaints for a specific user from backend with retries and mock fallback."""
   if BACKEND_URL:
     url = BACKEND_URL.rstrip("/") + f"/api/v1/complaints"
@@ -137,7 +142,7 @@ def get_user_complaints(telegram_user_id: str, page: int = 1, page_size: int = 2
       "page_size": page_size
     }
     try:
-      return _attempt_request("GET", url, params=params)
+      return await _attempt_request("GET", url, params=params)
     except Exception as exc:
       logger.warning("Backend GET %s failed after retries: %s", url, exc)
 
@@ -174,11 +179,15 @@ def get_user_complaints(telegram_user_id: str, page: int = 1, page_size: int = 2
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     demo = {"telegram_user_id": "123456", "hostel": "A", "room_number": "A101", "category": "plumbing", "description": "Leaking sink"}
-    print(submit_complaint(demo))
-    print(get_complaint_status("MOCK-12345"))
+    
+    async def main():
+        print(await submit_complaint(demo))
+        print(await get_complaint_status("MOCK-12345"))
+    
+    asyncio.run(main())
 
 
-def _get_service_token() -> Optional[str]:
+async def _get_service_token() -> Optional[str]:
   """Return a service token to authorize backend uploads.
 
   Priority:
@@ -195,8 +204,8 @@ def _get_service_token() -> Optional[str]:
     url = BACKEND_URL.rstrip("/") + "/auth/login"
     try:
       # The backend expects form data (OAuth2PasswordRequestForm), so post as form
-      client = _client or httpx.Client(timeout=_DEFAULT_TIMEOUT)
-      resp = client.post(url, data={"username": email, "password": password})
+      client = _get_client()
+      resp = await client.post(url, data={"username": email, "password": password})
       if resp.status_code == 200:
         data = resp.json()
         return data.get("access_token")
@@ -207,7 +216,7 @@ def _get_service_token() -> Optional[str]:
   return None
 
 
-def upload_photo(complaint_id: str, file_bytes: bytes, filename: str, mime_type: Optional[str] = None) -> Dict[str, Any]:
+async def upload_photo(complaint_id: str, file_bytes: bytes, filename: str, mime_type: Optional[str] = None) -> Dict[str, Any]:
     """Upload photo bytes using the presigned S3 pipeline."""
     if not BACKEND_URL:
         mock = {
@@ -221,7 +230,7 @@ def upload_photo(complaint_id: str, file_bytes: bytes, filename: str, mime_type:
         logger.info("Returning mock upload_photo response: %s", mock)
         return mock
 
-    token = _get_service_token()
+    token = await _get_service_token()
     if not token:
         raise RuntimeError("Service token required for photo uploads; set BACKEND_SERVICE_TOKEN.")
 
@@ -235,7 +244,7 @@ def upload_photo(complaint_id: str, file_bytes: bytes, filename: str, mime_type:
         "content_type": mime,
         "content_length": len(file_bytes),
     }
-    presign = _attempt_request(
+    presign = await _attempt_request(
         "POST",
         f"{base}/api/v1/complaints/{complaint_id}/photos/presign",
         json=presign_payload,
@@ -245,12 +254,12 @@ def upload_photo(complaint_id: str, file_bytes: bytes, filename: str, mime_type:
     # Step 2: PUT to S3
     method = presign.get("method", "PUT").upper()
     upload_url = presign["url"]
-    client = _client or httpx.Client(timeout=_DEFAULT_TIMEOUT)
+    client = _get_client()
     if method != "PUT":
         raise RuntimeError(f"Unsupported presign method {method}")
 
     put_headers = {"Content-Type": mime}
-    resp = client.put(upload_url, content=file_bytes, headers=put_headers)
+    resp = await client.put(upload_url, content=file_bytes, headers=put_headers)
     resp.raise_for_status()
 
     # Step 3: Confirm upload back to backend
@@ -260,11 +269,10 @@ def upload_photo(complaint_id: str, file_bytes: bytes, filename: str, mime_type:
         "file_size": len(file_bytes),
         "content_type": mime,
     }
-    confirmation = _attempt_request(
+    confirmation = await _attempt_request(
         "POST",
         f"{base}/api/v1/complaints/{complaint_id}/photos/confirm",
         json=confirm_payload,
         headers=headers,
     )
     return confirmation
-

@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple
 from sqlmodel import select
 from .models import OTPToken
-from .database import get_session, Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from . import auth
 
 logger = logging.getLogger("app.otp_utils")
@@ -25,7 +25,7 @@ def generate_otp_code() -> str:
 
 
 async def create_otp_token(
-    session: Session,
+    session: AsyncSession,
     email: str,
     purpose: str,
     expiry_minutes: int = OTP_EXPIRY_MINUTES
@@ -45,13 +45,14 @@ async def create_otp_token(
     # Check rate limiting: max 3 OTP requests per email per hour
     one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=OTP_RATE_LIMIT_WINDOW_HOURS)
     
-    recent_otps = session.exec(
+    result = await session.exec(
         select(OTPToken).where(
             OTPToken.email == email,
             OTPToken.purpose == purpose,
             OTPToken.created_at >= one_hour_ago
         )
-    ).all()
+    )
+    recent_otps = result.all()
     
     # Count non-expired requests
     now = datetime.now(timezone.utc)
@@ -72,17 +73,19 @@ async def create_otp_token(
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=expiry_minutes)
     
     # Invalidate previous unused OTPs for this email/purpose
-    existing_otps = session.exec(
+    result = await session.exec(
         select(OTPToken).where(
             OTPToken.email == email,
             OTPToken.purpose == purpose,
             OTPToken.used == False,
             OTPToken.expires_at > now
         )
-    ).all()
+    )
+    existing_otps = result.all()
     
     for existing in existing_otps:
         existing.used = True
+        session.add(existing)
     
     # Create new OTP token
     otp_token = OTPToken(
@@ -96,8 +99,8 @@ async def create_otp_token(
     )
     
     session.add(otp_token)
-    session.commit()
-    session.refresh(otp_token)
+    await session.commit()
+    await session.refresh(otp_token)
     
     logger.info(f"Created OTP token for {email} (purpose: {purpose})")
     
@@ -105,7 +108,7 @@ async def create_otp_token(
 
 
 async def verify_otp_token(
-    session: Session,
+    session: AsyncSession,
     email: str,
     otp_code: str,
     purpose: str
@@ -125,14 +128,15 @@ async def verify_otp_token(
     now = datetime.now(timezone.utc)
     
     # Find valid OTP token
-    otp_token = session.exec(
+    result = await session.exec(
         select(OTPToken).where(
             OTPToken.email == email,
             OTPToken.purpose == purpose,
             OTPToken.used == False,
             OTPToken.expires_at > now
         ).order_by(OTPToken.created_at.desc())
-    ).first()
+    )
+    otp_token = result.first()
     
     if not otp_token:
         error_msg = "Invalid or expired verification code. Please request a new code."
@@ -143,7 +147,7 @@ async def verify_otp_token(
     if otp_token.attempts >= otp_token.max_attempts:
         otp_token.used = True  # Mark as used to prevent further attempts
         session.add(otp_token)
-        session.commit()
+        await session.commit()
         error_msg = "Too many failed attempts. Please request a new verification code."
         logger.warning(f"OTP verification failed for {email}: Max attempts exceeded")
         return False, error_msg
@@ -162,7 +166,7 @@ async def verify_otp_token(
         logger.warning(f"OTP verification failed for {email}: Invalid code (attempt {otp_token.attempts}/{otp_token.max_attempts})")
     
     session.add(otp_token)
-    session.commit()
+    await session.commit()
     
     if is_valid:
         return True, None

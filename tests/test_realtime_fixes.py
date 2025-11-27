@@ -8,6 +8,7 @@ are working correctly and follow best practices.
 
 import asyncio
 import pytest
+import pytest_asyncio
 import websockets
 import json
 import httpx
@@ -15,48 +16,59 @@ import os
 
 # Set environment variables BEFORE importing app modules
 os.environ.setdefault("JWT_SECRET", "test-secret-key-for-pytest-only-12345")
-os.environ.setdefault("DATABASE_URL", "sqlite://")
+# Use aiosqlite for async SQLite testing
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite://")
 os.environ.setdefault("STORAGE_PROVIDER", "local")
 
-from fastapi.testclient import TestClient
 from app.main import app
 from app.websocket_manager import manager, NewComplaintEvent, StatusUpdateEvent, AssignmentEvent
 from app.telegram_notifier import telegram_notifier
 from app.models import Complaint, Porter
-from sqlmodel import Session, select
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlalchemy.orm import sessionmaker
 from datetime import datetime, timezone
 from unittest.mock import patch, AsyncMock
 
 
-@pytest.fixture(name="client")
-def client_fixture():
-    with TestClient(app) as client:
+@pytest_asyncio.fixture(name="async_client")
+async def async_client_fixture():
+    async with httpx.AsyncClient(app=app, base_url="http://localhost:8000") as client:
         yield client
 
 
-@pytest.fixture(name="session")
-def session_fixture():
+@pytest_asyncio.fixture(name="session")
+async def session_fixture():
     from app.database import engine
-    # Ensure tables exist for tests (SQLite/create_all used for local test DB)
     from sqlmodel import SQLModel
-    SQLModel.metadata.create_all(engine)
-    with Session(engine) as session:
+    
+    # Create tables using sync engine for in-memory sqlite
+    # Note: For in-memory sqlite, we need to keep the connection open or use shared cache
+    # But since we are using aiosqlite, it's tricky. 
+    # Ideally we use the engine from conftest which is configured for file-based or shared.
+    # Here we will assume the engine is already configured correctly by conftest or app.database
+    
+    # For this specific test file, let's rely on the app's engine which should be async
+    
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with async_session() as session:
         yield session
 
 
-@pytest.fixture(name="admin_token")
-def admin_token_fixture(client: TestClient, session: Session):
+@pytest_asyncio.fixture(name="admin_token")
+async def admin_token_fixture(async_client: httpx.AsyncClient, session: AsyncSession):
     """Create admin user and get token."""
     admin_email = "admin@test.local"
     admin_password = "adminpassword"
     
     # Check if admin exists, create if not
-    admin_user = session.exec(select(Porter).where(Porter.email == admin_email)).first()
+    result = await session.exec(select(Porter).where(Porter.email == admin_email))
+    admin_user = result.first()
     if not admin_user:
         from app.auth import create_porter
-        admin_user = create_porter(session, full_name="Admin User", email=admin_email, password=admin_password, role="admin")
+        admin_user = await create_porter(session, full_name="Admin User", email=admin_email, password=admin_password, role="admin")
     
-    response = client.post(
+    response = await async_client.post(
         "/auth/login",
         data={"username": admin_email, "password": admin_password},
         headers={"Content-Type": "application/x-www-form-urlencoded"}
@@ -65,19 +77,20 @@ def admin_token_fixture(client: TestClient, session: Session):
     return response.json()["access_token"]
 
 
-@pytest.fixture(name="porter_token")
-def porter_token_fixture(client: TestClient, session: Session):
+@pytest_asyncio.fixture(name="porter_token")
+async def porter_token_fixture(async_client: httpx.AsyncClient, session: AsyncSession):
     """Create porter user and get token."""
     porter_email = "porter@test.local"
     porter_password = "porterpassword"
     
     # Check if porter exists, create if not
-    porter_user = session.exec(select(Porter).where(Porter.email == porter_email)).first()
+    result = await session.exec(select(Porter).where(Porter.email == porter_email))
+    porter_user = result.first()
     if not porter_user:
         from app.auth import create_porter
-        porter_user = create_porter(session, full_name="Test Porter", email=porter_email, password=porter_password, role="porter")
+        porter_user = await create_porter(session, full_name="Test Porter", email=porter_email, password=porter_password, role="porter")
     
-    response = client.post(
+    response = await async_client.post(
         "/auth/login",
         data={"username": porter_email, "password": porter_password},
         headers={"Content-Type": "application/x-www-form-urlencoded"}
@@ -249,7 +262,7 @@ class TestMainIntegrationFixes:
     """Test main.py integration fixes."""
     
     @pytest.mark.asyncio
-    async def test_complaint_submission_with_notifications(self, session: Session, admin_token: str):
+    async def test_complaint_submission_with_notifications(self, session: AsyncSession, admin_token: str, async_client: httpx.AsyncClient):
         """Test that complaint submission triggers both WebSocket and Telegram notifications."""
         # Clear WebSocket connections
         manager.active_connections.clear()
@@ -265,12 +278,11 @@ class TestMainIntegrationFixes:
                 "severity": "high"
             }
             
-            async with httpx.AsyncClient(app=app, base_url="http://localhost:8000") as async_client:
-                response = await async_client.post(
-                    "/api/v1/complaints/submit",
-                    json=complaint_payload,
-                    headers={"Authorization": f"Bearer {admin_token}"}
-                )
+            response = await async_client.post(
+                "/api/v1/complaints/submit",
+                json=complaint_payload,
+                headers={"Authorization": f"Bearer {admin_token}"}
+            )
             
             assert response.status_code == 201
             complaint_id = response.json()["complaint_id"]
@@ -285,7 +297,7 @@ class TestMainIntegrationFixes:
                 assert call_args["severity"] == "high"
     
     @pytest.mark.asyncio
-    async def test_status_update_with_notifications(self, session: Session, admin_token: str):
+    async def test_status_update_with_notifications(self, session: AsyncSession, admin_token: str, async_client: httpx.AsyncClient):
         """Test that status updates trigger both WebSocket and Telegram notifications."""
         # Create a complaint first
         complaint_payload = {
@@ -297,12 +309,11 @@ class TestMainIntegrationFixes:
             "severity": "medium"
         }
         
-        async with httpx.AsyncClient(app=app, base_url="http://localhost:8000") as async_client:
-            response = await async_client.post(
-                "/api/v1/complaints/submit",
-                json=complaint_payload,
-                headers={"Authorization": f"Bearer {admin_token}"}
-            )
+        response = await async_client.post(
+            "/api/v1/complaints/submit",
+            json=complaint_payload,
+            headers={"Authorization": f"Bearer {admin_token}"}
+        )
         
         assert response.status_code == 201
         complaint_id = response.json()["complaint_id"]
@@ -311,12 +322,11 @@ class TestMainIntegrationFixes:
         with patch.object(telegram_notifier, 'send_status_update_alert', new_callable=AsyncMock) as mock_telegram:
             update_payload = {"status": "in_progress"}
             
-            async with httpx.AsyncClient(app=app, base_url="http://localhost:8000") as async_client:
-                response = await async_client.patch(
-                    f"/api/v1/complaints/{complaint_id}",
-                    json=update_payload,
-                    headers={"Authorization": f"Bearer {admin_token}"}
-                )
+            response = await async_client.patch(
+                f"/api/v1/complaints/{complaint_id}",
+                json=update_payload,
+                headers={"Authorization": f"Bearer {admin_token}"}
+            )
             
             assert response.status_code == 200
             
@@ -328,9 +338,10 @@ class TestMainIntegrationFixes:
                 assert call_args[1] == "reported"    # old_status
                 assert call_args[2] == "in_progress" # new_status
     
-    def test_websocket_health_endpoint(self, client: TestClient):
+    @pytest.mark.asyncio
+    async def test_websocket_health_endpoint(self, async_client: httpx.AsyncClient):
         """Test WebSocket health check endpoint."""
-        response = client.get("/api/v1/websocket/health")
+        response = await async_client.get("/api/v1/websocket/health")
         assert response.status_code == 200
         
         data = response.json()
@@ -338,9 +349,10 @@ class TestMainIntegrationFixes:
         assert "active_connections" in data
         assert data["service"] == "websocket_manager"
     
-    def test_websocket_stats_endpoint(self, client: TestClient, admin_token: str):
+    @pytest.mark.asyncio
+    async def test_websocket_stats_endpoint(self, async_client: httpx.AsyncClient, admin_token: str):
         """Test WebSocket stats endpoint (admin only)."""
-        response = client.get(
+        response = await async_client.get(
             "/api/v1/websocket/stats",
             headers={"Authorization": f"Bearer {admin_token}"}
         )
@@ -374,7 +386,7 @@ class TestEndToEndIntegration:
     """Test end-to-end integration of all fixes."""
     
     @pytest.mark.asyncio
-    async def test_complete_notification_flow(self, session: Session, admin_token: str):
+    async def test_complete_notification_flow(self, session: AsyncSession, admin_token: str, async_client: httpx.AsyncClient):
         """Test complete notification flow from complaint submission to dashboard update."""
         # Clear WebSocket connections
         manager.active_connections.clear()
@@ -393,12 +405,11 @@ class TestEndToEndIntegration:
                     "severity": "high"
                 }
                 
-                async with httpx.AsyncClient(app=app, base_url="http://localhost:8000") as async_client:
-                    response = await async_client.post(
-                        "/api/v1/complaints/submit",
-                        json=complaint_payload,
-                        headers={"Authorization": f"Bearer {admin_token}"}
-                    )
+                response = await async_client.post(
+                    "/api/v1/complaints/submit",
+                    json=complaint_payload,
+                    headers={"Authorization": f"Bearer {admin_token}"}
+                )
                 
                 assert response.status_code == 201
                 complaint_id = response.json()["complaint_id"]
@@ -406,12 +417,11 @@ class TestEndToEndIntegration:
                 # 2. Update status
                 update_payload = {"status": "in_progress"}
                 
-                async with httpx.AsyncClient(app=app, base_url="http://localhost:8000") as async_client:
-                    response = await async_client.patch(
-                        f"/api/v1/complaints/{complaint_id}",
-                        json=update_payload,
-                        headers={"Authorization": f"Bearer {admin_token}"}
-                    )
+                response = await async_client.patch(
+                    f"/api/v1/complaints/{complaint_id}",
+                    json=update_payload,
+                    headers={"Authorization": f"Bearer {admin_token}"}
+                )
                 
                 assert response.status_code == 200
                 
@@ -421,7 +431,8 @@ class TestEndToEndIntegration:
                     mock_status.assert_called_once()
                 
                 # 4. Verify complaint was created and updated
-                complaint = session.exec(select(Complaint).where(Complaint.id == complaint_id)).first()
+                result = await session.exec(select(Complaint).where(Complaint.id == complaint_id))
+                complaint = result.first()
                 assert complaint is not None
                 assert complaint.status == "in_progress"
                 assert complaint.hostel == "Paul"  # Database stores canonical name

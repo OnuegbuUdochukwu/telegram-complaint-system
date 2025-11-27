@@ -3,18 +3,24 @@ import sys
 import socket
 import subprocess
 import time
+import asyncio
 from pathlib import Path
 from typing import Callable, Tuple
 from urllib.parse import urlparse
 
 import pytest
-from sqlmodel import Session, SQLModel
+import pytest_asyncio
+from sqlmodel import SQLModel
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlalchemy.orm import sessionmaker
 
 REPO_ROOT = Path(__file__).parent
 
 # Set environment variables BEFORE importing app modules to bypass strict checks
 os.environ["JWT_SECRET"] = "test-secret-key-for-pytest-only-12345"
-os.environ["DATABASE_URL"] = "sqlite:///./test.db"  # Use file-based SQLite for shared access
+# Use aiosqlite for async SQLite testing
+os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///./test.db"
 os.environ["STORAGE_PROVIDER"] = "local"
 
 # Add the backend directory to sys.path so imports work
@@ -30,19 +36,19 @@ os.environ.setdefault("TEST_ADMIN_ALT_PASSWORD", "adminpassword")
 os.environ.setdefault("AUTO_ADMIN_EMAILS", "admin@test.local,admin-purge@test.com")
 
 db_url = os.environ["DATABASE_URL"]
-if db_url.startswith("sqlite:///"):
-    raw_path = db_url.split("sqlite:///", 1)[1]
+if db_url.startswith("sqlite+aiosqlite:///"):
+    raw_path = db_url.split("sqlite+aiosqlite:///", 1)[1]
     abs_path = (REPO_ROOT / raw_path).resolve()
-    os.environ["DATABASE_URL"] = f"sqlite:///{abs_path}"
+    os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{abs_path}"
 
 import app.database as database
 import app.auth as auth
 
 
 def _sqlite_path_from_url(url: str) -> Path | None:
-    if not url.startswith("sqlite:///"):
+    if not url.startswith("sqlite+aiosqlite:///"):
         return None
-    raw = url.split("sqlite:///", 1)[1]
+    raw = url.split("sqlite+aiosqlite:///", 1)[1]
     return (REPO_ROOT / raw).resolve()
 
 
@@ -57,24 +63,38 @@ def _wait_for_port(host: str, port: int, timeout: float = 20.0) -> None:
     raise RuntimeError(f"Backend server did not start on {host}:{port} within {timeout}s")
 
 
-def _ensure_seed_users():
+async def _ensure_seed_users():
     admin_email = os.environ.get("TEST_ADMIN_EMAIL", "admin@test.local")
     admin_password = os.environ.get("TEST_ADMIN_PASSWORD", "testpass123")
-    with Session(database.engine) as session:
-        auth.create_porter(session, full_name="Test Admin", email=admin_email, password=admin_password, role="admin")
-        auth.create_porter(session, full_name="Purge Admin", email="admin-purge@test.com", password="adminpass123", role="admin")
+    
+    # Create a dedicated async engine for seeding to avoid event loop issues
+    seed_engine = create_async_engine(os.environ["DATABASE_URL"])
+    async_session = sessionmaker(seed_engine, class_=AsyncSession, expire_on_commit=False)
+    
+    async with async_session() as session:
+        await auth.create_porter(session, full_name="Test Admin", email=admin_email, password=admin_password, role="admin")
+        await auth.create_porter(session, full_name="Purge Admin", email="admin-purge@test.com", password="adminpass123", role="admin")
+    
+    await seed_engine.dispose()
 
 
 @pytest.fixture(scope="session", autouse=True)
 def backend_server():
     """Start a uvicorn server once for integration tests and tear it down afterwards."""
+    # Clean up old DB
     db_path = _sqlite_path_from_url(os.environ["DATABASE_URL"])
     if db_path:
         db_path.unlink(missing_ok=True)
 
-    # Ensure schema + seed data exist before the server starts
-    SQLModel.metadata.create_all(database.engine)
-    _ensure_seed_users()
+    # Initialize DB schema synchronously for the test session
+    # We use a sync engine just for the initial CREATE TABLE
+    from sqlmodel import create_engine
+    sync_db_url = os.environ["DATABASE_URL"].replace("sqlite+aiosqlite", "sqlite")
+    sync_engine = create_engine(sync_db_url)
+    SQLModel.metadata.create_all(sync_engine)
+    
+    # Seed users using async
+    asyncio.run(_ensure_seed_users())
 
     parsed = urlparse(os.environ["TEST_BACKEND_URL"])
     host = parsed.hostname or "127.0.0.1"
@@ -120,21 +140,20 @@ def backend_server():
                 proc.kill()
 
 
-@pytest.fixture(scope="session")
-def db_engine():
-    # Ensure tables are created for the test database to avoid NOT NULL/PK issues
-    engine = database.engine
-    SQLModel.metadata.create_all(engine)
-    return engine
+@pytest_asyncio.fixture(scope="function")
+async def db_engine():
+    # Return the app's async engine
+    return database.engine
 
 
-@pytest.fixture
-def make_porter(db_engine) -> Callable[[str, str], Tuple[str, str]]:
+@pytest_asyncio.fixture(scope="function")
+async def make_porter(db_engine) -> Callable[[str, str], Tuple[str, str]]:
     """Return a factory that creates a porter directly in the DB and returns (id, token)."""
 
-    def _create(email: str, role: str = "porter"):
-        with Session(db_engine) as session:
-            porter = auth.create_porter(
+    async def _create(email: str, role: str = "porter"):
+        async_session = sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
+        async with async_session() as session:
+            porter = await auth.create_porter(
                 session,
                 full_name=email.split("@")[0],
                 password="testpass",
@@ -147,7 +166,7 @@ def make_porter(db_engine) -> Callable[[str, str], Tuple[str, str]]:
     return _create
 
 
-@pytest.fixture
-def admin_token(make_porter):
-    pid, token = make_porter("admin-in-tests@example.com", role="admin")
+@pytest_asyncio.fixture(scope="function")
+async def admin_token(make_porter):
+    pid, token = await make_porter("admin-in-tests@example.com", role="admin")
     return token
