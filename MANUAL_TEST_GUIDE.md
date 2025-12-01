@@ -26,9 +26,12 @@
 ## 🔑 Admin Credentials
 
 **Email**: `admin@test.local`  
-**Password**: `admin123`
+**Password**: `admin123`  
+**Role**: `admin` ✅
 
 **Login URL**: http://localhost:3000/login.html
+
+> **Note**: The admin account has been created and the role has been fixed to "admin". You should now be able to log in successfully!
 
 ---
 
@@ -51,7 +54,9 @@
 
 ### Dashboard Testing
 1. ✅ Open http://localhost:3000/login.html
-2. ✅ Login with admin credentials above
+2. ✅ Login with credentials:
+   - Email: `admin@test.local`
+   - Password: `admin123`
 3. ✅ Verify real-time updates:
    - New complaints appear instantly
    - Images load correctly
@@ -121,4 +126,35 @@ ps aux | grep -E "(uvicorn|python3.*main.py|http.server)"
 
 # Check ports
 lsof -i :8001 -i :3000
+
+# Test login API
+curl -X POST http://localhost:8001/auth/login \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=admin@test.local&password=admin123"
 ```
+
+---
+
+## 🔧 Troubleshooting
+
+### Login Issues
+If login fails:
+1. Check backend is running: `curl http://localhost:8001/docs`
+2. Verify admin role: Run the curl command in Health Checks section
+3. Check browser console for errors (F12)
+4. Clear browser cache and sessionStorage
+
+### Bot Not Responding
+1. Check bot log: `tail -f bot_manual_test.log`
+2. Verify TELEGRAM_BOT_TOKEN is set in `.env`
+3. Ensure backend is accessible: `curl http://localhost:8001/docs`
+
+### Dashboard Not Loading
+1. Check dashboard is serving: `curl http://localhost:3000/login.html`
+2. Verify port 3000 is not blocked
+3. Check browser console for CORS errors
+
+### Real-Time Updates Not Working
+1. Check WebSocket connection in browser DevTools (Network tab)
+2. Verify backend WebSocket endpoint: `ws://localhost:8001/ws/dashboard`
+3. Check backend logs for WebSocket errors
