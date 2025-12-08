@@ -28,7 +28,7 @@ _USE_PG_UUID = any(x in _DATABASE_URL for x in ("postgres://", "postgresql://", 
 class Hostel(SQLModel, table=True):
     __tablename__ = "hostels"
     if _USE_PG_UUID:
-        id: Optional[str] = Field(default=None, primary_key=True, sa_column=Column(PG_UUID(as_uuid=False), primary_key=True, server_default=text("gen_random_uuid()")))
+        id: Optional[uuid.UUID] = Field(default=None, primary_key=True, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")))
     else:
         id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
     slug: str = Field(sa_column_kwargs={"unique": True})
@@ -40,7 +40,7 @@ class Hostel(SQLModel, table=True):
 class Porter(SQLModel, table=True):
     __tablename__ = "porters"
     if _USE_PG_UUID:
-        id: Optional[str] = Field(default=None, primary_key=True, sa_column=Column(PG_UUID(as_uuid=False), primary_key=True, server_default=text("gen_random_uuid()")))
+        id: Optional[uuid.UUID] = Field(default=None, primary_key=True, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")))
     else:
         id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
     full_name: str
@@ -52,7 +52,7 @@ class Porter(SQLModel, table=True):
     role: Optional[str] = Field(default='porter')
     # assigned_hostel_id references hostels.id; ensure column type matches hostels.id
     if _USE_PG_UUID:
-        assigned_hostel_id: Optional[str] = Field(default=None, foreign_key="hostels.id", sa_column=Column(PG_UUID(as_uuid=False)))
+        assigned_hostel_id: Optional[uuid.UUID] = Field(default=None, foreign_key="hostels.id", sa_column=Column(PG_UUID(as_uuid=True)))
     else:
         assigned_hostel_id: Optional[str] = Field(default=None, foreign_key="hostels.id")
     active: bool = Field(default=True)
@@ -75,10 +75,10 @@ class Complaint(SQLModel, table=True):
     # the value using gen_random_uuid(). The sa_column explicitly marks
     # the Column as the primary key so SQLAlchemy/SQLModel can map it.
     if _USE_PG_UUID:
-        id: Optional[str] = Field(
+        id: Optional[uuid.UUID] = Field(
             default=None,
             primary_key=True,
-            sa_column=Column(PG_UUID(as_uuid=False), primary_key=True, server_default=text("gen_random_uuid()")),
+            sa_column=Column(PG_UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")),
         )
     else:
         # For SQLite/local tests, use a Python-generated UUID string as the primary key.
@@ -97,7 +97,7 @@ class Complaint(SQLModel, table=True):
     status: str = Field(default="reported")
     # Ensure assigned_porter_id column type matches porters.id when using Postgres UUIDs
     if _USE_PG_UUID:
-        assigned_porter_id: Optional[str] = Field(default=None, foreign_key="porters.id", sa_column=Column(PG_UUID(as_uuid=False)))
+        assigned_porter_id: Optional[uuid.UUID] = Field(default=None, foreign_key="porters.id", sa_column=Column(PG_UUID(as_uuid=True)))
     else:
         assigned_porter_id: Optional[str] = None
     created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -110,9 +110,9 @@ class AssignmentAudit(SQLModel, table=True):
     # Use matching column types for FK references. When Postgres with UUIDs is used
     # ensure complaint_id / assigned_by / assigned_to use the native UUID column type
     if _USE_PG_UUID:
-        complaint_id: str = Field(foreign_key="complaints.id", sa_column=Column(PG_UUID(as_uuid=False)))
-        assigned_by: str = Field(sa_column=Column(PG_UUID(as_uuid=False)))
-        assigned_to: str = Field(sa_column=Column(PG_UUID(as_uuid=False)))
+        complaint_id: uuid.UUID = Field(foreign_key="complaints.id", sa_column=Column(PG_UUID(as_uuid=True)))
+        assigned_by: uuid.UUID = Field(sa_column=Column(PG_UUID(as_uuid=True)))
+        assigned_to: uuid.UUID = Field(sa_column=Column(PG_UUID(as_uuid=True)))
     else:
         complaint_id: str = Field(foreign_key="complaints.id")
         assigned_by: str
@@ -123,12 +123,12 @@ class AssignmentAudit(SQLModel, table=True):
 class Photo(SQLModel, table=True):
     __tablename__ = "photos"
     if _USE_PG_UUID:
-        id: Optional[str] = Field(default=None, primary_key=True, sa_column=Column(PG_UUID(as_uuid=False), primary_key=True, server_default=text("gen_random_uuid()")))
+        id: Optional[uuid.UUID] = Field(default=None, primary_key=True, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")))
     else:
         id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
     
     if _USE_PG_UUID:
-        complaint_id: str = Field(foreign_key="complaints.id", sa_column=Column(PG_UUID(as_uuid=False)))
+        complaint_id: uuid.UUID = Field(foreign_key="complaints.id", sa_column=Column(PG_UUID(as_uuid=True)))
     else:
         complaint_id: str = Field(foreign_key="complaints.id")
     
@@ -162,8 +162,8 @@ class PhotoUpload(SQLModel, table=True):
 
     id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
     if _USE_PG_UUID:
-        complaint_id: str = Field(foreign_key="complaints.id", sa_column=Column(PG_UUID(as_uuid=False)))
-        photo_id: str = Field(sa_column=Column(PG_UUID(as_uuid=False)))
+        complaint_id: uuid.UUID = Field(foreign_key="complaints.id", sa_column=Column(PG_UUID(as_uuid=True)))
+        photo_id: uuid.UUID = Field(sa_column=Column(PG_UUID(as_uuid=True)))
     else:
         complaint_id: str = Field(foreign_key="complaints.id")
         photo_id: str
@@ -182,7 +182,7 @@ class AdminInvitation(SQLModel, table=True):
     """Admin invitation model for secure admin onboarding."""
     __tablename__ = "admin_invitations"
     if _USE_PG_UUID:
-        id: Optional[str] = Field(default=None, primary_key=True, sa_column=Column(PG_UUID(as_uuid=False), primary_key=True, server_default=text("gen_random_uuid()")))
+        id: Optional[uuid.UUID] = Field(default=None, primary_key=True, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")))
     else:
         id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
     
@@ -190,7 +190,7 @@ class AdminInvitation(SQLModel, table=True):
     
     # Foreign key to Porter who sent the invitation
     if _USE_PG_UUID:
-        invited_by: str = Field(foreign_key="porters.id", sa_column=Column(PG_UUID(as_uuid=False)))
+        invited_by: uuid.UUID = Field(foreign_key="porters.id", sa_column=Column(PG_UUID(as_uuid=True)))
     else:
         invited_by: str = Field(foreign_key="porters.id")
     
@@ -209,7 +209,7 @@ class OTPToken(SQLModel, table=True):
     """OTP token model for email verification and password reset."""
     __tablename__ = "otp_tokens"
     if _USE_PG_UUID:
-        id: Optional[str] = Field(default=None, primary_key=True, sa_column=Column(PG_UUID(as_uuid=False), primary_key=True, server_default=text("gen_random_uuid()")))
+        id: Optional[uuid.UUID] = Field(default=None, primary_key=True, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")))
     else:
         id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
     

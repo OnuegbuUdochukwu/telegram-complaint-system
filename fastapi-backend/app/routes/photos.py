@@ -6,7 +6,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from pydantic import BaseModel, Field, constr
 from sqlmodel import Session, select
 
@@ -90,8 +90,7 @@ def presign_upload(
     _: object = Depends(get_authenticated_user_or_service),
     session: Session = Depends(get_session),
 ):
-    """Issue a presigned PUT URL for the Telegram bot/dashboard to upload directly to S3."""
-    _ensure_s3()
+    """Issue a presigned PUT URL for S3 or a direct upload URL for local storage."""
     _load_complaint(session, complaint_id)
 
     content_type = request.content_type.lower()
@@ -102,11 +101,38 @@ def presign_upload(
     extension = guess_extension(content_type)
     key = f"complaints/{complaint_id}/originals/{photo_id}.{extension}"
 
-    try:
-        upload = storage.generate_presigned_put(key, content_type, request.content_length)
-    except StorageError as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+    # If S3 is enabled, use presigned PUT
+    if storage:
+        try:
+            upload = storage.generate_presigned_put(key, content_type, request.content_length)
+        except StorageError as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
 
+        record = PhotoUpload(
+            id=str(uuid.uuid4()),
+            complaint_id=complaint_id,
+            photo_id=photo_id,
+            filename=request.filename,
+            content_type=content_type,
+            content_length=request.content_length,
+            s3_key=key,
+            expires_at=datetime.now(timezone.utc) + timedelta(seconds=settings.s3_presign_expiry_upload),
+            created_at=datetime.now(timezone.utc),
+        )
+        session.add(record)
+        session.commit()
+
+        return PresignResponse(
+            upload_id=record.id,
+            photo_id=photo_id,
+            s3_key=key,
+            method=upload.method,
+            url=upload.url,
+            fields=upload.fields,
+            expires_in=upload.expires_in,
+        )
+    
+    # For local storage, return a direct upload URL to the backend
     record = PhotoUpload(
         id=str(uuid.uuid4()),
         complaint_id=complaint_id,
@@ -115,21 +141,105 @@ def presign_upload(
         content_type=content_type,
         content_length=request.content_length,
         s3_key=key,
-        expires_at=datetime.now(timezone.utc) + timedelta(seconds=settings.s3_presign_expiry_upload),
+        expires_at=datetime.now(timezone.utc) + timedelta(seconds=3600),  # 1 hour
         created_at=datetime.now(timezone.utc),
     )
     session.add(record)
     session.commit()
 
+    # Return backend upload URL for local storage
+    from ..config import get_settings
+    backend_url = get_settings().backend_url or "http://localhost:8001"
+    upload_url = f"{backend_url}/api/v1/complaints/{complaint_id}/photos/{photo_id}/upload"
+
     return PresignResponse(
         upload_id=record.id,
         photo_id=photo_id,
         s3_key=key,
-        method=upload.method,
-        url=upload.url,
-        fields=upload.fields,
-        expires_in=upload.expires_in,
+        method="PUT",
+        url=upload_url,
+        fields=None,
+        expires_in=3600,
     )
+
+
+@router.put("/complaints/{complaint_id}/photos/{photo_id}/upload", response_model=PhotoResponse)
+async def direct_upload(
+    complaint_id: str,
+    photo_id: str,
+    request: Request,
+    _: object = Depends(get_authenticated_user_or_service),
+    session: Session = Depends(get_session),
+):
+    """Direct upload endpoint for local storage (alternative to S3 presigned PUT)."""
+    _load_complaint(session, complaint_id)
+    UPLOAD_ATTEMPTS.inc()
+
+    # Read the raw body
+    body = await request.body()
+    if not body:
+        UPLOAD_FAILURES.inc()
+        raise HTTPException(status_code=400, detail="Empty upload body")
+
+    # Find the upload record
+    upload_stmt = select(PhotoUpload).where(
+        PhotoUpload.complaint_id == complaint_id,
+        PhotoUpload.photo_id == photo_id,
+    )
+    upload = session.exec(upload_stmt).first()
+    if not upload:
+        UPLOAD_FAILURES.inc()
+        raise HTTPException(status_code=404, detail="Upload record not found")
+
+    # Check expiry
+    now = datetime.now(timezone.utc)
+    expiry = upload.expires_at or now
+    if expiry.tzinfo is None:
+        expiry = expiry.replace(tzinfo=timezone.utc)
+    if expiry < now:
+        UPLOAD_FAILURES.inc()
+        raise HTTPException(status_code=410, detail="Upload expired")
+
+    # Store using local storage
+    from ..storage import upload_photo as local_upload_photo
+    try:
+        file_url, thumbnail_url = local_upload_photo(
+            body, complaint_id, photo_id, upload.content_type or "image/jpeg"
+        )
+    except Exception as exc:
+        UPLOAD_FAILURES.inc()
+        raise HTTPException(status_code=500, detail=f"Failed to store photo: {exc}")
+
+    # Create or update photo record
+    photo = session.get(Photo, photo_id)
+    if photo is None:
+        photo = Photo(
+            id=photo_id,
+            complaint_id=complaint_id,
+            file_url=file_url,
+            thumbnail_url=thumbnail_url,
+            file_name=upload.filename,
+            file_size=len(body),
+            mime_type=upload.content_type,
+            storage_provider="local",
+        )
+    else:
+        photo.file_url = file_url
+        photo.thumbnail_url = thumbnail_url
+        photo.file_name = upload.filename
+        photo.file_size = len(body)
+        photo.mime_type = upload.content_type
+        photo.storage_provider = "local"
+
+    session.add(photo)
+    upload.status = "confirmed"
+    upload.confirmed_at = now
+    session.add(upload)
+    session.commit()
+    session.refresh(photo)
+
+    UPLOAD_SUCCESSES.inc()
+    return _serialize_photo(photo)
 
 
 @router.post("/complaints/{complaint_id}/photos/confirm", response_model=PhotoResponse)

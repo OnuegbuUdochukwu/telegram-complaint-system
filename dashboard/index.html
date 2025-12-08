@@ -1,1000 +1,693 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Complaint Management Dashboard</title>
-        <script src="https://cdn.tailwindcss.com"></script>
-        <script>
-            tailwind.config = {
-                theme: {
-                    extend: {
-                        colors: {
-                            primary: {
-                                50: "#eff6ff",
-                                100: "#dbeafe",
-                                200: "#bfdbfe",
-                                300: "#93c5fd",
-                                400: "#60a5fa",
-                                500: "#3b82f6",
-                                600: "#2563eb",
-                                700: "#1d4ed8",
-                                800: "#1e40af",
-                                900: "#1e3a8a",
-                            },
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Complaint Management Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: "#eff6ff",
+                            100: "#dbeafe",
+                            200: "#bfdbfe",
+                            300: "#93c5fd",
+                            400: "#60a5fa",
+                            500: "#3b82f6",
+                            600: "#2563eb",
+                            700: "#1d4ed8",
+                            800: "#1e40af",
+                            900: "#1e3a8a",
                         },
                     },
                 },
-            };
-        </script>
-    </head>
-    <body class="bg-gray-50 min-h-screen">
-        <!-- Navigation Header -->
-        <nav class="bg-white shadow-sm border-b border-gray-200">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between items-center h-16">
-                    <!-- Logo and Title -->
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0 flex items-center">
-                            <div
-                                class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center mr-3"
-                            >
-                                <svg
-                                    class="w-5 h-5 text-white"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        stroke-width="2"
-                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                                    ></path>
+            },
+        };
+    </script>
+</head>
+
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation Header -->
+    <nav class="bg-white shadow-sm border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo and Title -->
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 flex items-center">
+                        <div class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center mr-3">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <h1 class="text-xl font-semibold text-gray-900">
+                            Complaint Management
+                        </h1>
+                    </div>
+                </div>
+
+                <!-- User Menu -->
+                <div class="flex items-center space-x-4">
+                    <span id="userInfo" class="text-sm text-gray-600"></span>
+                    <button id="profileButton"
+                        class="text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors duration-200 flex items-center">
+                        <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                        </svg>
+                        Profile
+                    </button>
+                    <button id="logoutButton"
+                        class="text-sm text-gray-500 hover:text-gray-700 transition-colors duration-200">
+                        Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Page Header -->
+        <div class="mb-8">
+            <h2 class="text-2xl font-bold text-gray-900 mb-2">
+                Complaints Dashboard
+            </h2>
+            <p class="text-gray-600">
+                Manage and track complaint statuses and assignments
+            </p>
+        </div>
+
+        <!-- Filters and Controls -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                <!-- Status Filter -->
+                <div>
+                    <label for="statusFilter" class="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                    <select id="statusFilter"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                        <option value="">All Statuses</option>
+                        <option value="reported">Reported</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="resolved">Resolved</option>
+                        <option value="closed">Closed</option>
+                    </select>
+                </div>
+
+                <!-- Hostel Filter -->
+                <div>
+                    <label for="hostelFilter" class="block text-sm font-medium text-gray-700 mb-2">Hostel</label>
+                    <select id="hostelFilter"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                        <option value="">All Hostels</option>
+                        <!-- Permanent hostel list (matches bot canonical HOSTELS) -->
+                        <option value="John">John</option>
+                        <option value="Joseph">Joseph</option>
+                        <option value="Paul">Paul</option>
+                        <option value="Peter">Peter</option>
+                        <option value="Daniel">Daniel</option>
+                        <option value="Esther">Esther</option>
+                        <option value="Dorcas">Dorcas</option>
+                        <option value="Lydia">Lydia</option>
+                        <option value="Mary">Mary</option>
+                        <option value="Deborah">Deborah</option>
+                    </select>
+                </div>
+
+                <!-- Category Filter -->
+                <div>
+                    <label for="categoryFilter" class="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                    <select id="categoryFilter"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                        <option value="">All Categories</option>
+                    </select>
+                </div>
+
+                <!-- Severity Filter -->
+                <div>
+                    <label for="severityFilter" class="block text-sm font-medium text-gray-700 mb-2">Severity</label>
+                    <select id="severityFilter"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                        <option value="">All Severities</option>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="critical">Critical</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex justify-between items-center">
+                <div class="flex space-x-3">
+                    <button id="refreshButton"
+                        class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors duration-200">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                            </path>
+                        </svg>
+                        Refresh
+                    </button>
+                </div>
+
+                <div class="text-sm text-gray-500">
+                    <span id="totalCount">Loading...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Complaints Table -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                                data-sort="id">
+                                ID
+                                <svg class="inline w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
                                 </svg>
-                            </div>
-                            <h1 class="text-xl font-semibold text-gray-900">
-                                Complaint Management
-                            </h1>
-                        </div>
-                    </div>
-
-                    <!-- User Menu -->
-                    <div class="flex items-center space-x-4">
-                        <span
-                            id="userInfo"
-                            class="text-sm text-gray-600"
-                        ></span>
-                        <button
-                            id="profileButton"
-                            class="text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors duration-200 flex items-center"
-                        >
-                            <svg
-                                class="w-5 h-5 mr-1"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    stroke-width="2"
-                                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                                ></path>
-                            </svg>
-                            Profile
-                        </button>
-                        <button
-                            id="logoutButton"
-                            class="text-sm text-gray-500 hover:text-gray-700 transition-colors duration-200"
-                        >
-                            Logout
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </nav>
-
-        <!-- Main Content -->
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <!-- Page Header -->
-            <div class="mb-8">
-                <h2 class="text-2xl font-bold text-gray-900 mb-2">
-                    Complaints Dashboard
-                </h2>
-                <p class="text-gray-600">
-                    Manage and track complaint statuses and assignments
-                </p>
-            </div>
-
-            <!-- Filters and Controls -->
-            <div
-                class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6"
-            >
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                    <!-- Status Filter -->
-                    <div>
-                        <label
-                            for="statusFilter"
-                            class="block text-sm font-medium text-gray-700 mb-2"
-                            >Status</label
-                        >
-                        <select
-                            id="statusFilter"
-                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                        >
-                            <option value="">All Statuses</option>
-                            <option value="reported">Reported</option>
-                            <option value="in_progress">In Progress</option>
-                            <option value="resolved">Resolved</option>
-                            <option value="closed">Closed</option>
-                        </select>
-                    </div>
-
-                    <!-- Hostel Filter -->
-                    <div>
-                        <label
-                            for="hostelFilter"
-                            class="block text-sm font-medium text-gray-700 mb-2"
-                            >Hostel</label
-                        >
-                        <select
-                            id="hostelFilter"
-                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                        >
-                            <option value="">All Hostels</option>
-                            <!-- Permanent hostel list (matches bot canonical HOSTELS) -->
-                            <option value="John">John</option>
-                            <option value="Joseph">Joseph</option>
-                            <option value="Paul">Paul</option>
-                            <option value="Peter">Peter</option>
-                            <option value="Daniel">Daniel</option>
-                            <option value="Esther">Esther</option>
-                            <option value="Dorcas">Dorcas</option>
-                            <option value="Lydia">Lydia</option>
-                            <option value="Mary">Mary</option>
-                            <option value="Deborah">Deborah</option>
-                        </select>
-                    </div>
-
-                    <!-- Category Filter -->
-                    <div>
-                        <label
-                            for="categoryFilter"
-                            class="block text-sm font-medium text-gray-700 mb-2"
-                            >Category</label
-                        >
-                        <select
-                            id="categoryFilter"
-                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                        >
-                            <option value="">All Categories</option>
-                        </select>
-                    </div>
-
-                    <!-- Severity Filter -->
-                    <div>
-                        <label
-                            for="severityFilter"
-                            class="block text-sm font-medium text-gray-700 mb-2"
-                            >Severity</label
-                        >
-                        <select
-                            id="severityFilter"
-                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                        >
-                            <option value="">All Severities</option>
-                            <option value="low">Low</option>
-                            <option value="medium">Medium</option>
-                            <option value="high">High</option>
-                            <option value="critical">Critical</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Action Buttons -->
-                <div class="flex justify-between items-center">
-                    <div class="flex space-x-3">
-                        <button
-                            id="refreshButton"
-                            class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors duration-200"
-                        >
-                            <svg
-                                class="w-4 h-4 mr-2"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    stroke-width="2"
-                                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                                ></path>
-                            </svg>
-                            Refresh
-                        </button>
-                    </div>
-
-                    <div class="text-sm text-gray-500">
-                        <span id="totalCount">Loading...</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Complaints Table -->
-            <div
-                class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden"
-            >
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                    data-sort="id"
-                                >
-                                    ID
-                                    <svg
-                                        class="inline w-4 h-4 ml-1"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="2"
-                                            d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-                                        ></path>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                                data-sort="hostel">
+                                Hostel
+                                <svg class="inline w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                                </svg>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                                data-sort="category">
+                                Category
+                                <svg class="inline w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                                </svg>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                                data-sort="severity">
+                                Severity
+                                <svg class="inline w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                                </svg>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                                data-sort="status">
+                                Status
+                                <svg class="inline w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                                </svg>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                                data-sort="created_at">
+                                Created
+                                <svg class="inline w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                                </svg>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Actions
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="complaintsTableBody" class="bg-white divide-y divide-gray-200">
+                        <!-- Loading State -->
+                        <tr id="loadingRow">
+                            <td colspan="7" class="px-6 py-12 text-center">
+                                <div class="flex items-center justify-center">
+                                    <svg class="animate-spin -ml-1 mr-3 h-8 w-8 text-primary-600" fill="none"
+                                        viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                            stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor"
+                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                        </path>
                                     </svg>
-                                </th>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                    data-sort="hostel"
-                                >
-                                    Hostel
-                                    <svg
-                                        class="inline w-4 h-4 ml-1"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="2"
-                                            d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-                                        ></path>
-                                    </svg>
-                                </th>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                    data-sort="category"
-                                >
-                                    Category
-                                    <svg
-                                        class="inline w-4 h-4 ml-1"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="2"
-                                            d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-                                        ></path>
-                                    </svg>
-                                </th>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                    data-sort="severity"
-                                >
-                                    Severity
-                                    <svg
-                                        class="inline w-4 h-4 ml-1"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="2"
-                                            d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-                                        ></path>
-                                    </svg>
-                                </th>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                    data-sort="status"
-                                >
-                                    Status
-                                    <svg
-                                        class="inline w-4 h-4 ml-1"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="2"
-                                            d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-                                        ></path>
-                                    </svg>
-                                </th>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                    data-sort="created_at"
-                                >
-                                    Created
-                                    <svg
-                                        class="inline w-4 h-4 ml-1"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="2"
-                                            d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-                                        ></path>
-                                    </svg>
-                                </th>
-                                <th
-                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                >
-                                    Actions
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody
-                            id="complaintsTableBody"
-                            class="bg-white divide-y divide-gray-200"
-                        >
-                            <!-- Loading State -->
-                            <tr id="loadingRow">
-                                <td colspan="7" class="px-6 py-12 text-center">
-                                    <div
-                                        class="flex items-center justify-center"
-                                    >
-                                        <svg
-                                            class="animate-spin -ml-1 mr-3 h-8 w-8 text-primary-600"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <circle
-                                                class="opacity-25"
-                                                cx="12"
-                                                cy="12"
-                                                r="10"
-                                                stroke="currentColor"
-                                                stroke-width="4"
-                                            ></circle>
-                                            <path
-                                                class="opacity-75"
-                                                fill="currentColor"
-                                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                            ></path>
-                                        </svg>
-                                        <span class="text-gray-500"
-                                            >Loading complaints...</span
-                                        >
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Pagination -->
-                <div
-                    id="pagination"
-                    class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6"
-                >
-                    <div class="flex-1 flex justify-between sm:hidden">
-                        <button
-                            id="prevPageMobile"
-                            class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                        >
-                            Previous
-                        </button>
-                        <button
-                            id="nextPageMobile"
-                            class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                        >
-                            Next
-                        </button>
-                    </div>
-                    <div
-                        class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between"
-                    >
-                        <div>
-                            <p
-                                id="paginationInfo"
-                                class="text-sm text-gray-700"
-                            >
-                                Showing <span id="showingStart">0</span> to
-                                <span id="showingEnd">0</span> of
-                                <span id="showingTotal">0</span> results
-                            </p>
-                        </div>
-                        <div>
-                            <nav
-                                class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
-                                aria-label="Pagination"
-                            >
-                                <button
-                                    id="prevPage"
-                                    class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                                >
-                                    <span class="sr-only">Previous</span>
-                                    <svg
-                                        class="h-5 w-5"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="2"
-                                            d="M15 19l-7-7 7-7"
-                                        ></path>
-                                    </svg>
-                                </button>
-                                <div id="pageNumbers" class="flex">
-                                    <!-- Page numbers will be inserted here -->
+                                    <span class="text-gray-500">Loading complaints...</span>
                                 </div>
-                                <button
-                                    id="nextPage"
-                                    class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                                >
-                                    <span class="sr-only">Next</span>
-                                    <svg
-                                        class="h-5 w-5"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="2"
-                                            d="M9 5l7 7-7 7"
-                                        ></path>
-                                    </svg>
-                                </button>
-                            </nav>
-                        </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div id="pagination"
+                class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                <div class="flex-1 flex justify-between sm:hidden">
+                    <button id="prevPageMobile"
+                        class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                        Previous
+                    </button>
+                    <button id="nextPageMobile"
+                        class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                        Next
+                    </button>
+                </div>
+                <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                    <div>
+                        <p id="paginationInfo" class="text-sm text-gray-700">
+                            Showing <span id="showingStart">0</span> to
+                            <span id="showingEnd">0</span> of
+                            <span id="showingTotal">0</span> results
+                        </p>
+                    </div>
+                    <div>
+                        <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                            <button id="prevPage"
+                                class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                <span class="sr-only">Previous</span>
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 19l-7-7 7-7"></path>
+                                </svg>
+                            </button>
+                            <div id="pageNumbers" class="flex">
+                                <!-- Page numbers will be inserted here -->
+                            </div>
+                            <button id="nextPage"
+                                class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                <span class="sr-only">Next</span>
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </button>
+                        </nav>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Complaint Detail Modal -->
-        <div
-            id="complaintModal"
-            class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50"
-        >
-            <div
-                class="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white"
-            >
-                <div class="mt-3">
-                    <!-- Modal Header -->
-                    <div
-                        class="flex items-center justify-between pb-4 border-b border-gray-200"
-                    >
-                        <h3 class="text-lg font-medium text-gray-900">
-                            Complaint Details
-                        </h3>
-                        <button
-                            id="closeModal"
-                            class="text-gray-400 hover:text-gray-600 transition-colors duration-200"
-                        >
-                            <svg
-                                class="w-6 h-6"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    stroke-width="2"
-                                    d="M6 18L18 6M6 6l12 12"
-                                ></path>
-                            </svg>
-                        </button>
-                    </div>
+    <!-- Complaint Detail Modal -->
+    <div id="complaintModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+        <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <!-- Modal Header -->
+                <div class="flex items-center justify-between pb-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">
+                        Complaint Details
+                    </h3>
+                    <button id="closeModal" class="text-gray-400 hover:text-gray-600 transition-colors duration-200">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
 
-                    <!-- Modal Content -->
-                    <div id="modalContent" class="mt-6">
-                        <!-- Content will be loaded here -->
-                    </div>
+                <!-- Modal Content -->
+                <div id="modalContent" class="mt-6">
+                    <!-- Content will be loaded here -->
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Profile Modal -->
-        <div
-            id="profileModal"
-            class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50"
-        >
-            <div
-                class="relative top-20 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white"
-            >
-                <div class="mt-3">
-                    <!-- Modal Header -->
-                    <div
-                        class="flex items-center justify-between pb-4 border-b border-gray-200"
-                    >
-                        <h3 class="text-lg font-medium text-gray-900">
-                            Admin Profile
-                        </h3>
-                        <button
-                            id="closeProfileModal"
-                            class="text-gray-400 hover:text-gray-600 transition-colors duration-200"
-                        >
-                            <svg
-                                class="w-6 h-6"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    stroke-width="2"
-                                    d="M6 18L18 6M6 6l12 12"
-                                ></svg>
-                            </svg>
-                        </button>
-                    </div>
+    <!-- Profile Modal -->
+    <div id="profileModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+        <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <!-- Modal Header -->
+                <div class="flex items-center justify-between pb-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">
+                        Admin Profile
+                    </h3>
+                    <button id="closeProfileModal"
+                        class="text-gray-400 hover:text-gray-600 transition-colors duration-200">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12">
+                        </svg>
+                        </svg>
+                    </button>
+                </div>
 
-                    <!-- Modal Content -->
-                    <div id="profileModalContent" class="mt-6">
-                        <!-- Profile information will be loaded here -->
-                        <div class="space-y-6">
-                            <!-- User Info Section -->
-                            <div>
-                                <h4 class="text-sm font-medium text-gray-900 mb-4">
-                                    Account Information
-                                </h4>
-                                <div class="space-y-4">
-                                    <div>
-                                        <label
-                                            class="block text-sm font-medium text-gray-700 mb-1"
-                                        >
-                                            Email
-                                        </label>
-                                        <input
-                                            type="email"
-                                            id="profileEmail"
-                                            readonly
-                                            class="block w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label
-                                            class="block text-sm font-medium text-gray-700 mb-1"
-                                        >
-                                            Full Name
-                                        </label>
-                                        <input
-                                            type="text"
-                                            id="profileFullName"
-                                            readonly
-                                            class="block w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label
-                                            class="block text-sm font-medium text-gray-700 mb-1"
-                                        >
-                                            Role
-                                        </label>
-                                        <input
-                                            type="text"
-                                            id="profileRole"
-                                            readonly
-                                            class="block w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
-                                        />
-                                    </div>
+                <!-- Modal Content -->
+                <div id="profileModalContent" class="mt-6">
+                    <!-- Profile information will be loaded here -->
+                    <div class="space-y-6">
+                        <!-- User Info Section -->
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-900 mb-4">
+                                Account Information
+                            </h4>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        Email
+                                    </label>
+                                    <input type="email" id="profileEmail" readonly
+                                        class="block w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        Full Name
+                                    </label>
+                                    <input type="text" id="profileFullName" readonly
+                                        class="block w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        Role
+                                    </label>
+                                    <input type="text" id="profileRole" readonly
+                                        class="block w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed" />
                                 </div>
                             </div>
+                        </div>
 
-                            <!-- Change Password Section -->
-                            <div class="border-t border-gray-200 pt-6">
-                                <h4 class="text-sm font-medium text-gray-900 mb-4">
-                                    Change Password
-                                </h4>
-                                <form id="changePasswordForm" class="space-y-4">
-                                    <div>
-                                        <label
-                                            for="currentPassword"
-                                            class="block text-sm font-medium text-gray-700 mb-1"
-                                        >
-                                            Current Password
-                                        </label>
-                                        <input
-                                            type="password"
-                                            id="currentPassword"
-                                            required
-                                            class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors duration-200"
-                                            placeholder="Enter current password"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label
-                                            for="newPassword"
-                                            class="block text-sm font-medium text-gray-700 mb-1"
-                                        >
-                                            New Password
-                                        </label>
-                                        <input
-                                            type="password"
-                                            id="newPassword"
-                                            required
-                                            class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors duration-200"
-                                            placeholder="Enter new password"
-                                        />
-                                        <p class="mt-1 text-xs text-gray-500">
-                                            Must be at least 8 characters with uppercase, lowercase, and a number
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <label
-                                            for="confirmPassword"
-                                            class="block text-sm font-medium text-gray-700 mb-1"
-                                        >
-                                            Confirm New Password
-                                        </label>
-                                        <input
-                                            type="password"
-                                            id="confirmPassword"
-                                            required
-                                            class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors duration-200"
-                                            placeholder="Confirm new password"
-                                        />
-                                    </div>
-                                    <div
-                                        id="passwordChangeMessage"
-                                        class="hidden rounded-lg p-4"
-                                    ></div>
-                                    <button
-                                        type="submit"
-                                        id="changePasswordButton"
-                                        class="w-full bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        <span id="changePasswordButtonText">Change Password</span>
-                                        <svg
-                                            id="changePasswordSpinner"
-                                            class="hidden animate-spin inline-block ml-2 h-4 w-4 text-white"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <circle
-                                                class="opacity-25"
-                                                cx="12"
-                                                cy="12"
-                                                r="10"
-                                                stroke="currentColor"
-                                                stroke-width="4"
-                                            ></circle>
-                                            <path
-                                                class="opacity-75"
-                                                fill="currentColor"
-                                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                            ></path>
-                                        </svg>
-                                    </button>
-                                </form>
-                            </div>
+                        <!-- Change Password Section -->
+                        <div class="border-t border-gray-200 pt-6">
+                            <h4 class="text-sm font-medium text-gray-900 mb-4">
+                                Change Password
+                            </h4>
+                            <form id="changePasswordForm" class="space-y-4">
+                                <div>
+                                    <label for="currentPassword" class="block text-sm font-medium text-gray-700 mb-1">
+                                        Current Password
+                                    </label>
+                                    <input type="password" id="currentPassword" required
+                                        class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors duration-200"
+                                        placeholder="Enter current password" />
+                                </div>
+                                <div>
+                                    <label for="newPassword" class="block text-sm font-medium text-gray-700 mb-1">
+                                        New Password
+                                    </label>
+                                    <input type="password" id="newPassword" required
+                                        class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors duration-200"
+                                        placeholder="Enter new password" />
+                                    <p class="mt-1 text-xs text-gray-500">
+                                        Must be at least 8 characters with uppercase, lowercase, and a number
+                                    </p>
+                                </div>
+                                <div>
+                                    <label for="confirmPassword" class="block text-sm font-medium text-gray-700 mb-1">
+                                        Confirm New Password
+                                    </label>
+                                    <input type="password" id="confirmPassword" required
+                                        class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors duration-200"
+                                        placeholder="Confirm new password" />
+                                </div>
+                                <div id="passwordChangeMessage" class="hidden rounded-lg p-4"></div>
+                                <button type="submit" id="changePasswordButton"
+                                    class="w-full bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <span id="changePasswordButtonText">Change Password</span>
+                                    <svg id="changePasswordSpinner"
+                                        class="hidden animate-spin inline-block ml-2 h-4 w-4 text-white" fill="none"
+                                        viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                            stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor"
+                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                        </path>
+                                    </svg>
+                                </button>
+                            </form>
+                        </div>
 
-                            <!-- Invite Admin Section (Admin Only) -->
-                            <div
-                                id="inviteAdminSection"
-                                class="border-t border-gray-200 pt-6 hidden"
-                            >
-                                <h4 class="text-sm font-medium text-gray-900 mb-4">
-                                    Invite Admin
-                                </h4>
-                                <form id="inviteAdminForm" class="space-y-4">
-                                    <div>
-                                        <label
-                                            for="inviteEmail"
-                                            class="block text-sm font-medium text-gray-700 mb-1"
-                                        >
-                                            Email Address
-                                        </label>
-                                        <input
-                                            type="email"
-                                            id="inviteEmail"
-                                            required
-                                            class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors duration-200"
-                                            placeholder="Enter email address to invite"
-                                        />
-                                        <p class="mt-1 text-xs text-gray-500">
-                                            An invitation email will be sent to this address
-                                        </p>
-                                    </div>
-                                    <div
-                                        id="inviteMessage"
-                                        class="hidden rounded-lg p-4"
-                                    ></div>
-                                    <button
-                                        type="submit"
-                                        id="inviteAdminButton"
-                                        class="w-full bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        <span id="inviteAdminButtonText">Send Invitation</span>
-                                        <svg
-                                            id="inviteAdminSpinner"
-                                            class="hidden animate-spin inline-block ml-2 h-4 w-4 text-white"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <circle
-                                                class="opacity-25"
-                                                cx="12"
-                                                cy="12"
-                                                r="10"
-                                                stroke="currentColor"
-                                                stroke-width="4"
-                                            ></circle>
-                                            <path
-                                                class="opacity-75"
-                                                fill="currentColor"
-                                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                            ></path>
-                                        </svg>
-                                    </button>
-                                </form>
-                            </div>
+                        <!-- Invite Admin Section (Admin Only) -->
+                        <div id="inviteAdminSection" class="border-t border-gray-200 pt-6 hidden">
+                            <h4 class="text-sm font-medium text-gray-900 mb-4">
+                                Invite Admin
+                            </h4>
+                            <form id="inviteAdminForm" class="space-y-4">
+                                <div>
+                                    <label for="inviteEmail" class="block text-sm font-medium text-gray-700 mb-1">
+                                        Email Address
+                                    </label>
+                                    <input type="email" id="inviteEmail" required
+                                        class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors duration-200"
+                                        placeholder="Enter email address to invite" />
+                                    <p class="mt-1 text-xs text-gray-500">
+                                        An invitation email will be sent to this address
+                                    </p>
+                                </div>
+                                <div id="inviteMessage" class="hidden rounded-lg p-4"></div>
+                                <button type="submit" id="inviteAdminButton"
+                                    class="w-full bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <span id="inviteAdminButtonText">Send Invitation</span>
+                                    <svg id="inviteAdminSpinner"
+                                        class="hidden animate-spin inline-block ml-2 h-4 w-4 text-white" fill="none"
+                                        viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                            stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor"
+                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                        </path>
+                                    </svg>
+                                </button>
+                            </form>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
 
-        <script>
-            // API Configuration
-            // Point dashboard to backend API during local development.
-            const API_BASE_URL = "http://localhost:8000";
+    <script>
+        // API Configuration
+        // Point dashboard to backend API during local development.
+        const API_BASE_URL = "http://localhost:8001";
 
-            // Mapping storage key -> display label for categories.
-            // Keep keys in sync with backend storage keys (no DB migration required).
-            const CATEGORY_KEY_TO_LABEL = {
-                "plumbing": "Plumbing / Water",
-                "electrical": "Electrical / Lighting",
-                "carpentry": "Carpentry",
-                "pest": "Pest Control",
-                "metalworks": "Metalworks/Bunks",
-                "other": "Other / Not Listed"
-            };
+        // Mapping storage key -> display label for categories.
+        // Keep keys in sync with backend storage keys (no DB migration required).
+        const CATEGORY_KEY_TO_LABEL = {
+            "plumbing": "Plumbing / Water",
+            "electrical": "Electrical / Lighting",
+            "carpentry": "Carpentry",
+            "pest": "Pest Control",
+            "metalworks": "Metalworks/Bunks",
+            "other": "Other / Not Listed"
+        };
 
-            // State Management
-            let currentPage = 1;
-            let pageSize = 20;
-            let currentSort = "created_at";
-            let sortDirection = "desc";
-            let currentFilters = {};
-            let complaints = [];
-            let porters = [];
-            let websocket = null;
-            let reconnectAttempts = 0;
-            const maxReconnectAttempts = 5;
-            let pingInterval = null;
+        // State Management
+        let currentPage = 1;
+        let pageSize = 20;
+        let currentSort = "created_at";
+        let sortDirection = "desc";
+        let currentFilters = {};
+        let complaints = [];
+        let porters = [];
+        let websocket = null;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+        let pingInterval = null;
 
-            // DOM Elements
-            const complaintsTableBody = document.getElementById(
-                "complaintsTableBody"
-            );
-            const loadingRow = document.getElementById("loadingRow");
-            const totalCount = document.getElementById("totalCount");
-            const refreshButton = document.getElementById("refreshButton");
-            const complaintModal = document.getElementById("complaintModal");
-            const modalContent = document.getElementById("modalContent");
-            const closeModal = document.getElementById("closeModal");
-            const logoutButton = document.getElementById("logoutButton");
-            const userInfo = document.getElementById("userInfo");
-            const profileButton = document.getElementById("profileButton");
-            const profileModal = document.getElementById("profileModal");
-            const closeProfileModal = document.getElementById("closeProfileModal");
-            const profileModalContent = document.getElementById("profileModalContent");
+        // DOM Elements
+        const complaintsTableBody = document.getElementById(
+            "complaintsTableBody"
+        );
+        const loadingRow = document.getElementById("loadingRow");
+        const totalCount = document.getElementById("totalCount");
+        const refreshButton = document.getElementById("refreshButton");
+        const complaintModal = document.getElementById("complaintModal");
+        const modalContent = document.getElementById("modalContent");
+        const closeModal = document.getElementById("closeModal");
+        const logoutButton = document.getElementById("logoutButton");
+        const userInfo = document.getElementById("userInfo");
+        const profileButton = document.getElementById("profileButton");
+        const profileModal = document.getElementById("profileModal");
+        const closeProfileModal = document.getElementById("closeProfileModal");
+        const profileModalContent = document.getElementById("profileModalContent");
 
-            // Filter Elements
-            const statusFilter = document.getElementById("statusFilter");
-            const hostelFilter = document.getElementById("hostelFilter");
-            const categoryFilter = document.getElementById("categoryFilter");
-            const severityFilter = document.getElementById("severityFilter");
+        // Filter Elements
+        const statusFilter = document.getElementById("statusFilter");
+        const hostelFilter = document.getElementById("hostelFilter");
+        const categoryFilter = document.getElementById("categoryFilter");
+        const severityFilter = document.getElementById("severityFilter");
 
-            // Pagination Elements
-            const prevPage = document.getElementById("prevPage");
-            const nextPage = document.getElementById("nextPage");
-            const prevPageMobile = document.getElementById("prevPageMobile");
-            const nextPageMobile = document.getElementById("nextPageMobile");
-            const pageNumbers = document.getElementById("pageNumbers");
-            const paginationInfo = document.getElementById("paginationInfo");
-            const showingStart = document.getElementById("showingStart");
-            const showingEnd = document.getElementById("showingEnd");
-            const showingTotal = document.getElementById("showingTotal");
+        // Pagination Elements
+        const prevPage = document.getElementById("prevPage");
+        const nextPage = document.getElementById("nextPage");
+        const prevPageMobile = document.getElementById("prevPageMobile");
+        const nextPageMobile = document.getElementById("nextPageMobile");
+        const pageNumbers = document.getElementById("pageNumbers");
+        const paginationInfo = document.getElementById("paginationInfo");
+        const showingStart = document.getElementById("showingStart");
+        const showingEnd = document.getElementById("showingEnd");
+        const showingTotal = document.getElementById("showingTotal");
 
-            // WebSocket Functions
-            function connectWebSocket() {
-                const token = sessionStorage.getItem("access_token");
-                if (!token) {
-                    console.warn(
-                        "No access token available for WebSocket connection"
-                    );
-                    return;
-                }
+        // WebSocket Functions
+        function connectWebSocket() {
+            const token = sessionStorage.getItem("access_token");
+            if (!token) {
+                console.warn(
+                    "No access token available for WebSocket connection"
+                );
+                return;
+            }
 
-                const wsUrl = `ws://${
-                    window.location.host
+            const wsUrl = `ws://${window.location.host
                 }/ws/dashboard?token=${encodeURIComponent(token)}`;
 
-                try {
-                    websocket = new WebSocket(wsUrl);
+            try {
+                websocket = new WebSocket(wsUrl);
 
-                    websocket.onopen = function (event) {
-                        console.log("WebSocket connected");
-                        reconnectAttempts = 0;
+                websocket.onopen = function (event) {
+                    console.log("WebSocket connected");
+                    reconnectAttempts = 0;
 
-                        // Clear any existing ping interval
-                        if (pingInterval) {
-                            clearInterval(pingInterval);
-                        }
+                    // Clear any existing ping interval
+                    if (pingInterval) {
+                        clearInterval(pingInterval);
+                    }
 
-                        // Send ping to keep connection alive
-                        pingInterval = setInterval(() => {
-                            if (
-                                websocket &&
-                                websocket.readyState === WebSocket.OPEN
-                            ) {
-                                websocket.send("ping");
-                            }
-                        }, 30000); // Ping every 30 seconds
-                    };
-
-                    websocket.onmessage = function (event) {
-                        try {
-                            const data = JSON.parse(event.data);
-                            handleWebSocketEvent(data);
-                        } catch (e) {
-                            // Handle pong responses
-                            if (event.data === "pong") {
-                                return;
-                            }
-                            console.error(
-                                "Error parsing WebSocket message:",
-                                e
-                            );
-                        }
-                    };
-
-                    websocket.onclose = function (event) {
-                        console.log(
-                            "WebSocket disconnected:",
-                            event.code,
-                            event.reason
-                        );
-                        websocket = null;
-
-                        // Clear ping interval
-                        if (pingInterval) {
-                            clearInterval(pingInterval);
-                            pingInterval = null;
-                        }
-
-                        // Attempt to reconnect if not a manual close
+                    // Send ping to keep connection alive
+                    pingInterval = setInterval(() => {
                         if (
-                            event.code !== 1000 &&
-                            reconnectAttempts < maxReconnectAttempts
+                            websocket &&
+                            websocket.readyState === WebSocket.OPEN
                         ) {
-                            reconnectAttempts++;
-                            console.log(
-                                `Attempting to reconnect (${reconnectAttempts}/${maxReconnectAttempts})...`
-                            );
-                            setTimeout(
-                                connectWebSocket,
-                                5000 * reconnectAttempts
-                            );
+                            websocket.send("ping");
                         }
-                    };
+                    }, 30000); // Ping every 30 seconds
+                };
 
-                    websocket.onerror = function (error) {
-                        console.error("WebSocket error:", error);
-                    };
-                } catch (error) {
-                    console.error(
-                        "Failed to create WebSocket connection:",
-                        error
+                websocket.onmessage = function (event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        handleWebSocketEvent(data);
+                    } catch (e) {
+                        // Handle pong responses
+                        if (event.data === "pong") {
+                            return;
+                        }
+                        console.error(
+                            "Error parsing WebSocket message:",
+                            e
+                        );
+                    }
+                };
+
+                websocket.onclose = function (event) {
+                    console.log(
+                        "WebSocket disconnected:",
+                        event.code,
+                        event.reason
                     );
-                }
-            }
+                    websocket = null;
 
-            function handleWebSocketEvent(event) {
-                console.log("Received WebSocket event:", event);
+                    // Clear ping interval
+                    if (pingInterval) {
+                        clearInterval(pingInterval);
+                        pingInterval = null;
+                    }
 
-                switch (event.event_type) {
-                    case "new_complaint":
-                        handleNewComplaint(event.data);
-                        break;
-                    case "status_update":
-                        handleStatusUpdate(event.data);
-                        break;
-                    case "assignment_update":
-                        handleAssignmentUpdate(event.data);
-                        break;
-                    default:
-                        console.log("Unknown event type:", event.event_type);
-                }
-            }
+                    // Attempt to reconnect if not a manual close
+                    if (
+                        event.code !== 1000 &&
+                        reconnectAttempts < maxReconnectAttempts
+                    ) {
+                        reconnectAttempts++;
+                        console.log(
+                            `Attempting to reconnect (${reconnectAttempts}/${maxReconnectAttempts})...`
+                        );
+                        setTimeout(
+                            connectWebSocket,
+                            5000 * reconnectAttempts
+                        );
+                    }
+                };
 
-            function handleNewComplaint(data) {
-                console.log("New complaint received:", data);
-
-                // Show notification
-                showNotification(
-                    `New complaint in ${data.hostel}: ${data.category} (${data.severity})`,
-                    "info"
+                websocket.onerror = function (error) {
+                    console.error("WebSocket error:", error);
+                };
+            } catch (error) {
+                console.error(
+                    "Failed to create WebSocket connection:",
+                    error
                 );
-
-                // Refresh the complaints list
-                fetchComplaints();
             }
+        }
 
-            function handleStatusUpdate(data) {
-                console.log("Status update received:", data);
+        function handleWebSocketEvent(event) {
+            console.log("Received WebSocket event:", event);
 
-                // Show notification
-                showNotification(
-                    `Complaint ${data.complaint_id.substring(
-                        0,
-                        8
-                    )}... status changed: ${data.old_status} → ${
-                        data.new_status
-                    }`,
-                    "success"
-                );
-
-                // Refresh the complaints list
-                fetchComplaints();
+            switch (event.event_type) {
+                case "new_complaint":
+                    handleNewComplaint(event.data);
+                    break;
+                case "status_update":
+                    handleStatusUpdate(event.data);
+                    break;
+                case "assignment_update":
+                    handleAssignmentUpdate(event.data);
+                    break;
+                default:
+                    console.log("Unknown event type:", event.event_type);
             }
+        }
 
-            function handleAssignmentUpdate(data) {
-                console.log("Assignment update received:", data);
+        function handleNewComplaint(data) {
+            console.log("New complaint received:", data);
 
-                // Show notification
-                showNotification(
-                    `Complaint ${data.complaint_id.substring(
-                        0,
-                        8
-                    )}... assigned to porter`,
-                    "info"
-                );
+            // Show notification
+            showNotification(
+                `New complaint in ${data.hostel}: ${data.category} (${data.severity})`,
+                "info"
+            );
 
-                // Refresh the complaints list
-                fetchComplaints();
-            }
+            // Refresh the complaints list
+            fetchComplaints();
+        }
 
-            function showNotification(message, type = "info") {
-                // Create a simple notification element
-                const notification = document.createElement("div");
-                notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 max-w-sm ${
-                    type === "success"
-                        ? "bg-green-100 text-green-800 border border-green-200"
-                        : type === "error"
+        function handleStatusUpdate(data) {
+            console.log("Status update received:", data);
+
+            // Show notification
+            showNotification(
+                `Complaint ${data.complaint_id.substring(
+                    0,
+                    8
+                )}... status changed: ${data.old_status} → ${data.new_status
+                }`,
+                "success"
+            );
+
+            // Refresh the complaints list
+            fetchComplaints();
+        }
+
+        function handleAssignmentUpdate(data) {
+            console.log("Assignment update received:", data);
+
+            // Show notification
+            showNotification(
+                `Complaint ${data.complaint_id.substring(
+                    0,
+                    8
+                )}... assigned to porter`,
+                "info"
+            );
+
+            // Refresh the complaints list
+            fetchComplaints();
+        }
+
+        function showNotification(message, type = "info") {
+            // Create a simple notification element
+            const notification = document.createElement("div");
+            notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 max-w-sm ${type === "success"
+                    ? "bg-green-100 text-green-800 border border-green-200"
+                    : type === "error"
                         ? "bg-red-100 text-red-800 border border-red-200"
                         : "bg-blue-100 text-blue-800 border border-blue-200"
                 }`;
 
-                notification.innerHTML = `
+            notification.innerHTML = `
                     <div class="flex items-center">
                         <div class="flex-1">
                             <p class="text-sm font-medium">${message}</p>
@@ -1007,198 +700,197 @@
                     </div>
                 `;
 
-                document.body.appendChild(notification);
+            document.body.appendChild(notification);
 
-                // Auto-remove after 5 seconds
-                setTimeout(() => {
-                    if (notification.parentElement) {
-                        notification.remove();
-                    }
-                }, 5000);
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.remove();
+                }
+            }, 5000);
+        }
+
+        function disconnectWebSocket() {
+            if (websocket) {
+                websocket.close(1000, "User logout");
+                websocket = null;
             }
 
-            function disconnectWebSocket() {
-                if (websocket) {
-                    websocket.close(1000, "User logout");
-                    websocket = null;
-                }
+            // Clear ping interval
+            if (pingInterval) {
+                clearInterval(pingInterval);
+                pingInterval = null;
+            }
+        }
 
-                // Clear ping interval
-                if (pingInterval) {
-                    clearInterval(pingInterval);
-                    pingInterval = null;
-                }
+        // Helper to perform fetch calls with Authorization when available.
+        // Ensures Content-Type is set only for requests with a body to avoid
+        // triggering browser auth popups on 401 responses to GET requests.
+        function getAuthHeaders() {
+            const token = sessionStorage.getItem("access_token");
+            if (!token) return {};
+            return { Authorization: `Bearer ${token}` };
+        }
+        async function fetchWithAuth(url, options = {}) {
+            options.headers = options.headers || {};
+
+            // Merge auth headers without overwriting provided headers
+            const authHeaders = getAuthHeaders();
+            for (const k in authHeaders) {
+                if (!(k in options.headers))
+                    options.headers[k] = authHeaders[k];
             }
 
-            // Helper to perform fetch calls with Authorization when available.
-            // Ensures Content-Type is set only for requests with a body to avoid
-            // triggering browser auth popups on 401 responses to GET requests.
-            function getAuthHeaders() {
-                const token = sessionStorage.getItem("access_token");
-                if (!token) return {};
-                return { Authorization: `Bearer ${token}` };
-            }
-            async function fetchWithAuth(url, options = {}) {
-                options.headers = options.headers || {};
-
-                // Merge auth headers without overwriting provided headers
-                const authHeaders = getAuthHeaders();
-                for (const k in authHeaders) {
-                    if (!(k in options.headers))
-                        options.headers[k] = authHeaders[k];
-                }
-
-                // If there is a body and Content-Type isn't set, assume JSON
-                if (options.body) {
-                    const normalized = {};
-                    Object.keys(options.headers || {}).forEach(
-                        (k) =>
-                            (normalized[k.toLowerCase()] = options.headers[k])
-                    );
-                    if (!("content-type" in normalized)) {
-                        options.headers["Content-Type"] = "application/json";
-                    }
-                }
-
-                return fetch(url, options);
-            }
-
-            function formatDate(dateString) {
-                const date = new Date(dateString);
-                return (
-                    date.toLocaleDateString() + " " + date.toLocaleTimeString()
+            // If there is a body and Content-Type isn't set, assume JSON
+            if (options.body) {
+                const normalized = {};
+                Object.keys(options.headers || {}).forEach(
+                    (k) =>
+                        (normalized[k.toLowerCase()] = options.headers[k])
                 );
-            }
-
-            function getStatusBadge(status) {
-                const statusClasses = {
-                    reported: "bg-yellow-100 text-yellow-800",
-                    in_progress: "bg-blue-100 text-blue-800",
-                    resolved: "bg-green-100 text-green-800",
-                    closed: "bg-gray-100 text-gray-800",
-                };
-                return statusClasses[status] || "bg-gray-100 text-gray-800";
-            }
-
-            function getSeverityBadge(severity) {
-                const severityClasses = {
-                    low: "bg-green-100 text-green-800",
-                    medium: "bg-yellow-100 text-yellow-800",
-                    high: "bg-orange-100 text-orange-800",
-                    critical: "bg-red-100 text-red-800",
-                };
-                return severityClasses[severity] || "bg-gray-100 text-gray-800";
-            }
-
-            // API Functions
-            async function fetchComplaints() {
-                try {
-                    const params = new URLSearchParams({
-                        page: currentPage,
-                        page_size: pageSize,
-                        ...currentFilters,
-                    });
-
-                    const response = await fetchWithAuth(
-                        `${API_BASE_URL}/api/v1/complaints?${params}`
-                    );
-
-                    if (!response.ok) {
-                        if (response.status === 401) {
-                            // Token expired, redirect to login
-                            sessionStorage.clear();
-                            window.location.href = "/dashboard/login.html";
-                            return;
-                        }
-                        throw new Error("Failed to fetch complaints");
-                    }
-
-                    const data = await response.json();
-                    complaints = data.items;
-                    updateComplaintsTable(data);
-                    updatePagination(data);
-                } catch (error) {
-                    console.error("Error fetching complaints:", error);
-                    showError("Failed to load complaints. Please try again.");
+                if (!("content-type" in normalized)) {
+                    options.headers["Content-Type"] = "application/json";
                 }
             }
 
-            async function fetchPorters() {
-                try {
-                    const response = await fetchWithAuth(
-                        `${API_BASE_URL}/api/v1/porters`
-                    );
+            return fetch(url, options);
+        }
 
-                    if (response.ok) {
-                        porters = await response.json();
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return (
+                date.toLocaleDateString() + " " + date.toLocaleTimeString()
+            );
+        }
+
+        function getStatusBadge(status) {
+            const statusClasses = {
+                reported: "bg-yellow-100 text-yellow-800",
+                in_progress: "bg-blue-100 text-blue-800",
+                resolved: "bg-green-100 text-green-800",
+                closed: "bg-gray-100 text-gray-800",
+            };
+            return statusClasses[status] || "bg-gray-100 text-gray-800";
+        }
+
+        function getSeverityBadge(severity) {
+            const severityClasses = {
+                low: "bg-green-100 text-green-800",
+                medium: "bg-yellow-100 text-yellow-800",
+                high: "bg-orange-100 text-orange-800",
+                critical: "bg-red-100 text-red-800",
+            };
+            return severityClasses[severity] || "bg-gray-100 text-gray-800";
+        }
+
+        // API Functions
+        async function fetchComplaints() {
+            try {
+                const params = new URLSearchParams({
+                    page: currentPage,
+                    page_size: pageSize,
+                    ...currentFilters,
+                });
+
+                const response = await fetchWithAuth(
+                    `${API_BASE_URL}/api/v1/complaints?${params}`
+                );
+
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        // Token expired, redirect to login
+                        sessionStorage.clear();
+                        window.location.href = "/dashboard/login.html";
+                        return;
                     }
-                } catch (error) {
-                    console.error("Error fetching porters:", error);
+                    throw new Error("Failed to fetch complaints");
                 }
+
+                const data = await response.json();
+                complaints = data.items;
+                updateComplaintsTable(data);
+                updatePagination(data);
+            } catch (error) {
+                console.error("Error fetching complaints:", error);
+                showError("Failed to load complaints. Please try again.");
             }
+        }
 
-            async function fetchComplaintDetails(complaintId) {
-                try {
-                    const response = await fetchWithAuth(
-                        `${API_BASE_URL}/api/v1/complaints/${complaintId}`
-                    );
+        async function fetchPorters() {
+            try {
+                const response = await fetchWithAuth(
+                    `${API_BASE_URL}/api/v1/porters`
+                );
 
-                    if (!response.ok) {
-                        throw new Error("Failed to fetch complaint details");
+                if (response.ok) {
+                    porters = await response.json();
+                }
+            } catch (error) {
+                console.error("Error fetching porters:", error);
+            }
+        }
+
+        async function fetchComplaintDetails(complaintId) {
+            try {
+                const response = await fetchWithAuth(
+                    `${API_BASE_URL}/api/v1/complaints/${complaintId}`
+                );
+
+                if (!response.ok) {
+                    throw new Error("Failed to fetch complaint details");
+                }
+
+                return await response.json();
+            } catch (error) {
+                console.error("Error fetching complaint details:", error);
+                throw error;
+            }
+        }
+
+        async function updateComplaint(complaintId, updates) {
+            try {
+                const response = await fetchWithAuth(
+                    `${API_BASE_URL}/api/v1/complaints/${complaintId}`,
+                    {
+                        method: "PATCH",
+                        body: JSON.stringify(updates),
                     }
+                );
 
-                    return await response.json();
-                } catch (error) {
-                    console.error("Error fetching complaint details:", error);
-                    throw error;
-                }
-            }
-
-            async function updateComplaint(complaintId, updates) {
-                try {
-                    const response = await fetchWithAuth(
-                        `${API_BASE_URL}/api/v1/complaints/${complaintId}`,
-                        {
-                            method: "PATCH",
-                            body: JSON.stringify(updates),
-                        }
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(
+                        errorData.detail || "Failed to update complaint"
                     );
-
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(
-                            errorData.detail || "Failed to update complaint"
-                        );
-                    }
-
-                    return await response.json();
-                } catch (error) {
-                    console.error("Error updating complaint:", error);
-                    throw error;
                 }
+
+                return await response.json();
+            } catch (error) {
+                console.error("Error updating complaint:", error);
+                throw error;
             }
+        }
 
-            // UI Update Functions
-            function updateComplaintsTable(data) {
-                loadingRow.style.display = "none";
+        // UI Update Functions
+        function updateComplaintsTable(data) {
+            loadingRow.style.display = "none";
 
-                if (data.items.length === 0) {
-                    complaintsTableBody.innerHTML = `
+            if (data.items.length === 0) {
+                complaintsTableBody.innerHTML = `
                     <tr>
                         <td colspan="7" class="px-6 py-12 text-center text-gray-500">
                             No complaints found matching your criteria.
                         </td>
                     </tr>
                 `;
-                    return;
-                }
+                return;
+            }
 
-                complaintsTableBody.innerHTML = data.items
-                    .map(
-                        (complaint) => `
-                <tr class="hover:bg-gray-50 cursor-pointer" onclick="openComplaintModal('${
-                    complaint.id
-                }')">
+            complaintsTableBody.innerHTML = data.items
+                .map(
+                    (complaint) => `
+                <tr class="hover:bg-gray-50 cursor-pointer" onclick="openComplaintModal('${complaint.id
+                        }')">
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         ${complaint.id.substring(0, 8)}...
                     </td>
@@ -1232,84 +924,83 @@
                     </td>
                 </tr>
             `
-                    )
-                    .join("");
+                )
+                .join("");
+        }
+
+        function updatePagination(data) {
+            const start = (data.page - 1) * data.page_size + 1;
+            const end = Math.min(data.page * data.page_size, data.total);
+
+            showingStart.textContent = start;
+            showingEnd.textContent = end;
+            showingTotal.textContent = data.total;
+            totalCount.textContent = `${data.total} complaints`;
+
+            // Update pagination buttons
+            prevPage.disabled = data.page === 1;
+            nextPage.disabled = data.page === data.total_pages;
+            prevPageMobile.disabled = data.page === 1;
+            nextPageMobile.disabled = data.page === data.total_pages;
+
+            // Generate page numbers
+            const maxVisiblePages = 5;
+            let startPage = Math.max(
+                1,
+                data.page - Math.floor(maxVisiblePages / 2)
+            );
+            let endPage = Math.min(
+                data.total_pages,
+                startPage + maxVisiblePages - 1
+            );
+
+            if (endPage - startPage + 1 < maxVisiblePages) {
+                startPage = Math.max(1, endPage - maxVisiblePages + 1);
             }
 
-            function updatePagination(data) {
-                const start = (data.page - 1) * data.page_size + 1;
-                const end = Math.min(data.page * data.page_size, data.total);
-
-                showingStart.textContent = start;
-                showingEnd.textContent = end;
-                showingTotal.textContent = data.total;
-                totalCount.textContent = `${data.total} complaints`;
-
-                // Update pagination buttons
-                prevPage.disabled = data.page === 1;
-                nextPage.disabled = data.page === data.total_pages;
-                prevPageMobile.disabled = data.page === 1;
-                nextPageMobile.disabled = data.page === data.total_pages;
-
-                // Generate page numbers
-                const maxVisiblePages = 5;
-                let startPage = Math.max(
-                    1,
-                    data.page - Math.floor(maxVisiblePages / 2)
-                );
-                let endPage = Math.min(
-                    data.total_pages,
-                    startPage + maxVisiblePages - 1
-                );
-
-                if (endPage - startPage + 1 < maxVisiblePages) {
-                    startPage = Math.max(1, endPage - maxVisiblePages + 1);
-                }
-
-                pageNumbers.innerHTML = "";
-                for (let i = startPage; i <= endPage; i++) {
-                    const pageButton = document.createElement("button");
-                    pageButton.className = `relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                        i === data.page
-                            ? "z-10 bg-primary-50 border-primary-500 text-primary-600"
-                            : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
+            pageNumbers.innerHTML = "";
+            for (let i = startPage; i <= endPage; i++) {
+                const pageButton = document.createElement("button");
+                pageButton.className = `relative inline-flex items-center px-4 py-2 border text-sm font-medium ${i === data.page
+                        ? "z-10 bg-primary-50 border-primary-500 text-primary-600"
+                        : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
                     }`;
-                    pageButton.textContent = i;
-                    pageButton.onclick = () => {
-                        currentPage = i;
-                        fetchComplaints();
-                    };
-                    pageNumbers.appendChild(pageButton);
-                }
+                pageButton.textContent = i;
+                pageButton.onclick = () => {
+                    currentPage = i;
+                    fetchComplaints();
+                };
+                pageNumbers.appendChild(pageButton);
             }
+        }
 
-            function updateFilters() {
-                currentFilters = {};
-                if (statusFilter.value)
-                    currentFilters.status = statusFilter.value;
-                if (hostelFilter.value)
-                    currentFilters.hostel = hostelFilter.value;
-                if (categoryFilter.value)
-                    currentFilters.category = categoryFilter.value;
-                if (severityFilter.value)
-                    currentFilters.severity = severityFilter.value;
+        function updateFilters() {
+            currentFilters = {};
+            if (statusFilter.value)
+                currentFilters.status = statusFilter.value;
+            if (hostelFilter.value)
+                currentFilters.hostel = hostelFilter.value;
+            if (categoryFilter.value)
+                currentFilters.category = categoryFilter.value;
+            if (severityFilter.value)
+                currentFilters.severity = severityFilter.value;
 
-                currentPage = 1;
-                fetchComplaints();
+            currentPage = 1;
+            fetchComplaints();
+        }
+
+        // Modal Functions
+        async function openComplaintModal(complaintId) {
+            try {
+                const complaint = await fetchComplaintDetails(complaintId);
+                showComplaintModal(complaint);
+            } catch (error) {
+                showError("Failed to load complaint details");
             }
+        }
 
-            // Modal Functions
-            async function openComplaintModal(complaintId) {
-                try {
-                    const complaint = await fetchComplaintDetails(complaintId);
-                    showComplaintModal(complaint);
-                } catch (error) {
-                    showError("Failed to load complaint details");
-                }
-            }
-
-            function showComplaintModal(complaint) {
-                modalContent.innerHTML = `
+        function showComplaintModal(complaint) {
+            modalContent.innerHTML = `
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <!-- Left Column - Complaint Details -->
                     <div class="space-y-6">
@@ -1318,40 +1009,35 @@
                             <dl class="grid grid-cols-1 gap-4">
                                 <div>
                                     <dt class="text-sm font-medium text-gray-500">ID</dt>
-                                    <dd class="mt-1 text-sm text-gray-900">${
-                                        complaint.id
-                                    }</dd>
+                                    <dd class="mt-1 text-sm text-gray-900">${complaint.id
+                }</dd>
                                 </div>
                                 <div>
                                     <dt class="text-sm font-medium text-gray-500">Hostel</dt>
-                                    <dd class="mt-1 text-sm text-gray-900">${
-                                        complaint.hostel
-                                    }</dd>
+                                    <dd class="mt-1 text-sm text-gray-900">${complaint.hostel
+                }</dd>
                                 </div>
                                 <div>
                                     <dt class="text-sm font-medium text-gray-500">Wing</dt>
-                                    <dd class="mt-1 text-sm text-gray-900">${
-                                        complaint.wing || "N/A"
-                                    }</dd>
+                                    <dd class="mt-1 text-sm text-gray-900">${complaint.wing || "N/A"
+                }</dd>
                                 </div>
                                 <div>
                                     <dt class="text-sm font-medium text-gray-500">Room Number</dt>
-                                    <dd class="mt-1 text-sm text-gray-900">${
-                                        complaint.room_number
-                                    }</dd>
+                                    <dd class="mt-1 text-sm text-gray-900">${complaint.room_number
+                }</dd>
                                 </div>
                                 <div>
                                     <dt class="text-sm font-medium text-gray-500">Category</dt>
-                                    <dd class="mt-1 text-sm text-gray-900">${
-                                        complaint.category
-                                    }</dd>
+                                    <dd class="mt-1 text-sm text-gray-900">${complaint.category
+                }</dd>
                                 </div>
                                 <div>
                                     <dt class="text-sm font-medium text-gray-500">Severity</dt>
                                     <dd class="mt-1">
                                         <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getSeverityBadge(
-                                            complaint.severity
-                                        )}">
+                    complaint.severity
+                )}">
                                             ${complaint.severity}
                                         </span>
                                     </dd>
@@ -1360,58 +1046,55 @@
                                     <dt class="text-sm font-medium text-gray-500">Status</dt>
                                     <dd class="mt-1">
                                         <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(
-                                            complaint.status
-                                        )}">
+                    complaint.status
+                )}">
                                             ${complaint.status.replace(
-                                                "_",
-                                                " "
-                                            )}
+                    "_",
+                    " "
+                )}
                                         </span>
                                     </dd>
                                 </div>
                                 <div>
                                     <dt class="text-sm font-medium text-gray-500">Created</dt>
                                     <dd class="mt-1 text-sm text-gray-900">${formatDate(
-                                        complaint.created_at
-                                    )}</dd>
+                    complaint.created_at
+                )}</dd>
                                 </div>
                                 <div>
                                     <dt class="text-sm font-medium text-gray-500">Updated</dt>
-                                    <dd class="mt-1 text-sm text-gray-900">${
-                                        complaint.updated_at
-                                            ? formatDate(complaint.updated_at)
-                                            : "Never"
-                                    }</dd>
+                                    <dd class="mt-1 text-sm text-gray-900">${complaint.updated_at
+                    ? formatDate(complaint.updated_at)
+                    : "Never"
+                }</dd>
                                 </div>
                             </dl>
                         </div>
 
                         <div>
                             <h4 class="text-lg font-medium text-gray-900 mb-4">Description</h4>
-                            <p class="text-sm text-gray-700 bg-gray-50 p-4 rounded-lg">${
-                                complaint.description
-                            }</p>
+                            <p class="text-sm text-gray-700 bg-gray-50 p-4 rounded-lg">${complaint.description
+                }</p>
                         </div>
 
-                        ${
-                            complaint.photo_urls &&
-                            complaint.photo_urls.length > 0
-                                ? `
+                        ${complaint.photo_urls &&
+                    complaint.photo_urls.length > 0
+                    ? `
                         <div>
                             <h4 class="text-lg font-medium text-gray-900 mb-4">Photos</h4>
                             <div class="grid grid-cols-2 gap-4">
                                 ${complaint.photo_urls
-                                    .map(
-                                        (url) => `
+                        .map(
+                            (url) => `
                                     <img src="${url}" alt="Complaint photo" class="w-full h-32 object-cover rounded-lg border border-gray-200">
                                 `
-                                    )
-                                    .join("")}
+                        )
+                        .join("")}
                             </div>
                         </div>
                         `
-                                : ""
-                        }
+                    : ""
+                }
                     </div>
 
                     <!-- Right Column - Actions -->
@@ -1423,26 +1106,22 @@
                             <div class="mb-6">
                                 <label for="statusSelect" class="block text-sm font-medium text-gray-700 mb-2">Update Status</label>
                                 <select id="statusSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
-                                    <option value="reported" ${
-                                        complaint.status === "reported"
-                                            ? "selected"
-                                            : ""
-                                    }>Reported</option>
-                                    <option value="in_progress" ${
-                                        complaint.status === "in_progress"
-                                            ? "selected"
-                                            : ""
-                                    }>In Progress</option>
-                                    <option value="resolved" ${
-                                        complaint.status === "resolved"
-                                            ? "selected"
-                                            : ""
-                                    }>Resolved</option>
-                                    <option value="closed" ${
-                                        complaint.status === "closed"
-                                            ? "selected"
-                                            : ""
-                                    }>Closed</option>
+                                    <option value="reported" ${complaint.status === "reported"
+                    ? "selected"
+                    : ""
+                }>Reported</option>
+                                    <option value="in_progress" ${complaint.status === "in_progress"
+                    ? "selected"
+                    : ""
+                }>In Progress</option>
+                                    <option value="resolved" ${complaint.status === "resolved"
+                    ? "selected"
+                    : ""
+                }>Resolved</option>
+                                    <option value="closed" ${complaint.status === "closed"
+                    ? "selected"
+                    : ""
+                }>Closed</option>
                                 </select>
                             </div>
 
@@ -1452,21 +1131,19 @@
                                 <select id="porterSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
                                     <option value="">Unassigned</option>
                                     ${porters
-                                        .map(
-                                            (porter) => `
-                                        <option value="${porter.id}" ${
-                                                complaint.assigned_porter_id ===
-                                                porter.id
-                                                    ? "selected"
-                                                    : ""
-                                            }>
-                                            ${porter.full_name} (${
-                                                porter.email || porter.phone
-                                            })
+                    .map(
+                        (porter) => `
+                                        <option value="${porter.id}" ${complaint.assigned_porter_id ===
+                                porter.id
+                                ? "selected"
+                                : ""
+                            }>
+                                            ${porter.full_name} (${porter.email || porter.phone
+                            })
                                         </option>
                                     `
-                                        )
-                                        .join("")}
+                    )
+                    .join("")}
                                 </select>
                             </div>
 
@@ -1482,406 +1159,405 @@
                         </div>
 
                         <!-- Current Assignment -->
-                        ${
-                            complaint.assigned_porter_id
-                                ? `
+                        ${complaint.assigned_porter_id
+                    ? `
                         <div>
                             <h4 class="text-lg font-medium text-gray-900 mb-4">Current Assignment</h4>
                             <div class="bg-gray-50 p-4 rounded-lg">
                                 <p class="text-sm text-gray-700">
-                                    Assigned to: ${
-                                        porters.find(
-                                            (p) =>
-                                                p.id ===
-                                                complaint.assigned_porter_id
-                                        )?.full_name || "Unknown Porter"
-                                    }
+                                    Assigned to: ${porters.find(
+                        (p) =>
+                            p.id ===
+                            complaint.assigned_porter_id
+                    )?.full_name || "Unknown Porter"
+                    }
                                 </p>
                             </div>
                         </div>
                         `
-                                : ""
-                        }
+                    : ""
+                }
                     </div>
                 </div>
             `;
 
-                // Add event listeners for modal actions
-                document.getElementById("updateComplaint").onclick = () =>
-                    updateComplaintFromModal(complaint.id);
-                document.getElementById("assignToMe").onclick = () =>
-                    assignToMe(complaint.id);
+            // Add event listeners for modal actions
+            document.getElementById("updateComplaint").onclick = () =>
+                updateComplaintFromModal(complaint.id);
+            document.getElementById("assignToMe").onclick = () =>
+                assignToMe(complaint.id);
 
-                complaintModal.classList.remove("hidden");
-            }
+            complaintModal.classList.remove("hidden");
+        }
 
-            async function updateComplaintFromModal(complaintId) {
-                const status = document.getElementById("statusSelect").value;
-                const porterId = document.getElementById("porterSelect").value;
+        async function updateComplaintFromModal(complaintId) {
+            const status = document.getElementById("statusSelect").value;
+            const porterId = document.getElementById("porterSelect").value;
 
-                const updates = {};
-                if (status) updates.status = status;
-                if (porterId) updates.assigned_porter_id = porterId;
+            const updates = {};
+            if (status) updates.status = status;
+            if (porterId) updates.assigned_porter_id = porterId;
 
-                try {
-                    await updateComplaint(complaintId, updates);
-                    complaintModal.classList.add("hidden");
-                    fetchComplaints(); // Refresh the list
-                    showSuccess("Complaint updated successfully");
-                } catch (error) {
-                    showError(error.message);
-                }
-            }
-
-            async function assignToMe(complaintId) {
-                const userId = sessionStorage.getItem("user_id");
-                if (!userId) {
-                    showError("User ID not found");
-                    return;
-                }
-
-                try {
-                    await updateComplaint(complaintId, {
-                        assigned_porter_id: userId,
-                    });
-                    complaintModal.classList.add("hidden");
-                    fetchComplaints(); // Refresh the list
-                    showSuccess("Complaint assigned to you");
-                } catch (error) {
-                    showError(error.message);
-                }
-            }
-
-            function showError(message) {
-                // Simple error notification - could be enhanced with a proper toast system
-                alert("Error: " + message);
-            }
-
-            function showSuccess(message) {
-                // Simple success notification - could be enhanced with a proper toast system
-                alert("Success: " + message);
-            }
-
-            // Event Listeners
-            refreshButton.onclick = () => {
-                currentPage = 1;
-                fetchComplaints();
-            };
-
-            closeModal.onclick = () => {
+            try {
+                await updateComplaint(complaintId, updates);
                 complaintModal.classList.add("hidden");
-            };
+                fetchComplaints(); // Refresh the list
+                showSuccess("Complaint updated successfully");
+            } catch (error) {
+                showError(error.message);
+            }
+        }
 
-            logoutButton.onclick = () => {
-                disconnectWebSocket();
-                sessionStorage.clear();
+        async function assignToMe(complaintId) {
+            const userId = sessionStorage.getItem("user_id");
+            if (!userId) {
+                showError("User ID not found");
+                return;
+            }
+
+            try {
+                await updateComplaint(complaintId, {
+                    assigned_porter_id: userId,
+                });
+                complaintModal.classList.add("hidden");
+                fetchComplaints(); // Refresh the list
+                showSuccess("Complaint assigned to you");
+            } catch (error) {
+                showError(error.message);
+            }
+        }
+
+        function showError(message) {
+            // Simple error notification - could be enhanced with a proper toast system
+            alert("Error: " + message);
+        }
+
+        function showSuccess(message) {
+            // Simple success notification - could be enhanced with a proper toast system
+            alert("Success: " + message);
+        }
+
+        // Event Listeners
+        refreshButton.onclick = () => {
+            currentPage = 1;
+            fetchComplaints();
+        };
+
+        closeModal.onclick = () => {
+            complaintModal.classList.add("hidden");
+        };
+
+        logoutButton.onclick = () => {
+            disconnectWebSocket();
+            sessionStorage.clear();
+            window.location.href = "/dashboard/login.html";
+        };
+
+        // Filter event listeners
+        [
+            statusFilter,
+            hostelFilter,
+            categoryFilter,
+            severityFilter,
+        ].forEach((filter) => {
+            filter.onchange = updateFilters;
+        });
+
+        // Pagination event listeners
+        prevPage.onclick = () => {
+            if (currentPage > 1) {
+                currentPage--;
+                fetchComplaints();
+            }
+        };
+
+        nextPage.onclick = () => {
+            currentPage++;
+            fetchComplaints();
+        };
+
+        prevPageMobile.onclick = () => {
+            if (currentPage > 1) {
+                currentPage--;
+                fetchComplaints();
+            }
+        };
+
+        nextPageMobile.onclick = () => {
+            currentPage++;
+            fetchComplaints();
+        };
+
+        // Initialize
+        document.addEventListener("DOMContentLoaded", async () => {
+            // Check authentication
+            if (!sessionStorage.getItem("access_token")) {
                 window.location.href = "/dashboard/login.html";
-            };
+                return;
+            }
 
-            // Filter event listeners
-            [
-                statusFilter,
-                hostelFilter,
-                categoryFilter,
-                severityFilter,
-            ].forEach((filter) => {
-                filter.onchange = updateFilters;
-            });
+            // Set user info
+            await loadUserProfile();
 
-            // Pagination event listeners
-            prevPage.onclick = () => {
-                if (currentPage > 1) {
-                    currentPage--;
-                    fetchComplaints();
-                }
-            };
+            // Load initial data
+            await fetchPorters();
+            await fetchComplaints();
 
-            nextPage.onclick = () => {
-                currentPage++;
-                fetchComplaints();
-            };
+            // Connect WebSocket for real-time updates
+            connectWebSocket();
 
-            prevPageMobile.onclick = () => {
-                if (currentPage > 1) {
-                    currentPage--;
-                    fetchComplaints();
-                }
-            };
+            // Populate filter options
+            // Fetch hostels and categories from the API so the dashboard stays
+            // in sync with the backend and the bot's canonical list.
+            async function fetchHostelsAndCategories() {
+                // Hostels are embedded in the HTML as a permanent list to match the bot's
+                // canonical `HOSTELS`. We keep that static so the dashboard dropdown
+                // is always populated even before authentication.
 
-            nextPageMobile.onclick = () => {
-                currentPage++;
-                fetchComplaints();
-            };
-
-            // Initialize
-            document.addEventListener("DOMContentLoaded", async () => {
-                // Check authentication
-                if (!sessionStorage.getItem("access_token")) {
-                    window.location.href = "/dashboard/login.html";
-                    return;
-                }
-
-                // Set user info
-                await loadUserProfile();
-
-                // Load initial data
-                await fetchPorters();
-                await fetchComplaints();
-
-                // Connect WebSocket for real-time updates
-                connectWebSocket();
-
-                // Populate filter options
-                // Fetch hostels and categories from the API so the dashboard stays
-                // in sync with the backend and the bot's canonical list.
-                async function fetchHostelsAndCategories() {
-                    // Hostels are embedded in the HTML as a permanent list to match the bot's
-                    // canonical `HOSTELS`. We keep that static so the dashboard dropdown
-                    // is always populated even before authentication.
-
-                    // Populate categories using the canonical CATEGORY_KEY_TO_LABEL mapping
-                    // so the dashboard matches the bot exactly in label text and order.
-                    // We still attempt to fetch the server categories to include any
-                    // server-side-only categories, but we render in the canonical order.
-                    try {
-                        let serverCategories = [];
-                        const cRes = await fetch(`${API_BASE_URL}/api/v1/categories`);
-                        if (cRes && cRes.ok) {
-                            serverCategories = await cRes.json();
-                        }
-
-                        // Build a map of server category keys for quick lookup
-                        const serverKeys = new Set((serverCategories || []).map(c => c.name));
-
-                        // First, add canonical categories in the order defined in CATEGORY_KEY_TO_LABEL
-                        Object.keys(CATEGORY_KEY_TO_LABEL).forEach((storageKey) => {
-                            const option = document.createElement("option");
-                            option.value = storageKey;
-                            option.textContent = CATEGORY_KEY_TO_LABEL[storageKey];
-                            categoryFilter.appendChild(option);
-                            // Mark as seen so we don't duplicate later
-                            if (serverKeys.has(storageKey)) serverKeys.delete(storageKey);
-                        });
-
-                        // Append any server-side-only categories that are not in our canonical mapping
-                        // Place them after the canonical list so admins can still see additional types.
-                        if (serverCategories && serverCategories.length) {
-                            serverCategories.forEach((category) => {
-                                if (!Object.prototype.hasOwnProperty.call(CATEGORY_KEY_TO_LABEL, category.name)) {
-                                    const option = document.createElement("option");
-                                    option.value = category.name;
-                                    option.textContent = category.display_name || category.name;
-                                    categoryFilter.appendChild(option);
-                                }
-                            });
-                        }
-                    } catch (err) {
-                        console.error("Error fetching categories:", err);
-
-                        // Fall back to canonical mapping if fetch fails
-                        Object.keys(CATEGORY_KEY_TO_LABEL).forEach((storageKey) => {
-                            const option = document.createElement("option");
-                            option.value = storageKey;
-                            option.textContent = CATEGORY_KEY_TO_LABEL[storageKey];
-                            categoryFilter.appendChild(option);
-                        });
-                    }
-                }
-
-                // Populate filters from API
-                fetchHostelsAndCategories();
-            });
-
-            // Profile Management Functions
-            let currentUser = null;
-
-            async function loadUserProfile() {
+                // Populate categories using the canonical CATEGORY_KEY_TO_LABEL mapping
+                // so the dashboard matches the bot exactly in label text and order.
+                // We still attempt to fetch the server categories to include any
+                // server-side-only categories, but we render in the canonical order.
                 try {
-                    const response = await fetch(`${API_BASE_URL}/api/v1/profile/me`, {
-                        headers: getAuthHeaders(),
+                    let serverCategories = [];
+                    const cRes = await fetch(`${API_BASE_URL}/api/v1/categories`);
+                    if (cRes && cRes.ok) {
+                        serverCategories = await cRes.json();
+                    }
+
+                    // Build a map of server category keys for quick lookup
+                    const serverKeys = new Set((serverCategories || []).map(c => c.name));
+
+                    // First, add canonical categories in the order defined in CATEGORY_KEY_TO_LABEL
+                    Object.keys(CATEGORY_KEY_TO_LABEL).forEach((storageKey) => {
+                        const option = document.createElement("option");
+                        option.value = storageKey;
+                        option.textContent = CATEGORY_KEY_TO_LABEL[storageKey];
+                        categoryFilter.appendChild(option);
+                        // Mark as seen so we don't duplicate later
+                        if (serverKeys.has(storageKey)) serverKeys.delete(storageKey);
                     });
 
-                    if (!response.ok) {
-                        throw new Error("Failed to load user profile");
+                    // Append any server-side-only categories that are not in our canonical mapping
+                    // Place them after the canonical list so admins can still see additional types.
+                    if (serverCategories && serverCategories.length) {
+                        serverCategories.forEach((category) => {
+                            if (!Object.prototype.hasOwnProperty.call(CATEGORY_KEY_TO_LABEL, category.name)) {
+                                const option = document.createElement("option");
+                                option.value = category.name;
+                                option.textContent = category.display_name || category.name;
+                                categoryFilter.appendChild(option);
+                            }
+                        });
                     }
+                } catch (err) {
+                    console.error("Error fetching categories:", err);
 
-                    currentUser = await response.json();
-                    
-                    // Update user info in header
-                    userInfo.textContent = currentUser.email || `User ID: ${currentUser.id}`;
-                    
-                    // Populate profile modal if it's open
-                    if (!profileModal.classList.contains("hidden")) {
-                        populateProfileModal();
-                    }
-                } catch (error) {
-                    console.error("Failed to load user profile:", error);
-                    const userId = sessionStorage.getItem("user_id");
-                    userInfo.textContent = `User ID: ${userId}`;
+                    // Fall back to canonical mapping if fetch fails
+                    Object.keys(CATEGORY_KEY_TO_LABEL).forEach((storageKey) => {
+                        const option = document.createElement("option");
+                        option.value = storageKey;
+                        option.textContent = CATEGORY_KEY_TO_LABEL[storageKey];
+                        categoryFilter.appendChild(option);
+                    });
                 }
             }
 
-            function populateProfileModal() {
-                if (!currentUser) return;
+            // Populate filters from API
+            fetchHostelsAndCategories();
+        });
 
-                document.getElementById("profileEmail").value = currentUser.email || "";
-                document.getElementById("profileFullName").value = currentUser.full_name || "";
-                document.getElementById("profileRole").value = (currentUser.role || "porter").toUpperCase();
+        // Profile Management Functions
+        let currentUser = null;
 
-                // Show invite admin section only for admins
-                const inviteAdminSection = document.getElementById("inviteAdminSection");
-                if (currentUser.role === "admin") {
-                    inviteAdminSection.classList.remove("hidden");
+        async function loadUserProfile() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/v1/profile/me`, {
+                    headers: getAuthHeaders(),
+                });
+
+                if (!response.ok) {
+                    throw new Error("Failed to load user profile");
+                }
+
+                currentUser = await response.json();
+
+                // Update user info in header
+                userInfo.textContent = currentUser.email || `User ID: ${currentUser.id}`;
+
+                // Populate profile modal if it's open
+                if (!profileModal.classList.contains("hidden")) {
+                    populateProfileModal();
+                }
+            } catch (error) {
+                console.error("Failed to load user profile:", error);
+                const userId = sessionStorage.getItem("user_id");
+                userInfo.textContent = `User ID: ${userId}`;
+            }
+        }
+
+        function populateProfileModal() {
+            if (!currentUser) return;
+
+            document.getElementById("profileEmail").value = currentUser.email || "";
+            document.getElementById("profileFullName").value = currentUser.full_name || "";
+            document.getElementById("profileRole").value = (currentUser.role || "porter").toUpperCase();
+
+            // Show invite admin section only for admins
+            const inviteAdminSection = document.getElementById("inviteAdminSection");
+            if (currentUser.role === "admin") {
+                inviteAdminSection.classList.remove("hidden");
+            } else {
+                inviteAdminSection.classList.add("hidden");
+            }
+        }
+
+        // Profile Modal Event Handlers
+        profileButton.addEventListener("click", async () => {
+            await loadUserProfile();
+            populateProfileModal();
+            profileModal.classList.remove("hidden");
+        });
+
+        closeProfileModal.addEventListener("click", () => {
+            profileModal.classList.add("hidden");
+            // Reset forms
+            document.getElementById("changePasswordForm").reset();
+            document.getElementById("inviteAdminForm").reset();
+            document.getElementById("passwordChangeMessage").classList.add("hidden");
+            document.getElementById("inviteMessage").classList.add("hidden");
+        });
+
+        // Close modal when clicking outside
+        profileModal.addEventListener("click", (e) => {
+            if (e.target === profileModal) {
+                closeProfileModal.click();
+            }
+        });
+
+        // Change Password Form Handler
+        document.getElementById("changePasswordForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            const currentPassword = document.getElementById("currentPassword").value;
+            const newPassword = document.getElementById("newPassword").value;
+            const confirmPassword = document.getElementById("confirmPassword").value;
+            const messageDiv = document.getElementById("passwordChangeMessage");
+            const button = document.getElementById("changePasswordButton");
+            const buttonText = document.getElementById("changePasswordButtonText");
+            const spinner = document.getElementById("changePasswordSpinner");
+
+            // Validate passwords match
+            if (newPassword !== confirmPassword) {
+                messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
+                messageDiv.innerHTML = '<p class="text-sm text-red-800">New passwords do not match</p>';
+                messageDiv.classList.remove("hidden");
+                return;
+            }
+
+            try {
+                button.disabled = true;
+                buttonText.classList.add("hidden");
+                spinner.classList.remove("hidden");
+                messageDiv.classList.add("hidden");
+
+                const response = await fetch(`${API_BASE_URL}/api/v1/profile/change-password`, {
+                    method: "POST",
+                    headers: {
+                        ...getAuthHeaders(),
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        current_password: currentPassword,
+                        new_password: newPassword,
+                    }),
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    messageDiv.className = "bg-green-50 border border-green-200 rounded-lg p-4";
+                    messageDiv.innerHTML = '<p class="text-sm text-green-800">Password changed successfully!</p>';
+                    document.getElementById("changePasswordForm").reset();
                 } else {
-                    inviteAdminSection.classList.add("hidden");
+                    messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
+                    messageDiv.innerHTML = `<p class="text-sm text-red-800">${data.detail || "Failed to change password"}</p>`;
                 }
+                messageDiv.classList.remove("hidden");
+            } catch (error) {
+                console.error("Password change error:", error);
+                messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
+                messageDiv.innerHTML = '<p class="text-sm text-red-800">An error occurred. Please try again.</p>';
+                messageDiv.classList.remove("hidden");
+            } finally {
+                button.disabled = false;
+                buttonText.classList.remove("hidden");
+                spinner.classList.add("hidden");
+            }
+        });
+
+        // Invite Admin Form Handler
+        document.getElementById("inviteAdminForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            const email = document.getElementById("inviteEmail").value.trim();
+            const messageDiv = document.getElementById("inviteMessage");
+            const button = document.getElementById("inviteAdminButton");
+            const buttonText = document.getElementById("inviteAdminButtonText");
+            const spinner = document.getElementById("inviteAdminSpinner");
+
+            // Basic email validation
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
+                messageDiv.innerHTML = '<p class="text-sm text-red-800">Please enter a valid email address</p>';
+                messageDiv.classList.remove("hidden");
+                return;
             }
 
-            // Profile Modal Event Handlers
-            profileButton.addEventListener("click", async () => {
-                await loadUserProfile();
-                populateProfileModal();
-                profileModal.classList.remove("hidden");
-            });
+            try {
+                button.disabled = true;
+                buttonText.classList.add("hidden");
+                spinner.classList.remove("hidden");
+                messageDiv.classList.add("hidden");
 
-            closeProfileModal.addEventListener("click", () => {
-                profileModal.classList.add("hidden");
-                // Reset forms
-                document.getElementById("changePasswordForm").reset();
-                document.getElementById("inviteAdminForm").reset();
-                document.getElementById("passwordChangeMessage").classList.add("hidden");
-                document.getElementById("inviteMessage").classList.add("hidden");
-            });
+                const response = await fetch(`${API_BASE_URL}/auth/admin/invite`, {
+                    method: "POST",
+                    headers: {
+                        ...getAuthHeaders(),
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ email }),
+                });
 
-            // Close modal when clicking outside
-            profileModal.addEventListener("click", (e) => {
-                if (e.target === profileModal) {
-                    closeProfileModal.click();
-                }
-            });
+                const data = await response.json();
 
-            // Change Password Form Handler
-            document.getElementById("changePasswordForm").addEventListener("submit", async (e) => {
-                e.preventDefault();
-                
-                const currentPassword = document.getElementById("currentPassword").value;
-                const newPassword = document.getElementById("newPassword").value;
-                const confirmPassword = document.getElementById("confirmPassword").value;
-                const messageDiv = document.getElementById("passwordChangeMessage");
-                const button = document.getElementById("changePasswordButton");
-                const buttonText = document.getElementById("changePasswordButtonText");
-                const spinner = document.getElementById("changePasswordSpinner");
-
-                // Validate passwords match
-                if (newPassword !== confirmPassword) {
+                if (response.ok) {
+                    messageDiv.className = "bg-green-50 border border-green-200 rounded-lg p-4";
+                    messageDiv.innerHTML = `<p class="text-sm text-green-800">Invitation sent successfully to ${email}!</p>`;
+                    document.getElementById("inviteAdminForm").reset();
+                } else {
                     messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
-                    messageDiv.innerHTML = '<p class="text-sm text-red-800">New passwords do not match</p>';
-                    messageDiv.classList.remove("hidden");
-                    return;
+                    messageDiv.innerHTML = `<p class="text-sm text-red-800">${data.detail || "Failed to send invitation"}</p>`;
                 }
+                messageDiv.classList.remove("hidden");
+            } catch (error) {
+                console.error("Invite admin error:", error);
+                messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
+                messageDiv.innerHTML = '<p class="text-sm text-red-800">An error occurred. Please try again.</p>';
+                messageDiv.classList.remove("hidden");
+            } finally {
+                button.disabled = false;
+                buttonText.classList.remove("hidden");
+                spinner.classList.add("hidden");
+            }
+        });
 
-                try {
-                    button.disabled = true;
-                    buttonText.classList.add("hidden");
-                    spinner.classList.remove("hidden");
-                    messageDiv.classList.add("hidden");
+        // Cleanup on page unload
+        window.addEventListener("beforeunload", () => {
+            disconnectWebSocket();
+        });
+    </script>
+</body>
 
-                    const response = await fetch(`${API_BASE_URL}/api/v1/profile/change-password`, {
-                        method: "POST",
-                        headers: {
-                            ...getAuthHeaders(),
-                            "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify({
-                            current_password: currentPassword,
-                            new_password: newPassword,
-                        }),
-                    });
-
-                    const data = await response.json();
-
-                    if (response.ok) {
-                        messageDiv.className = "bg-green-50 border border-green-200 rounded-lg p-4";
-                        messageDiv.innerHTML = '<p class="text-sm text-green-800">Password changed successfully!</p>';
-                        document.getElementById("changePasswordForm").reset();
-                    } else {
-                        messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
-                        messageDiv.innerHTML = `<p class="text-sm text-red-800">${data.detail || "Failed to change password"}</p>`;
-                    }
-                    messageDiv.classList.remove("hidden");
-                } catch (error) {
-                    console.error("Password change error:", error);
-                    messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
-                    messageDiv.innerHTML = '<p class="text-sm text-red-800">An error occurred. Please try again.</p>';
-                    messageDiv.classList.remove("hidden");
-                } finally {
-                    button.disabled = false;
-                    buttonText.classList.remove("hidden");
-                    spinner.classList.add("hidden");
-                }
-            });
-
-            // Invite Admin Form Handler
-            document.getElementById("inviteAdminForm").addEventListener("submit", async (e) => {
-                e.preventDefault();
-
-                const email = document.getElementById("inviteEmail").value.trim();
-                const messageDiv = document.getElementById("inviteMessage");
-                const button = document.getElementById("inviteAdminButton");
-                const buttonText = document.getElementById("inviteAdminButtonText");
-                const spinner = document.getElementById("inviteAdminSpinner");
-
-                // Basic email validation
-                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                if (!emailRegex.test(email)) {
-                    messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
-                    messageDiv.innerHTML = '<p class="text-sm text-red-800">Please enter a valid email address</p>';
-                    messageDiv.classList.remove("hidden");
-                    return;
-                }
-
-                try {
-                    button.disabled = true;
-                    buttonText.classList.add("hidden");
-                    spinner.classList.remove("hidden");
-                    messageDiv.classList.add("hidden");
-
-                    const response = await fetch(`${API_BASE_URL}/auth/admin/invite`, {
-                        method: "POST",
-                        headers: {
-                            ...getAuthHeaders(),
-                            "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify({ email }),
-                    });
-
-                    const data = await response.json();
-
-                    if (response.ok) {
-                        messageDiv.className = "bg-green-50 border border-green-200 rounded-lg p-4";
-                        messageDiv.innerHTML = `<p class="text-sm text-green-800">Invitation sent successfully to ${email}!</p>`;
-                        document.getElementById("inviteAdminForm").reset();
-                    } else {
-                        messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
-                        messageDiv.innerHTML = `<p class="text-sm text-red-800">${data.detail || "Failed to send invitation"}</p>`;
-                    }
-                    messageDiv.classList.remove("hidden");
-                } catch (error) {
-                    console.error("Invite admin error:", error);
-                    messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
-                    messageDiv.innerHTML = '<p class="text-sm text-red-800">An error occurred. Please try again.</p>';
-                    messageDiv.classList.remove("hidden");
-                } finally {
-                    button.disabled = false;
-                    buttonText.classList.remove("hidden");
-                    spinner.classList.add("hidden");
-                }
-            });
-
-            // Cleanup on page unload
-            window.addEventListener("beforeunload", () => {
-                disconnectWebSocket();
-            });
-        </script>
-    </body>
 </html>

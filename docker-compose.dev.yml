@@ -51,7 +51,7 @@ services:
         env_file:
             - ./fastapi-backend/.env
         environment:
-            DATABASE_URL: postgresql+psycopg2://cms_user:cms_password@postgres:5432/cms_db
+            DATABASE_URL: postgresql+asyncpg://cms_user:cms_password@postgres:5432/cms_db
             STORAGE_PROVIDER: s3
             S3_BUCKET: complaint-photos
             S3_REGION: us-east-1
@@ -80,7 +80,7 @@ services:
         env_file:
             - ./fastapi-backend/.env
         environment:
-            DATABASE_URL: postgresql+psycopg2://cms_user:cms_password@postgres:5432/cms_db
+            DATABASE_URL: postgresql+asyncpg://cms_user:cms_password@postgres:5432/cms_db
             STORAGE_PROVIDER: s3
             S3_BUCKET: complaint-photos
             S3_REGION: us-east-1

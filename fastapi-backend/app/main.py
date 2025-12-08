@@ -664,6 +664,11 @@ async def submit_complaint(payload: ComplaintCreate, session=Depends(get_session
         # Default to 'low' if an unknown severity is provided
         data["severity"] = "low"
 
+    # Ensure ID is a UUID object if using Postgres UUIDs
+    if "id" not in data:
+        import uuid
+        data["id"] = uuid.uuid4()
+    
     complaint = Complaint(**data)
     session.add(complaint)
     await session.commit()
