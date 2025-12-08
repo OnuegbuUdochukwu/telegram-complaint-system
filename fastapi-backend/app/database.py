@@ -15,8 +15,11 @@ config = dotenv_values(str(_env_path))
 DATABASE_URL = os.environ.get("DATABASE_URL") or config.get("DATABASE_URL") or "sqlite+aiosqlite:///./test.db"
 
 # Ensure we use the async driver for postgres
-if DATABASE_URL and DATABASE_URL.startswith("postgresql://"):
-    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
+if DATABASE_URL:
+    if DATABASE_URL.startswith("postgresql://"):
+        DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
+    elif DATABASE_URL.startswith("postgresql+psycopg2://"):
+        DATABASE_URL = DATABASE_URL.replace("postgresql+psycopg2://", "postgresql+asyncpg://")
 
 # Configure sqlite to be usable from multiple threads in this local/dev setup.
 # For production (Postgres) these options are ignored.

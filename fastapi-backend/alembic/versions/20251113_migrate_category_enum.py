@@ -13,42 +13,46 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = '20251113_migrate_category_enum'
-down_revision = '1baee5921a2a'
+down_revision = '20251021_create_photos_table'
 branch_labels = None
 depends_on = None
 
 
 def upgrade():
     # Perform a safe enum migration for Postgres
+    # 1. Create new enum type
     op.execute(r"""
--- Create new enum type with the desired values
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'complaint_category_new') THEN
-        CREATE TYPE complaint_category_new AS ENUM ('plumbing','electrical','carpentry','pest','metalworks','other');
-    END IF;
-END$$;
+    DO $$
+    BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'complaint_category_new') THEN
+            CREATE TYPE complaint_category_new AS ENUM ('plumbing','electrical','carpentry','pest','metalworks','other');
+        END IF;
+    END$$;
+    """)
 
--- Alter column to use the new enum, mapping old values to new names
-ALTER TABLE complaints ALTER COLUMN category TYPE complaint_category_new USING (
-  CASE
-    WHEN category = 'common_area' THEN 'metalworks'
-    WHEN category = 'structural' THEN 'carpentry'
-    ELSE category
-  END
-)::complaint_category_new;
+    # 2. Alter column
+    op.execute(r"""
+    ALTER TABLE complaints ALTER COLUMN category TYPE complaint_category_new USING (
+      CASE
+        WHEN category::text = 'common_area' THEN 'metalworks'
+        WHEN category::text = 'structural' THEN 'carpentry'
+        ELSE category::text
+      END
+    )::complaint_category_new
+    """)
 
--- Drop old enum type if present
-DO $$
-BEGIN
-    IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'complaint_category') THEN
-        DROP TYPE complaint_category;
-    END IF;
-END$$;
+    # 3. Drop old enum type
+    op.execute(r"""
+    DO $$
+    BEGIN
+        IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'complaint_category') THEN
+            DROP TYPE complaint_category;
+        END IF;
+    END$$;
+    """)
 
--- Rename the new type to the original name
-ALTER TYPE complaint_category_new RENAME TO complaint_category;
-""")
+    # 4. Rename new type
+    op.execute("ALTER TYPE complaint_category_new RENAME TO complaint_category")
 
 
 def downgrade():

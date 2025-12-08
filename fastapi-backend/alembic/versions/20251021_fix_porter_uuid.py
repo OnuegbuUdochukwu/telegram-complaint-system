@@ -8,7 +8,7 @@ Create Date: 2025-10-21 00:00:00.000000
 
 from alembic import op
 
-revision = '20251021_fix_assigned_porter_uuid'
+revision = '20251021_fix_porter_uuid'
 down_revision = '4dbeedc537a0'
 branch_labels = None
 depends_on = None

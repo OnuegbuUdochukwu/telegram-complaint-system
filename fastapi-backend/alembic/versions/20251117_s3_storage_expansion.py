@@ -19,29 +19,48 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column("photos", sa.Column("processed_at", sa.DateTime(timezone=True), nullable=True))
-    op.add_column("photos", sa.Column("storage_provider", sa.String(length=32), nullable=False, server_default="s3"))
-    op.add_column("photos", sa.Column("s3_key", sa.String(length=512), nullable=True))
-    op.add_column("photos", sa.Column("s3_thumbnail_key", sa.String(length=512), nullable=True))
-    op.add_column("photos", sa.Column("checksum_sha256", sa.String(length=128), nullable=True))
+    # Add columns to photos table safely
+    op.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS processed_at TIMESTAMPTZ")
+    op.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS storage_provider VARCHAR(32) NOT NULL DEFAULT 's3'")
+    op.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS s3_key VARCHAR(512)")
+    op.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS s3_thumbnail_key VARCHAR(512)")
+    op.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS checksum_sha256 VARCHAR(128)")
 
-    op.create_table(
-        "photo_uploads",
-        sa.Column("id", sa.String(length=36), primary_key=True),
-        sa.Column("complaint_id", sa.String(length=36), nullable=False),
-        sa.Column("photo_id", sa.String(length=36), nullable=False),
-        sa.Column("filename", sa.String(length=255), nullable=False),
-        sa.Column("content_type", sa.String(length=128), nullable=False),
-        sa.Column("content_length", sa.BigInteger(), nullable=True),
-        sa.Column("s3_key", sa.String(length=512), nullable=False),
-        sa.Column("status", sa.String(length=32), nullable=False, server_default="pending"),
-        sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("confirmed_at", sa.DateTime(timezone=True), nullable=True),
-        sa.ForeignKeyConstraint(["complaint_id"], ["complaints.id"], ondelete="CASCADE"),
+    # Create photo_uploads table
+    op.execute(r"""
+    CREATE TABLE IF NOT EXISTS photo_uploads (
+        id VARCHAR(36) PRIMARY KEY,
+        complaint_id UUID NOT NULL REFERENCES complaints(id) ON DELETE CASCADE,
+        photo_id UUID NOT NULL, -- Logical reference to photos.id? Or just external ID? Using UUID for consistency if photos.id is UUID.
+        -- Wait, original said sa.String(36). UUID is safer if matching other tables.
+        -- Let's stick to original definition: sa.String(36).
+        -- complaint_id was sa.String(36) in original?
+        -- complaints.id is UUID. So complaint_id MUST be UUID to reference it.
+        -- Original: sa.Column("complaint_id", sa.String(length=36), nullable=False)
+        -- This implies implicit cast or text mismatch? 
+        -- Postgres allows FK from String to UUID? NO.
+        -- I MUST change complaint_id to UUID in photo_uploads if complaints.id is UUID.
+        -- And photo_id? Photos.id is UUID.
+        
+        filename VARCHAR(255) NOT NULL,
+        content_type VARCHAR(128) NOT NULL,
+        content_length BIGINT,
+        -- s3_key already defined above? No, specific to this table.
+        s3_key VARCHAR(512) NOT NULL,
+        status VARCHAR(32) NOT NULL DEFAULT 'pending',
+        expires_at TIMESTAMPTZ NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL,
+        confirmed_at TIMESTAMPTZ
     )
-    op.create_index("ix_photo_uploads_complaint_id", "photo_uploads", ["complaint_id"])
-    op.create_index("ix_photo_uploads_photo_id", "photo_uploads", ["photo_id"])
+    """)
+    
+    # Fix types for FKs if needed (using UUID)
+    # Re-reading original file: complaint_id was String(36). complaints.id is UUID.
+    # This was a bug in original definition! It would have failed on FK creation.
+    # So I AM FIXING A BUG HERE TOO. I will use UUID.
+
+    op.execute("CREATE INDEX IF NOT EXISTS ix_photo_uploads_complaint_id ON photo_uploads (complaint_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_photo_uploads_photo_id ON photo_uploads (photo_id)")
 
 
 def downgrade() -> None:

@@ -19,6 +19,7 @@ _env_path = Path(__file__).resolve().parents[1] / ".env"
 env = dotenv_values(str(_env_path))
 DATABASE_URL = env.get("DATABASE_URL") or ""
 if DATABASE_URL:
+    print(f"DEBUG: Alembic using DATABASE_URL: {DATABASE_URL}")
     config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
 # Interpret the config file for Python logging.
@@ -37,12 +38,20 @@ def run_migrations_offline():
         context.run_migrations()
 
 
-def run_migrations_online():
+import asyncio
+
+def do_run_migrations(connection):
+    context.configure(connection=connection, target_metadata=target_metadata)
+    with context.begin_transaction():
+        context.run_migrations()
+
+async def run_async_migrations():
     connectable = engine
-    with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
-        with context.begin_transaction():
-            context.run_migrations()
+    async with connectable.connect() as connection:
+        await connection.run_sync(do_run_migrations)
+
+def run_migrations_online():
+    asyncio.run(run_async_migrations())
 
 
 if context.is_offline_mode():
