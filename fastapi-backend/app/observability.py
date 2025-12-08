@@ -122,8 +122,9 @@ def setup_metrics_middleware(app):
         # Record metrics
         duration = time.time() - start_time
         
-        # Extract endpoint (simplified to route path)
-        endpoint = request.url.path
+        # Extract endpoint (use route template to avoid high cardinality)
+        route = request.scope.get("route")
+        endpoint = route.path if route else request.url.path
         method = request.method
         status = response.status_code
         

@@ -4,6 +4,14 @@ from fastapi.responses import JSONResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials, OAuth2PasswordRequestForm
 from fastapi import Body
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from dotenv import load_dotenv
+from pathlib import Path
+import os
+
+# Load environment variables early
+_env_path = Path(__file__).resolve().parents[2] / ".env"
+load_dotenv(_env_path)
 from . import auth
 from typing import List, Optional
 from pydantic import BaseModel, StrictStr, validator
@@ -71,6 +79,12 @@ app = FastAPI(title="Complaint Management API")
 
 # Setup metrics middleware
 setup_metrics_middleware(app)
+
+# Setup TrustedHost middleware
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=os.environ.get("ALLOWED_HOSTS", "*").split(",")
+)
 app.include_router(photos_routes.router)
 
 # Serve the static dashboard files from the repository's `dashboard/` folder
@@ -1547,32 +1561,6 @@ async def startup_event():
     logger.info("WebSocket manager initialized")
     # Log service-token rollout status for operators
     import os
-    # Load .env values into process env if present but not already exported. This
-    # helps local dev where operators place configuration in the repository
-    # `.env` file but may not export them into the shell before starting uvicorn.
-    try:
-        from dotenv import dotenv_values
-        from pathlib import Path
-        _env_path = Path(__file__).resolve().parents[2] / ".env"
-        logger.info(f"Looking for .env at {_env_path}")
-        cfg = dotenv_values(str(_env_path))
-        if cfg:
-            logger.info(f".env contains {len(cfg)} keys (masked display)")
-        # Only set keys that are not already present in os.environ
-        for k, v in (cfg.items() if cfg else []):
-            if v is None:
-                continue
-            if k not in os.environ:
-                os.environ[k] = v
-                logger.info(f"Loaded {k} from .env into process environment (dev only)")
-        if cfg and 'BACKEND_SERVICE_TOKEN' in cfg:
-            sval = cfg.get('BACKEND_SERVICE_TOKEN') or ''
-            masked = (sval[:6] + '...' + sval[-4:]) if len(sval) > 12 else '(<short>)'
-            logger.info(f".env BACKEND_SERVICE_TOKEN present (masked): {masked}")
-    except Exception as e:
-        # Non-fatal if dotenv missing
-        logger.error(f"Error loading .env during startup: {e}")
-
     svc = os.environ.get("BACKEND_SERVICE_TOKEN")
     if svc:
         logger.info("BACKEND_SERVICE_TOKEN is configured — endpoints that accept service tokens will allow trusted callers (e.g. bot) to authenticate using this opaque token")
