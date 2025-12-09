@@ -26,6 +26,7 @@ class Settings:
     environment: str
     storage_provider: str
     service_token: Optional[str]
+    backend_url: Optional[str]
 
     # Database (read-only; SQLModel/alembic still look at DATABASE_URL)
     database_url: str
@@ -81,6 +82,7 @@ def get_settings() -> Settings:
         environment=_env_lookup("APP_ENV", env_file, "development"),
         storage_provider=storage_provider,
         service_token=_env_lookup("BACKEND_SERVICE_TOKEN", env_file),
+        backend_url=_env_lookup("BACKEND_URL", env_file) or _env_lookup("TEST_BACKEND_URL", env_file),
         database_url=_env_lookup("DATABASE_URL", env_file, "sqlite:///./test.db"),
         s3_bucket=_env_lookup("S3_BUCKET", env_file, "complaint-photos"),
         s3_region=_env_lookup("S3_REGION", env_file, "us-east-1"),

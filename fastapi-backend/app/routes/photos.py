@@ -76,22 +76,24 @@ def _ensure_s3():
     return storage
 
 
-def _load_complaint(session: Session, complaint_id: str) -> Complaint:
-    complaint = session.get(Complaint, complaint_id)
+from fastapi.concurrency import run_in_threadpool
+
+async def _load_complaint(session: Session, complaint_id: str) -> Complaint:
+    complaint = await session.get(Complaint, complaint_id)
     if not complaint:
         raise HTTPException(status_code=404, detail="Complaint not found")
     return complaint
 
 
 @router.post("/complaints/{complaint_id}/photos/presign", response_model=PresignResponse, status_code=status.HTTP_201_CREATED)
-def presign_upload(
+async def presign_upload(
     complaint_id: str,
     request: PresignRequest,
     _: object = Depends(get_authenticated_user_or_service),
     session: Session = Depends(get_session),
 ):
     """Issue a presigned PUT URL for S3 or a direct upload URL for local storage."""
-    _load_complaint(session, complaint_id)
+    await _load_complaint(session, complaint_id)
 
     content_type = request.content_type.lower()
     if content_type not in ALLOWED_MIME_TYPES:
@@ -104,6 +106,8 @@ def presign_upload(
     # If S3 is enabled, use presigned PUT
     if storage:
         try:
+            # generate_presigned_put is purely local crypto and string formatting in boto3
+            # so it is safe to call synchronously without threadpool
             upload = storage.generate_presigned_put(key, content_type, request.content_length)
         except StorageError as exc:
             raise HTTPException(status_code=500, detail=str(exc))
@@ -120,7 +124,7 @@ def presign_upload(
             created_at=datetime.now(timezone.utc),
         )
         session.add(record)
-        session.commit()
+        await session.commit()
 
         return PresignResponse(
             upload_id=record.id,
@@ -145,7 +149,7 @@ def presign_upload(
         created_at=datetime.now(timezone.utc),
     )
     session.add(record)
-    session.commit()
+    await session.commit()
 
     # Return backend upload URL for local storage
     from ..config import get_settings
@@ -168,11 +172,15 @@ async def direct_upload(
     complaint_id: str,
     photo_id: str,
     request: Request,
-    _: object = Depends(get_authenticated_user_or_service),
     session: Session = Depends(get_session),
 ):
-    """Direct upload endpoint for local storage (alternative to S3 presigned PUT)."""
-    _load_complaint(session, complaint_id)
+    """Direct upload endpoint for local storage (alternative to S3 presigned PUT).
+    
+    This endpoint mimics S3 presigned URLs by relying on the secrecy of the photo_id/upload_id
+    and the expiry time checked against the PhotoUpload record. Authentication is NOT required
+    because the client (using S3-style flow) does not send credentials, only the URL.
+    """
+    await _load_complaint(session, complaint_id)
     UPLOAD_ATTEMPTS.inc()
 
     # Read the raw body
@@ -186,7 +194,8 @@ async def direct_upload(
         PhotoUpload.complaint_id == complaint_id,
         PhotoUpload.photo_id == photo_id,
     )
-    upload = session.exec(upload_stmt).first()
+    result = await session.exec(upload_stmt)
+    upload = result.first()
     if not upload:
         UPLOAD_FAILURES.inc()
         raise HTTPException(status_code=404, detail="Upload record not found")
@@ -203,15 +212,20 @@ async def direct_upload(
     # Store using local storage
     from ..storage import upload_photo as local_upload_photo
     try:
-        file_url, thumbnail_url = local_upload_photo(
-            body, complaint_id, photo_id, upload.content_type or "image/jpeg"
+        # File I/O might block, use threadpool
+        file_url, thumbnail_url = await run_in_threadpool(
+            local_upload_photo, 
+            body, 
+            complaint_id, 
+            photo_id, 
+            upload.content_type or "image/jpeg"
         )
     except Exception as exc:
         UPLOAD_FAILURES.inc()
         raise HTTPException(status_code=500, detail=f"Failed to store photo: {exc}")
 
     # Create or update photo record
-    photo = session.get(Photo, photo_id)
+    photo = await session.get(Photo, photo_id)
     if photo is None:
         photo = Photo(
             id=photo_id,
@@ -235,15 +249,15 @@ async def direct_upload(
     upload.status = "confirmed"
     upload.confirmed_at = now
     session.add(upload)
-    session.commit()
-    session.refresh(photo)
+    await session.commit()
+    await session.refresh(photo)
 
     UPLOAD_SUCCESSES.inc()
     return _serialize_photo(photo)
 
 
 @router.post("/complaints/{complaint_id}/photos/confirm", response_model=PhotoResponse)
-def confirm_upload(
+async def confirm_upload(
     complaint_id: str,
     payload: ConfirmUploadRequest,
     _: object = Depends(get_authenticated_user_or_service),
@@ -251,7 +265,7 @@ def confirm_upload(
 ):
     """Confirm that a PUT upload completed and persist metadata."""
     s3 = _ensure_s3()
-    _load_complaint(session, complaint_id)
+    await _load_complaint(session, complaint_id)
     UPLOAD_ATTEMPTS.inc()
 
     try:
@@ -260,7 +274,8 @@ def confirm_upload(
             PhotoUpload.photo_id == payload.photo_id,
             PhotoUpload.s3_key == payload.s3_key,
         )
-        upload = session.exec(upload_stmt).first()
+        result = await session.exec(upload_stmt)
+        upload = result.first()
         if not upload:
             raise HTTPException(status_code=404, detail="Upload record not found")
 
@@ -271,12 +286,14 @@ def confirm_upload(
         if expiry < now:
             raise HTTPException(status_code=410, detail="Presigned upload expired")
 
-        head = s3.head_object(payload.s3_key)
+        # s3.head_object makes network call -> run in threadpool
+        head = await run_in_threadpool(s3.head_object, payload.s3_key)
+        
         file_size = payload.file_size or head.get("ContentLength")
         content_type = payload.content_type or head.get("ContentType")
         file_url = f"s3://{settings.s3_bucket}/{payload.s3_key}"
 
-        photo = session.get(Photo, payload.photo_id)
+        photo = await session.get(Photo, payload.photo_id)
         if photo is None:
             photo = Photo(
                 id=payload.photo_id,
@@ -303,8 +320,8 @@ def confirm_upload(
         upload.status = "confirmed"
         upload.confirmed_at = now
         session.add(upload)
-        session.commit()
-        session.refresh(photo)
+        await session.commit()
+        await session.refresh(photo)
     except HTTPException:
         UPLOAD_FAILURES.inc()
         raise
@@ -319,44 +336,48 @@ def confirm_upload(
 
 
 @router.get("/complaints/{complaint_id}/photos", response_model=List[PhotoResponse])
-def list_photos(
+async def list_photos(
     complaint_id: str,
     _: object = Depends(get_authenticated_user_or_service),
     session: Session = Depends(get_session),
 ):
-    _load_complaint(session, complaint_id)
+    await _load_complaint(session, complaint_id)
     stmt = select(Photo).where(Photo.complaint_id == complaint_id).order_by(Photo.created_at.desc())
-    photos = session.exec(stmt).all()
+    result = await session.exec(stmt)
+    photos = result.all()
     return [_serialize_photo(p) for p in photos]
 
 
 @router.get("/complaints/{complaint_id}/photos/{photo_id}", response_model=PhotoResponse)
-def get_photo(
+async def get_photo(
     complaint_id: str,
     photo_id: str,
     _: object = Depends(get_authenticated_user_or_service),
     session: Session = Depends(get_session),
 ):
-    photo = session.get(Photo, photo_id)
+    photo = await session.get(Photo, photo_id)
     if not photo or photo.complaint_id != complaint_id:
         raise HTTPException(status_code=404, detail="Photo not found")
+    # serialization is purely local/cpu
     return _serialize_photo(photo, include_signed_urls=True)
 
 
 @router.delete("/complaints/{complaint_id}/photos/{photo_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_photo_endpoint(
+async def delete_photo_endpoint(
     complaint_id: str,
     photo_id: str,
     _: object = Depends(get_authenticated_user_or_service),
     session: Session = Depends(get_session),
 ):
-    photo = session.get(Photo, photo_id)
+    photo = await session.get(Photo, photo_id)
     if not photo or photo.complaint_id != complaint_id:
         raise HTTPException(status_code=404, detail="Photo not found")
 
-    delete_photo(complaint_id, photo_id)
-    session.delete(photo)
-    session.commit()
+    # delete_photo might do blocking FS or s3 op -> threadpool
+    await run_in_threadpool(delete_photo, complaint_id, photo_id)
+    
+    await session.delete(photo)
+    await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

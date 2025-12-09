@@ -22,6 +22,7 @@ os.environ["JWT_SECRET"] = "test-secret-key-for-pytest-only-12345"
 # Use aiosqlite for async SQLite testing
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///./test.db"
 os.environ["STORAGE_PROVIDER"] = "local"
+os.environ["BACKEND_SERVICE_TOKEN"] = "test-service-token"
 
 # Add the backend directory to sys.path so imports work
 BACKEND_PATH = Path(__file__).parent / "fastapi-backend"
@@ -34,6 +35,7 @@ os.environ.setdefault("TEST_ADMIN_EMAIL", "admin@test.local")
 os.environ.setdefault("TEST_ADMIN_PASSWORD", "testpass123")
 os.environ.setdefault("TEST_ADMIN_ALT_PASSWORD", "adminpassword")
 os.environ.setdefault("AUTO_ADMIN_EMAILS", "admin@test.local,admin-purge@test.com")
+os.environ.setdefault("ALLOWED_HOSTS", "*")
 
 db_url = os.environ["DATABASE_URL"]
 if db_url.startswith("sqlite+aiosqlite:///"):

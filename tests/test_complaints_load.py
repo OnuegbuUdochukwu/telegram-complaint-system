@@ -157,5 +157,5 @@ class MetricsUser(HttpUser):
 
 if __name__ == "__main__":
     print("Load test script for Complaint Management System")
-    print("Run with: locust -f load_tests/test_complaints_load.py --host=http://localhost:8000")
+    print("Run with: locust -f tests/test_complaints_load.py --host=http://localhost:8000")
 

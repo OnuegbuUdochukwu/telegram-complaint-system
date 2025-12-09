@@ -56,7 +56,16 @@ async def create_otp_token(
     
     # Count non-expired requests
     now = datetime.now(timezone.utc)
-    active_requests = [otp for otp in recent_otps if otp.expires_at > now and not otp.used]
+    
+    def is_active(otp):
+        if otp.used:
+            return False
+        exp = otp.expires_at
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        return exp > now
+
+    active_requests = [otp for otp in recent_otps if is_active(otp)]
     
     if len(active_requests) >= OTP_RATE_LIMIT_MAX_REQUESTS:
         error_msg = f"Too many OTP requests. Please wait before requesting another code."
