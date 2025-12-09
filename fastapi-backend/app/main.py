@@ -665,7 +665,11 @@ class ComplaintUpdate(BaseModel):
 
 
 @app.post("/api/v1/complaints/submit", status_code=201)
-async def submit_complaint(payload: ComplaintCreate, session=Depends(get_session)):
+async def submit_complaint(
+    payload: ComplaintCreate, 
+    _: object = Depends(get_authenticated_user_or_service),
+    session=Depends(get_session)
+):
     # Map validated Pydantic payload into SQLModel Complaint for persistence
     data = payload.dict()
     # Validate category and severity to avoid writing invalid ENUM values into Postgres

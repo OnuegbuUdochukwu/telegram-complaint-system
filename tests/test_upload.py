@@ -28,7 +28,7 @@ async def test_api_photo_upload_flow(monkeypatch):
             "description": "Pipe burst",
             "severity": "high",
         }
-        resp = await client.post("/api/v1/complaints/submit", json=complaint_data)
+        resp = await client.post("/api/v1/complaints/submit", json=complaint_data, headers=headers)
         assert resp.status_code == 201
         data = resp.json()
         complaint_id = data["complaint_id"]
