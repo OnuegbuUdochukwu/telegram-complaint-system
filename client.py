@@ -98,7 +98,9 @@ async def submit_complaint(data: Dict[str, Any]) -> Dict[str, Any]:
   if BACKEND_URL:
     url = BACKEND_URL.rstrip("/") + "/api/v1/complaints/submit"
     try:
-      return await _attempt_request("POST", url, json=data)
+      token = await _get_service_token()
+      headers = {"Authorization": f"Bearer {token}"} if token else {}
+      return await _attempt_request("POST", url, json=data, headers=headers)
     except Exception as exc:  # pragma: no cover - network fallback
       logger.warning("Backend POST to %s failed after retries: %s", url, exc)
       # If operator explicitly allows mock fallback (dev only), return a mock
@@ -119,7 +121,9 @@ async def get_complaint_status(complaint_id: str) -> Dict[str, Any]:
   if BACKEND_URL:
     url = BACKEND_URL.rstrip("/") + f"/api/v1/complaints/{complaint_id}"
     try:
-      return await _attempt_request("GET", url)
+      token = await _get_service_token()
+      headers = {"Authorization": f"Bearer {token}"} if token else {}
+      return await _attempt_request("GET", url, headers=headers)
     except Exception as exc:  # pragma: no cover - network fallback
       logger.warning("Backend GET %s failed after retries: %s", url, exc)
 
@@ -142,7 +146,9 @@ async def get_user_complaints(telegram_user_id: str, page: int = 1, page_size: i
       "page_size": page_size
     }
     try:
-      return await _attempt_request("GET", url, params=params)
+      token = await _get_service_token()
+      headers = {"Authorization": f"Bearer {token}"} if token else {}
+      return await _attempt_request("GET", url, params=params, headers=headers)
     except Exception as exc:
       logger.warning("Backend GET %s failed after retries: %s", url, exc)
 
