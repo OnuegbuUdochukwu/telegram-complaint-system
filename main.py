@@ -30,6 +30,7 @@ from merged_constants import (
     SEVERITY_KEYS,
     SEVERITY_LABELS,
     TELEGRAM_USER_ID_PATTERN,
+    ROOM_NUMBER_PATTERN,
 )
 
 # Compile a module-level regex for known commands so the unknown handler
@@ -293,7 +294,7 @@ async def get_room_number(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     room_input = raw_input.upper()
 
     # Strict validation: one letter A-H followed by three digits (e.g., A312)
-    if not hasattr(__import__('re'), 'match') or not re.match(r'^[A-H][0-9]{3}$', room_input):
+    if not ROOM_NUMBER_PATTERN.match(room_input):
         await update.message.reply_text(
             "⚠️ Room number must be one letter (A–H) followed by three digits, like A312. "
             "Please enter a valid room number.",
