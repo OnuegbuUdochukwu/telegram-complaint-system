@@ -36,6 +36,10 @@ if DATABASE_URL.startswith("sqlite"):
         # Use NullPool to avoid reusing connections across threads in a way that
         # can lead to 'SQLite objects created in a thread can only be used in that same thread.'
         engine_kwargs["poolclass"] = NullPool
+elif "asyncpg" in DATABASE_URL or "postgresql" in DATABASE_URL:
+    # Use NullPool for asyncpg to avoid connection pool issues with uvicorn's async handling.
+    # QueuePool (default) can cause async connection deadlocks in certain edge cases.
+    engine_kwargs["poolclass"] = NullPool
 
 engine = create_async_engine(DATABASE_URL, **engine_kwargs)
 
