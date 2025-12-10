@@ -184,8 +184,8 @@ class PhotoUpload(SQLModel, table=True):
     content_length: Optional[int] = None
     s3_key: str
     status: str = Field(default="pending")
-    expires_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc) + timedelta(minutes=10))
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    expires_at: datetime = Field(default_factory=lambda: datetime.utcnow() + timedelta(minutes=10))
+    created_at: datetime = Field(default_factory=lambda: datetime.utcnow())
     confirmed_at: Optional[datetime] = None
 
 
