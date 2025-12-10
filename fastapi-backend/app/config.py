@@ -35,6 +35,7 @@ class Settings:
     s3_bucket: str
     s3_region: str
     s3_endpoint: Optional[str]
+    s3_endpoint_public: Optional[str]  # External URL for presigned URLs (e.g., localhost:9000 when backend uses minio:9000)
     s3_use_ssl: bool
     s3_access_key_id: Optional[str]
     s3_secret_access_key: Optional[str]
@@ -87,6 +88,7 @@ def get_settings() -> Settings:
         s3_bucket=_env_lookup("S3_BUCKET", env_file, "complaint-photos"),
         s3_region=_env_lookup("S3_REGION", env_file, "us-east-1"),
         s3_endpoint=_env_lookup("S3_ENDPOINT", env_file) or _env_lookup("S3_ENDPOINT_URL", env_file),
+        s3_endpoint_public=_env_lookup("S3_ENDPOINT_PUBLIC", env_file),
         s3_use_ssl=_as_bool(_env_lookup("S3_USE_SSL", env_file, "true"), True),
         s3_access_key_id=_env_lookup("S3_ACCESS_KEY_ID", env_file) or _env_lookup("S3_ACCESS_KEY", env_file),
         s3_secret_access_key=_env_lookup("S3_SECRET_ACCESS_KEY", env_file) or _env_lookup("S3_SECRET_KEY", env_file),
