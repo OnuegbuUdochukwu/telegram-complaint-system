@@ -780,7 +780,7 @@
                         if (response.status === 401) {
                             // Token expired, redirect to login
                             sessionStorage.clear();
-                            window.location.href = "/dashboard/login.html";
+                            window.location.href = "login.html";
                             return;
                         }
                         throw new Error("Failed to fetch complaints");
@@ -1230,7 +1230,7 @@
             logoutButton.onclick = () => {
                 disconnectWebSocket();
                 sessionStorage.clear();
-                window.location.href = "/dashboard/login.html";
+                window.location.href = "login.html";
             };
 
             // Filter event listeners
@@ -1272,7 +1272,7 @@
             document.addEventListener("DOMContentLoaded", async () => {
                 // Check authentication
                 if (!sessionStorage.getItem("access_token")) {
-                    window.location.href = "/dashboard/login.html";
+                    window.location.href = "login.html";
                     return;
                 }
 

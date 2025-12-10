@@ -585,7 +585,7 @@ async def reset_password(
 def get_current_user_profile(user: Porter = Depends(auth.get_current_user)):
     """Get current user's profile information."""
     return PorterPublic(
-        id=user.id,
+        id=str(user.id),
         full_name=user.full_name,
         phone=user.phone,
         email=user.email,
@@ -1318,8 +1318,8 @@ async def list_porters(user: Porter = Depends(auth.get_current_user), session=De
     statement = select(Porter).where(Porter.active == True)
     result = await session.exec(statement)
     results = result.all()
-    # Map to PorterPublic
-    public = [PorterPublic(id=r.id, full_name=r.full_name, phone=r.phone, email=r.email, role=r.role) for r in results]
+    # Map to PorterPublic - convert UUID to string
+    public = [PorterPublic(id=str(r.id), full_name=r.full_name, phone=r.phone, email=r.email, role=r.role) for r in results]
     return public
 
 
