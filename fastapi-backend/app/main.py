@@ -80,6 +80,15 @@ app = FastAPI(title="Complaint Management API")
 # Setup metrics middleware
 setup_metrics_middleware(app)
 
+# Setup CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins for dev; restrict in prod
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Setup TrustedHost middleware
 app.add_middleware(
     TrustedHostMiddleware,
@@ -114,7 +123,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), session=Depend
     # Use the stored Porter.role when issuing JWT so admin/porter is consistent
     token = auth.create_access_token(subject=porter.id, role=(porter.role or "porter"))
     # Return the created token and the porter id (so clients can correlate id <-> token)
-    return {"access_token": token, "token_type": "bearer", "id": porter.id, "role": (porter.role or "porter")}
+    return {"access_token": token, "token_type": "bearer", "id": str(porter.id), "role": (porter.role or "porter")}
 
 
 @app.post("/auth/register", response_model=dict)

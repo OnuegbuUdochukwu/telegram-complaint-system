@@ -3,6 +3,7 @@ from datetime import datetime, timezone, timedelta
 from sqlmodel import SQLModel, Field
 
 # SQLAlchemy imports for explicit server-side UUID column
+import sqlalchemy as sa
 from sqlalchemy import Column, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 import uuid
@@ -22,7 +23,7 @@ if not _DATABASE_URL:
     # We'll allow empty string at module level but main.py/database.py should enforce it on startup.
     pass
 
-_USE_PG_UUID = any(x in _DATABASE_URL for x in ("postgres://", "postgresql://", "psycopg2"))
+_USE_PG_UUID = "postgres" in _DATABASE_URL.lower() or "asyncpg" in _DATABASE_URL.lower()
 
 
 class Hostel(SQLModel, table=True):
@@ -56,7 +57,10 @@ class Porter(SQLModel, table=True):
     else:
         assigned_hostel_id: Optional[str] = Field(default=None, foreign_key="hostels.id")
     active: bool = Field(default=True)
-    created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
+    if _USE_PG_UUID:
+        created_at: Optional[datetime] = Field(default=None, sa_column=Column(sa.DateTime(timezone=True), server_default=text("now()")))
+    else:
+        created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: Optional[datetime] = None
 
 

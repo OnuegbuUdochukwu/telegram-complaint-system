@@ -133,235 +133,86 @@
         </div>
     </div>
 
+    <!-- Shared Scripts -->
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+
     <script>
-        // API Configuration
-        // Point to the backend API server
-        const API_BASE_URL = "http://localhost:8001";
+        document.addEventListener('DOMContentLoaded', () => {
+            // DOM Elements
+            const loginForm = document.getElementById("loginForm");
+            const usernameInput = document.getElementById("username");
+            const passwordInput = document.getElementById("password");
+            const loginButton = document.getElementById("loginButton");
+            const loginButtonText = document.getElementById("loginButtonText");
+            const loginSpinner = document.getElementById("loginSpinner");
+            const errorMessage = document.getElementById("errorMessage");
+            const errorText = document.getElementById("errorText");
 
-        // DOM Elements
-        const loginForm = document.getElementById("loginForm");
-        const usernameInput = document.getElementById("username");
-        const passwordInput = document.getElementById("password");
-        const loginButton = document.getElementById("loginButton");
-        const loginButtonText = document.getElementById("loginButtonText");
-        const loginSpinner = document.getElementById("loginSpinner");
-        const errorMessage = document.getElementById("errorMessage");
-        const errorText = document.getElementById("errorText");
-
-        // Utility Functions
-        function showError(message) {
-            errorText.textContent = message;
-            errorMessage.classList.remove("hidden");
-        }
-
-        function hideError() {
-            errorMessage.classList.add("hidden");
-        }
-
-        function setLoading(loading) {
-            if (loading) {
-                loginButton.disabled = true;
-                loginButtonText.classList.add("hidden");
-                loginSpinner.classList.remove("hidden");
-            } else {
-                loginButton.disabled = false;
-                loginButtonText.classList.remove("hidden");
-                loginSpinner.classList.add("hidden");
-            }
-        }
-
-        // Login Function
-        async function login(username, password) {
-            try {
-                // Use URLSearchParams so the request is sent as
-                // application/x-www-form-urlencoded which FastAPI's
-                // OAuth2PasswordRequestForm expects.
-                const body = new URLSearchParams();
-                body.append("username", username);
-                body.append("password", password);
-
-                const response = await fetch(`${API_BASE_URL}/auth/login`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/x-www-form-urlencoded",
-                    },
-                    body: body.toString(),
-                });
-
-                if (!response.ok) {
-                    // Some servers may return non-JSON error pages (HTML). Try to
-                    // parse JSON first, and fall back to text if parsing fails so
-                    // the UI shows a useful message instead of `Unexpected token`.
-                    let msg = "Login failed";
-                    try {
-                        const errorData = await response.json();
-                        msg =
-                            errorData.detail ||
-                            JSON.stringify(errorData) ||
-                            msg;
-                    } catch (err) {
-                        // Non-JSON response, fall back to plain text
-                        try {
-                            const text = await response.text();
-                            msg = text || msg;
-                        } catch (err2) {
-                            /* ignore */
-                        }
-                    }
-                    throw new Error(msg);
-                }
-
-                let data;
-                try {
-                    data = await response.json();
-                } catch (err) {
-                    // If server returned a non-JSON success payload (unlikely),
-                    // fall back to throwing a parse error for visibility.
-                    throw new Error(
-                        "Login succeeded but response was not JSON"
-                    );
-                }
-
-                // Store token and user info in sessionStorage
-                sessionStorage.setItem("access_token", data.access_token);
-                sessionStorage.setItem("user_id", data.id);
-                sessionStorage.setItem("token_type", data.token_type);
-
-                // Redirect to dashboard
+            // Check if already logged in
+            if (sessionStorage.getItem("access_token")) {
                 window.location.href = "index.html";
-            } catch (error) {
-                console.error("Login error:", error);
-                showError(
-                    error.message ||
-                    "An error occurred during login. Please try again."
-                );
-            }
-        }
-
-        // Event Listeners
-        loginForm.addEventListener("submit", async (e) => {
-            e.preventDefault();
-            hideError();
-            setLoading(true);
-
-            const username = usernameInput.value.trim();
-            const password = passwordInput.value;
-
-            if (!username || !password) {
-                showError("Please enter both username and password.");
-                setLoading(false);
-                return;
             }
 
-            await login(username, password);
-            setLoading(false);
-        });
+            // Utility Functions
+            function showError(message) {
+                errorText.textContent = message;
+                errorMessage.classList.remove("hidden");
+            }
 
-        // Clear error when user starts typing
-        [usernameInput, passwordInput].forEach((input) => {
-            input.addEventListener("input", hideError);
-        });
+            function hideError() {
+                errorMessage.classList.add("hidden");
+            }
 
-        // Forgot Password Handler
-        document
-            .getElementById("forgotPasswordLink")
-            .addEventListener("click", (e) => {
+            function setLoading(loading) {
+                if (loading) {
+                    loginButton.disabled = true;
+                    loginButtonText.classList.add("hidden");
+                    loginSpinner.classList.remove("hidden");
+                } else {
+                    loginButton.disabled = false;
+                    loginButtonText.classList.remove("hidden");
+                    loginSpinner.classList.add("hidden");
+                }
+            }
+
+            // Event Listeners
+            loginForm.addEventListener("submit", async (e) => {
                 e.preventDefault();
-                const email = prompt("Enter your email address:");
-                if (email) {
-                    handleForgotPassword(email);
+                hideError();
+                setLoading(true);
+
+                const username = usernameInput.value.trim();
+                const password = passwordInput.value;
+
+                if (!username || !password) {
+                    showError("Please enter both username and password.");
+                    setLoading(false);
+                    return;
+                }
+
+                try {
+                    await loginUser(username, password);
+                    window.location.href = "index.html";
+                } catch (error) {
+                    console.error("Login error:", error);
+                    showError(error.message || "An error occurred during login.");
+                } finally {
+                    setLoading(false);
                 }
             });
 
-        async function handleForgotPassword(email) {
-            try {
-                setLoading(true);
-                hideError();
+            // Clear error when user starts typing
+            [usernameInput, passwordInput].forEach((input) => {
+                input.addEventListener("input", hideError);
+            });
 
-                const response = await fetch(
-                    `${API_BASE_URL}/auth/forgot-password`,
-                    {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify({ email }),
-                    }
-                );
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    const otpCode = prompt(
-                        "A verification code has been sent to your email.\n\nEnter the code:"
-                    );
-                    if (otpCode) {
-                        const newPassword = prompt(
-                            "Enter your new password:"
-                        );
-                        if (newPassword) {
-                            await handleResetPassword(
-                                email,
-                                otpCode,
-                                newPassword
-                            );
-                        }
-                    }
-                } else {
-                    showError(
-                        data.detail || "Failed to send password reset code"
-                    );
-                }
-            } catch (error) {
-                console.error("Forgot password error:", error);
-                showError("An error occurred. Please try again.");
-            } finally {
-                setLoading(false);
-            }
-        }
-
-        async function handleResetPassword(email, otpCode, newPassword) {
-            try {
-                setLoading(true);
-                hideError();
-
-                const response = await fetch(
-                    `${API_BASE_URL}/auth/reset-password`,
-                    {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify({
-                            email,
-                            otp_code: otpCode,
-                            new_password: newPassword,
-                        }),
-                    }
-                );
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    alert(
-                        "Password reset successfully! Please login with your new password."
-                    );
-                    passwordInput.value = "";
-                } else {
-                    showError(data.detail || "Failed to reset password");
-                }
-            } catch (error) {
-                console.error("Reset password error:", error);
-                showError("An error occurred. Please try again.");
-            } finally {
-                setLoading(false);
-            }
-        }
-
-        // Check if already logged in
-        if (sessionStorage.getItem("access_token")) {
-            window.location.href = "index.html";
-        }
+            // Forgot Password Handler (Simplified for now)
+            document.getElementById("forgotPasswordLink").addEventListener("click", (e) => {
+                e.preventDefault();
+                alert("Please contact the system administrator to reset your password.");
+            });
+        });
     </script>
 </body>
 

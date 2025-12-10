@@ -65,7 +65,7 @@ def get_password_hash(password: str) -> str:
 
 
 def create_access_token(subject: str, role: Optional[str] = None, expires_delta: Optional[timedelta] = None) -> str:
-    to_encode = {"sub": subject}
+    to_encode = {"sub": str(subject)}  # Convert to string to handle UUID objects
     if role:
         to_encode["role"] = role
     expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
@@ -196,7 +196,7 @@ async def create_porter(session, full_name: str, password: str, email: Optional[
 
     ph = get_password_hash(password)
     # Ensure an id is always present for SQLite/local tests to avoid NULL PK insert errors
-    data = {"id": str(uuid.uuid4()), "full_name": full_name, "password_hash": ph, "role": role}
+    data = {"full_name": full_name, "password_hash": ph, "role": role}
     if email:
         data["email"] = email
     if phone:

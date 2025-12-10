@@ -28,6 +28,13 @@
             },
         };
     </script>
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        if (!checkAuth()) {
+            throw new Error("Authentication failed, redirection handled by checkAuth");
+        }
+    </script>
 </head>
 
 <body class="bg-gray-50 min-h-screen">
@@ -457,237 +464,240 @@
         </div>
     </div>
 
+    <!-- Page Specific Script -->
     <script>
-        // API Configuration
-        // Point dashboard to backend API during local development.
-        const API_BASE_URL = "http://localhost:8001";
+        document.addEventListener('DOMContentLoaded', () => {
+            // Auth checked in head
 
-        // Mapping storage key -> display label for categories.
-        // Keep keys in sync with backend storage keys (no DB migration required).
-        const CATEGORY_KEY_TO_LABEL = {
-            "plumbing": "Plumbing / Water",
-            "electrical": "Electrical / Lighting",
-            "carpentry": "Carpentry",
-            "pest": "Pest Control",
-            "metalworks": "Metalworks/Bunks",
-            "other": "Other / Not Listed"
-        };
 
-        // State Management
-        let currentPage = 1;
-        let pageSize = 20;
-        let currentSort = "created_at";
-        let sortDirection = "desc";
-        let currentFilters = {};
-        let complaints = [];
-        let porters = [];
-        let websocket = null;
-        let reconnectAttempts = 0;
-        const maxReconnectAttempts = 5;
-        let pingInterval = null;
+            // Mapping storage key -> display label for categories.
 
-        // DOM Elements
-        const complaintsTableBody = document.getElementById(
-            "complaintsTableBody"
-        );
-        const loadingRow = document.getElementById("loadingRow");
-        const totalCount = document.getElementById("totalCount");
-        const refreshButton = document.getElementById("refreshButton");
-        const complaintModal = document.getElementById("complaintModal");
-        const modalContent = document.getElementById("modalContent");
-        const closeModal = document.getElementById("closeModal");
-        const logoutButton = document.getElementById("logoutButton");
-        const userInfo = document.getElementById("userInfo");
-        const profileButton = document.getElementById("profileButton");
-        const profileModal = document.getElementById("profileModal");
-        const closeProfileModal = document.getElementById("closeProfileModal");
-        const profileModalContent = document.getElementById("profileModalContent");
+            // Mapping storage key -> display label for categories.
+            // Keep keys in sync with backend storage keys (no DB migration required).
+            const CATEGORY_KEY_TO_LABEL = {
+                "plumbing": "Plumbing / Water",
+                "electrical": "Electrical / Lighting",
+                "carpentry": "Carpentry",
+                "pest": "Pest Control",
+                "metalworks": "Metalworks/Bunks",
+                "other": "Other / Not Listed"
+            };
 
-        // Filter Elements
-        const statusFilter = document.getElementById("statusFilter");
-        const hostelFilter = document.getElementById("hostelFilter");
-        const categoryFilter = document.getElementById("categoryFilter");
-        const severityFilter = document.getElementById("severityFilter");
+            // State Management
+            let currentPage = 1;
+            let pageSize = 20;
+            let currentSort = "created_at";
+            let sortDirection = "desc";
+            let currentFilters = {};
+            let complaints = [];
+            let porters = [];
+            let websocket = null;
+            let reconnectAttempts = 0;
+            const maxReconnectAttempts = 5;
+            let pingInterval = null;
 
-        // Pagination Elements
-        const prevPage = document.getElementById("prevPage");
-        const nextPage = document.getElementById("nextPage");
-        const prevPageMobile = document.getElementById("prevPageMobile");
-        const nextPageMobile = document.getElementById("nextPageMobile");
-        const pageNumbers = document.getElementById("pageNumbers");
-        const paginationInfo = document.getElementById("paginationInfo");
-        const showingStart = document.getElementById("showingStart");
-        const showingEnd = document.getElementById("showingEnd");
-        const showingTotal = document.getElementById("showingTotal");
+            // DOM Elements
+            const complaintsTableBody = document.getElementById(
+                "complaintsTableBody"
+            );
+            const loadingRow = document.getElementById("loadingRow");
+            const totalCount = document.getElementById("totalCount");
+            const refreshButton = document.getElementById("refreshButton");
+            const complaintModal = document.getElementById("complaintModal");
+            const modalContent = document.getElementById("modalContent");
+            const closeModal = document.getElementById("closeModal");
+            const logoutButton = document.getElementById("logoutButton");
+            const userInfo = document.getElementById("userInfo");
+            const profileButton = document.getElementById("profileButton");
+            const profileModal = document.getElementById("profileModal");
+            const closeProfileModal = document.getElementById("closeProfileModal");
+            const profileModalContent = document.getElementById("profileModalContent");
 
-        // WebSocket Functions
-        function connectWebSocket() {
-            const token = sessionStorage.getItem("access_token");
-            if (!token) {
-                console.warn(
-                    "No access token available for WebSocket connection"
-                );
-                return;
-            }
+            // Filter Elements
+            const statusFilter = document.getElementById("statusFilter");
+            const hostelFilter = document.getElementById("hostelFilter");
+            const categoryFilter = document.getElementById("categoryFilter");
+            const severityFilter = document.getElementById("severityFilter");
 
-            const wsUrl = `ws://${window.location.host
-                }/ws/dashboard?token=${encodeURIComponent(token)}`;
+            // Pagination Elements
+            const prevPage = document.getElementById("prevPage");
+            const nextPage = document.getElementById("nextPage");
+            const prevPageMobile = document.getElementById("prevPageMobile");
+            const nextPageMobile = document.getElementById("nextPageMobile");
+            const pageNumbers = document.getElementById("pageNumbers");
+            const paginationInfo = document.getElementById("paginationInfo");
+            const showingStart = document.getElementById("showingStart");
+            const showingEnd = document.getElementById("showingEnd");
+            const showingTotal = document.getElementById("showingTotal");
 
-            try {
-                websocket = new WebSocket(wsUrl);
-
-                websocket.onopen = function (event) {
-                    console.log("WebSocket connected");
-                    reconnectAttempts = 0;
-
-                    // Clear any existing ping interval
-                    if (pingInterval) {
-                        clearInterval(pingInterval);
-                    }
-
-                    // Send ping to keep connection alive
-                    pingInterval = setInterval(() => {
-                        if (
-                            websocket &&
-                            websocket.readyState === WebSocket.OPEN
-                        ) {
-                            websocket.send("ping");
-                        }
-                    }, 30000); // Ping every 30 seconds
-                };
-
-                websocket.onmessage = function (event) {
-                    try {
-                        const data = JSON.parse(event.data);
-                        handleWebSocketEvent(data);
-                    } catch (e) {
-                        // Handle pong responses
-                        if (event.data === "pong") {
-                            return;
-                        }
-                        console.error(
-                            "Error parsing WebSocket message:",
-                            e
-                        );
-                    }
-                };
-
-                websocket.onclose = function (event) {
-                    console.log(
-                        "WebSocket disconnected:",
-                        event.code,
-                        event.reason
+            // WebSocket Functions
+            function connectWebSocket() {
+                const token = sessionStorage.getItem("access_token");
+                if (!token) {
+                    console.warn(
+                        "No access token available for WebSocket connection"
                     );
-                    websocket = null;
+                    return;
+                }
 
-                    // Clear ping interval
-                    if (pingInterval) {
-                        clearInterval(pingInterval);
-                        pingInterval = null;
-                    }
+                const wsUrl = `ws://${window.location.host
+                    }/ws/dashboard?token=${encodeURIComponent(token)}`;
 
-                    // Attempt to reconnect if not a manual close
-                    if (
-                        event.code !== 1000 &&
-                        reconnectAttempts < maxReconnectAttempts
-                    ) {
-                        reconnectAttempts++;
+                try {
+                    websocket = new WebSocket(wsUrl);
+
+                    websocket.onopen = function (event) {
+                        console.log("WebSocket connected");
+                        reconnectAttempts = 0;
+
+                        // Clear any existing ping interval
+                        if (pingInterval) {
+                            clearInterval(pingInterval);
+                        }
+
+                        // Send ping to keep connection alive
+                        pingInterval = setInterval(() => {
+                            if (
+                                websocket &&
+                                websocket.readyState === WebSocket.OPEN
+                            ) {
+                                websocket.send("ping");
+                            }
+                        }, 30000); // Ping every 30 seconds
+                    };
+
+                    websocket.onmessage = function (event) {
+                        try {
+                            const data = JSON.parse(event.data);
+                            handleWebSocketEvent(data);
+                        } catch (e) {
+                            // Handle pong responses
+                            if (event.data === "pong") {
+                                return;
+                            }
+                            console.error(
+                                "Error parsing WebSocket message:",
+                                e
+                            );
+                        }
+                    };
+
+                    websocket.onclose = function (event) {
                         console.log(
-                            `Attempting to reconnect (${reconnectAttempts}/${maxReconnectAttempts})...`
+                            "WebSocket disconnected:",
+                            event.code,
+                            event.reason
                         );
-                        setTimeout(
-                            connectWebSocket,
-                            5000 * reconnectAttempts
-                        );
-                    }
-                };
+                        websocket = null;
 
-                websocket.onerror = function (error) {
-                    console.error("WebSocket error:", error);
-                };
-            } catch (error) {
-                console.error(
-                    "Failed to create WebSocket connection:",
-                    error
+                        // Clear ping interval
+                        if (pingInterval) {
+                            clearInterval(pingInterval);
+                            pingInterval = null;
+                        }
+
+                        // Attempt to reconnect if not a manual close
+                        if (
+                            event.code !== 1000 &&
+                            reconnectAttempts < maxReconnectAttempts
+                        ) {
+                            reconnectAttempts++;
+                            console.log(
+                                `Attempting to reconnect (${reconnectAttempts}/${maxReconnectAttempts})...`
+                            );
+                            setTimeout(
+                                connectWebSocket,
+                                5000 * reconnectAttempts
+                            );
+                        }
+                    };
+
+                    websocket.onerror = function (error) {
+                        console.error("WebSocket error:", error);
+                    };
+                } catch (error) {
+                    console.error(
+                        "Failed to create WebSocket connection:",
+                        error
+                    );
+                }
+            }
+
+            function handleWebSocketEvent(event) {
+                console.log("Received WebSocket event:", event);
+
+                switch (event.event_type) {
+                    case "new_complaint":
+                        handleNewComplaint(event.data);
+                        break;
+                    case "status_update":
+                        handleStatusUpdate(event.data);
+                        break;
+                    case "assignment_update":
+                        handleAssignmentUpdate(event.data);
+                        break;
+                    default:
+                        console.log("Unknown event type:", event.event_type);
+                }
+            }
+
+            function handleNewComplaint(data) {
+                console.log("New complaint received:", data);
+
+                // Show notification
+                showNotification(
+                    `New complaint in ${data.hostel}: ${data.category} (${data.severity})`,
+                    "info"
                 );
+
+                // Refresh the complaints list
+                fetchComplaints();
             }
-        }
 
-        function handleWebSocketEvent(event) {
-            console.log("Received WebSocket event:", event);
+            function handleStatusUpdate(data) {
+                console.log("Status update received:", data);
 
-            switch (event.event_type) {
-                case "new_complaint":
-                    handleNewComplaint(event.data);
-                    break;
-                case "status_update":
-                    handleStatusUpdate(event.data);
-                    break;
-                case "assignment_update":
-                    handleAssignmentUpdate(event.data);
-                    break;
-                default:
-                    console.log("Unknown event type:", event.event_type);
+                // Show notification
+                showNotification(
+                    `Complaint ${data.complaint_id.substring(
+                        0,
+                        8
+                    )}... status changed: ${data.old_status} → ${data.new_status
+                    }`,
+                    "success"
+                );
+
+                // Refresh the complaints list
+                fetchComplaints();
             }
-        }
 
-        function handleNewComplaint(data) {
-            console.log("New complaint received:", data);
+            function handleAssignmentUpdate(data) {
+                console.log("Assignment update received:", data);
 
-            // Show notification
-            showNotification(
-                `New complaint in ${data.hostel}: ${data.category} (${data.severity})`,
-                "info"
-            );
+                // Show notification
+                showNotification(
+                    `Complaint ${data.complaint_id.substring(
+                        0,
+                        8
+                    )}... assigned to porter`,
+                    "info"
+                );
 
-            // Refresh the complaints list
-            fetchComplaints();
-        }
+                // Refresh the complaints list
+                fetchComplaints();
+            }
 
-        function handleStatusUpdate(data) {
-            console.log("Status update received:", data);
-
-            // Show notification
-            showNotification(
-                `Complaint ${data.complaint_id.substring(
-                    0,
-                    8
-                )}... status changed: ${data.old_status} → ${data.new_status
-                }`,
-                "success"
-            );
-
-            // Refresh the complaints list
-            fetchComplaints();
-        }
-
-        function handleAssignmentUpdate(data) {
-            console.log("Assignment update received:", data);
-
-            // Show notification
-            showNotification(
-                `Complaint ${data.complaint_id.substring(
-                    0,
-                    8
-                )}... assigned to porter`,
-                "info"
-            );
-
-            // Refresh the complaints list
-            fetchComplaints();
-        }
-
-        function showNotification(message, type = "info") {
-            // Create a simple notification element
-            const notification = document.createElement("div");
-            notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 max-w-sm ${type === "success"
+            function showNotification(message, type = "info") {
+                // Create a simple notification element
+                const notification = document.createElement("div");
+                notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 max-w-sm ${type === "success"
                     ? "bg-green-100 text-green-800 border border-green-200"
                     : type === "error"
                         ? "bg-red-100 text-red-800 border border-red-200"
                         : "bg-blue-100 text-blue-800 border border-blue-200"
-                }`;
+                    }`;
 
-            notification.innerHTML = `
+                notification.innerHTML = `
                     <div class="flex items-center">
                         <div class="flex-1">
                             <p class="text-sm font-medium">${message}</p>
@@ -700,197 +710,166 @@
                     </div>
                 `;
 
-            document.body.appendChild(notification);
+                document.body.appendChild(notification);
 
-            // Auto-remove after 5 seconds
-            setTimeout(() => {
-                if (notification.parentElement) {
-                    notification.remove();
-                }
-            }, 5000);
-        }
-
-        function disconnectWebSocket() {
-            if (websocket) {
-                websocket.close(1000, "User logout");
-                websocket = null;
-            }
-
-            // Clear ping interval
-            if (pingInterval) {
-                clearInterval(pingInterval);
-                pingInterval = null;
-            }
-        }
-
-        // Helper to perform fetch calls with Authorization when available.
-        // Ensures Content-Type is set only for requests with a body to avoid
-        // triggering browser auth popups on 401 responses to GET requests.
-        function getAuthHeaders() {
-            const token = sessionStorage.getItem("access_token");
-            if (!token) return {};
-            return { Authorization: `Bearer ${token}` };
-        }
-        async function fetchWithAuth(url, options = {}) {
-            options.headers = options.headers || {};
-
-            // Merge auth headers without overwriting provided headers
-            const authHeaders = getAuthHeaders();
-            for (const k in authHeaders) {
-                if (!(k in options.headers))
-                    options.headers[k] = authHeaders[k];
-            }
-
-            // If there is a body and Content-Type isn't set, assume JSON
-            if (options.body) {
-                const normalized = {};
-                Object.keys(options.headers || {}).forEach(
-                    (k) =>
-                        (normalized[k.toLowerCase()] = options.headers[k])
-                );
-                if (!("content-type" in normalized)) {
-                    options.headers["Content-Type"] = "application/json";
-                }
-            }
-
-            return fetch(url, options);
-        }
-
-        function formatDate(dateString) {
-            const date = new Date(dateString);
-            return (
-                date.toLocaleDateString() + " " + date.toLocaleTimeString()
-            );
-        }
-
-        function getStatusBadge(status) {
-            const statusClasses = {
-                reported: "bg-yellow-100 text-yellow-800",
-                in_progress: "bg-blue-100 text-blue-800",
-                resolved: "bg-green-100 text-green-800",
-                closed: "bg-gray-100 text-gray-800",
-            };
-            return statusClasses[status] || "bg-gray-100 text-gray-800";
-        }
-
-        function getSeverityBadge(severity) {
-            const severityClasses = {
-                low: "bg-green-100 text-green-800",
-                medium: "bg-yellow-100 text-yellow-800",
-                high: "bg-orange-100 text-orange-800",
-                critical: "bg-red-100 text-red-800",
-            };
-            return severityClasses[severity] || "bg-gray-100 text-gray-800";
-        }
-
-        // API Functions
-        async function fetchComplaints() {
-            try {
-                const params = new URLSearchParams({
-                    page: currentPage,
-                    page_size: pageSize,
-                    ...currentFilters,
-                });
-
-                const response = await fetchWithAuth(
-                    `${API_BASE_URL}/api/v1/complaints?${params}`
-                );
-
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        // Token expired, redirect to login
-                        sessionStorage.clear();
-                        window.location.href = "/dashboard/login.html";
-                        return;
+                // Auto-remove after 5 seconds
+                setTimeout(() => {
+                    if (notification.parentElement) {
+                        notification.remove();
                     }
-                    throw new Error("Failed to fetch complaints");
+                }, 5000);
+            }
+
+            function disconnectWebSocket() {
+                if (websocket) {
+                    websocket.close(1000, "User logout");
+                    websocket = null;
                 }
 
-                const data = await response.json();
-                complaints = data.items;
-                updateComplaintsTable(data);
-                updatePagination(data);
-            } catch (error) {
-                console.error("Error fetching complaints:", error);
-                showError("Failed to load complaints. Please try again.");
-            }
-        }
-
-        async function fetchPorters() {
-            try {
-                const response = await fetchWithAuth(
-                    `${API_BASE_URL}/api/v1/porters`
-                );
-
-                if (response.ok) {
-                    porters = await response.json();
+                // Clear ping interval
+                if (pingInterval) {
+                    clearInterval(pingInterval);
+                    pingInterval = null;
                 }
-            } catch (error) {
-                console.error("Error fetching porters:", error);
             }
-        }
 
-        async function fetchComplaintDetails(complaintId) {
-            try {
-                const response = await fetchWithAuth(
-                    `${API_BASE_URL}/api/v1/complaints/${complaintId}`
+            // ... fetchWithAuth and getAuthHeaders are now imported from js/auth.js ...
+
+            function formatDate(dateString) {
+                const date = new Date(dateString);
+                return (
+                    date.toLocaleDateString() + " " + date.toLocaleTimeString()
                 );
-
-                if (!response.ok) {
-                    throw new Error("Failed to fetch complaint details");
-                }
-
-                return await response.json();
-            } catch (error) {
-                console.error("Error fetching complaint details:", error);
-                throw error;
             }
-        }
 
-        async function updateComplaint(complaintId, updates) {
-            try {
-                const response = await fetchWithAuth(
-                    `${API_BASE_URL}/api/v1/complaints/${complaintId}`,
-                    {
-                        method: "PATCH",
-                        body: JSON.stringify(updates),
-                    }
-                );
+            function getStatusBadge(status) {
+                const statusClasses = {
+                    reported: "bg-yellow-100 text-yellow-800",
+                    in_progress: "bg-blue-100 text-blue-800",
+                    resolved: "bg-green-100 text-green-800",
+                    closed: "bg-gray-100 text-gray-800",
+                };
+                return statusClasses[status] || "bg-gray-100 text-gray-800";
+            }
 
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(
-                        errorData.detail || "Failed to update complaint"
+            function getSeverityBadge(severity) {
+                const severityClasses = {
+                    low: "bg-green-100 text-green-800",
+                    medium: "bg-yellow-100 text-yellow-800",
+                    high: "bg-orange-100 text-orange-800",
+                    critical: "bg-red-100 text-red-800",
+                };
+                return severityClasses[severity] || "bg-gray-100 text-gray-800";
+            }
+
+            // API Functions
+            async function fetchComplaints() {
+                try {
+                    const params = new URLSearchParams({
+                        page: currentPage,
+                        page_size: pageSize,
+                        ...currentFilters,
+                    });
+
+                    const response = await fetchWithAuth(
+                        `${API_BASE_URL}/api/v1/complaints?${params}`
                     );
+
+                    if (!response.ok) {
+                        if (response.status === 401) {
+                            // Token expired, redirect to login
+                            sessionStorage.clear();
+                            window.location.href = "/dashboard/login.html";
+                            return;
+                        }
+                        throw new Error("Failed to fetch complaints");
+                    }
+
+                    const data = await response.json();
+                    complaints = data.items;
+                    updateComplaintsTable(data);
+                    updatePagination(data);
+                } catch (error) {
+                    console.error("Error fetching complaints:", error);
+                    showError("Failed to load complaints. Please try again.");
                 }
-
-                return await response.json();
-            } catch (error) {
-                console.error("Error updating complaint:", error);
-                throw error;
             }
-        }
 
-        // UI Update Functions
-        function updateComplaintsTable(data) {
-            loadingRow.style.display = "none";
+            async function fetchPorters() {
+                try {
+                    const response = await fetchWithAuth(
+                        `${API_BASE_URL}/api/v1/porters`
+                    );
 
-            if (data.items.length === 0) {
-                complaintsTableBody.innerHTML = `
+                    if (response.ok) {
+                        porters = await response.json();
+                    }
+                } catch (error) {
+                    console.error("Error fetching porters:", error);
+                }
+            }
+
+            async function fetchComplaintDetails(complaintId) {
+                try {
+                    const response = await fetchWithAuth(
+                        `${API_BASE_URL}/api/v1/complaints/${complaintId}`
+                    );
+
+                    if (!response.ok) {
+                        throw new Error("Failed to fetch complaint details");
+                    }
+
+                    return await response.json();
+                } catch (error) {
+                    console.error("Error fetching complaint details:", error);
+                    throw error;
+                }
+            }
+
+            async function updateComplaint(complaintId, updates) {
+                try {
+                    const response = await fetchWithAuth(
+                        `${API_BASE_URL}/api/v1/complaints/${complaintId}`,
+                        {
+                            method: "PATCH",
+                            body: JSON.stringify(updates),
+                        }
+                    );
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(
+                            errorData.detail || "Failed to update complaint"
+                        );
+                    }
+
+                    return await response.json();
+                } catch (error) {
+                    console.error("Error updating complaint:", error);
+                    throw error;
+                }
+            }
+
+            // UI Update Functions
+            function updateComplaintsTable(data) {
+                loadingRow.style.display = "none";
+
+                if (data.items.length === 0) {
+                    complaintsTableBody.innerHTML = `
                     <tr>
                         <td colspan="7" class="px-6 py-12 text-center text-gray-500">
                             No complaints found matching your criteria.
                         </td>
                     </tr>
                 `;
-                return;
-            }
+                    return;
+                }
 
-            complaintsTableBody.innerHTML = data.items
-                .map(
-                    (complaint) => `
+                complaintsTableBody.innerHTML = data.items
+                    .map(
+                        (complaint) => `
                 <tr class="hover:bg-gray-50 cursor-pointer" onclick="openComplaintModal('${complaint.id
-                        }')">
+                            }')">
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         ${complaint.id.substring(0, 8)}...
                     </td>
@@ -902,15 +881,15 @@
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getSeverityBadge(
-                            complaint.severity
-                        )}">
+                                complaint.severity
+                            )}">
                             ${complaint.severity}
                         </span>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(
-                            complaint.status
-                        )}">
+                                complaint.status
+                            )}">
                             ${complaint.status.replace("_", " ")}
                         </span>
                     </td>
@@ -924,83 +903,83 @@
                     </td>
                 </tr>
             `
-                )
-                .join("");
-        }
-
-        function updatePagination(data) {
-            const start = (data.page - 1) * data.page_size + 1;
-            const end = Math.min(data.page * data.page_size, data.total);
-
-            showingStart.textContent = start;
-            showingEnd.textContent = end;
-            showingTotal.textContent = data.total;
-            totalCount.textContent = `${data.total} complaints`;
-
-            // Update pagination buttons
-            prevPage.disabled = data.page === 1;
-            nextPage.disabled = data.page === data.total_pages;
-            prevPageMobile.disabled = data.page === 1;
-            nextPageMobile.disabled = data.page === data.total_pages;
-
-            // Generate page numbers
-            const maxVisiblePages = 5;
-            let startPage = Math.max(
-                1,
-                data.page - Math.floor(maxVisiblePages / 2)
-            );
-            let endPage = Math.min(
-                data.total_pages,
-                startPage + maxVisiblePages - 1
-            );
-
-            if (endPage - startPage + 1 < maxVisiblePages) {
-                startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                    )
+                    .join("");
             }
 
-            pageNumbers.innerHTML = "";
-            for (let i = startPage; i <= endPage; i++) {
-                const pageButton = document.createElement("button");
-                pageButton.className = `relative inline-flex items-center px-4 py-2 border text-sm font-medium ${i === data.page
+            function updatePagination(data) {
+                const start = (data.page - 1) * data.page_size + 1;
+                const end = Math.min(data.page * data.page_size, data.total);
+
+                showingStart.textContent = start;
+                showingEnd.textContent = end;
+                showingTotal.textContent = data.total;
+                totalCount.textContent = `${data.total} complaints`;
+
+                // Update pagination buttons
+                prevPage.disabled = data.page === 1;
+                nextPage.disabled = data.page === data.total_pages;
+                prevPageMobile.disabled = data.page === 1;
+                nextPageMobile.disabled = data.page === data.total_pages;
+
+                // Generate page numbers
+                const maxVisiblePages = 5;
+                let startPage = Math.max(
+                    1,
+                    data.page - Math.floor(maxVisiblePages / 2)
+                );
+                let endPage = Math.min(
+                    data.total_pages,
+                    startPage + maxVisiblePages - 1
+                );
+
+                if (endPage - startPage + 1 < maxVisiblePages) {
+                    startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                }
+
+                pageNumbers.innerHTML = "";
+                for (let i = startPage; i <= endPage; i++) {
+                    const pageButton = document.createElement("button");
+                    pageButton.className = `relative inline-flex items-center px-4 py-2 border text-sm font-medium ${i === data.page
                         ? "z-10 bg-primary-50 border-primary-500 text-primary-600"
                         : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
-                    }`;
-                pageButton.textContent = i;
-                pageButton.onclick = () => {
-                    currentPage = i;
-                    fetchComplaints();
-                };
-                pageNumbers.appendChild(pageButton);
+                        }`;
+                    pageButton.textContent = i;
+                    pageButton.onclick = () => {
+                        currentPage = i;
+                        fetchComplaints();
+                    };
+                    pageNumbers.appendChild(pageButton);
+                }
             }
-        }
 
-        function updateFilters() {
-            currentFilters = {};
-            if (statusFilter.value)
-                currentFilters.status = statusFilter.value;
-            if (hostelFilter.value)
-                currentFilters.hostel = hostelFilter.value;
-            if (categoryFilter.value)
-                currentFilters.category = categoryFilter.value;
-            if (severityFilter.value)
-                currentFilters.severity = severityFilter.value;
+            function updateFilters() {
+                currentFilters = {};
+                if (statusFilter.value)
+                    currentFilters.status = statusFilter.value;
+                if (hostelFilter.value)
+                    currentFilters.hostel = hostelFilter.value;
+                if (categoryFilter.value)
+                    currentFilters.category = categoryFilter.value;
+                if (severityFilter.value)
+                    currentFilters.severity = severityFilter.value;
 
-            currentPage = 1;
-            fetchComplaints();
-        }
-
-        // Modal Functions
-        async function openComplaintModal(complaintId) {
-            try {
-                const complaint = await fetchComplaintDetails(complaintId);
-                showComplaintModal(complaint);
-            } catch (error) {
-                showError("Failed to load complaint details");
+                currentPage = 1;
+                fetchComplaints();
             }
-        }
 
-        function showComplaintModal(complaint) {
-            modalContent.innerHTML = `
+            // Modal Functions
+            async function openComplaintModal(complaintId) {
+                try {
+                    const complaint = await fetchComplaintDetails(complaintId);
+                    showComplaintModal(complaint);
+                } catch (error) {
+                    showError("Failed to load complaint details");
+                }
+            }
+
+            function showComplaintModal(complaint) {
+                modalContent.innerHTML = `
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <!-- Left Column - Complaint Details -->
                     <div class="space-y-6">
@@ -1010,34 +989,34 @@
                                 <div>
                                     <dt class="text-sm font-medium text-gray-500">ID</dt>
                                     <dd class="mt-1 text-sm text-gray-900">${complaint.id
-                }</dd>
+                    }</dd>
                                 </div>
                                 <div>
                                     <dt class="text-sm font-medium text-gray-500">Hostel</dt>
                                     <dd class="mt-1 text-sm text-gray-900">${complaint.hostel
-                }</dd>
+                    }</dd>
                                 </div>
                                 <div>
                                     <dt class="text-sm font-medium text-gray-500">Wing</dt>
                                     <dd class="mt-1 text-sm text-gray-900">${complaint.wing || "N/A"
-                }</dd>
+                    }</dd>
                                 </div>
                                 <div>
                                     <dt class="text-sm font-medium text-gray-500">Room Number</dt>
                                     <dd class="mt-1 text-sm text-gray-900">${complaint.room_number
-                }</dd>
+                    }</dd>
                                 </div>
                                 <div>
                                     <dt class="text-sm font-medium text-gray-500">Category</dt>
                                     <dd class="mt-1 text-sm text-gray-900">${complaint.category
-                }</dd>
+                    }</dd>
                                 </div>
                                 <div>
                                     <dt class="text-sm font-medium text-gray-500">Severity</dt>
                                     <dd class="mt-1">
                                         <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getSeverityBadge(
-                    complaint.severity
-                )}">
+                        complaint.severity
+                    )}">
                                             ${complaint.severity}
                                         </span>
                                     </dd>
@@ -1046,27 +1025,27 @@
                                     <dt class="text-sm font-medium text-gray-500">Status</dt>
                                     <dd class="mt-1">
                                         <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(
-                    complaint.status
-                )}">
+                        complaint.status
+                    )}">
                                             ${complaint.status.replace(
-                    "_",
-                    " "
-                )}
+                        "_",
+                        " "
+                    )}
                                         </span>
                                     </dd>
                                 </div>
                                 <div>
                                     <dt class="text-sm font-medium text-gray-500">Created</dt>
                                     <dd class="mt-1 text-sm text-gray-900">${formatDate(
-                    complaint.created_at
-                )}</dd>
+                        complaint.created_at
+                    )}</dd>
                                 </div>
                                 <div>
                                     <dt class="text-sm font-medium text-gray-500">Updated</dt>
                                     <dd class="mt-1 text-sm text-gray-900">${complaint.updated_at
-                    ? formatDate(complaint.updated_at)
-                    : "Never"
-                }</dd>
+                        ? formatDate(complaint.updated_at)
+                        : "Never"
+                    }</dd>
                                 </div>
                             </dl>
                         </div>
@@ -1074,27 +1053,27 @@
                         <div>
                             <h4 class="text-lg font-medium text-gray-900 mb-4">Description</h4>
                             <p class="text-sm text-gray-700 bg-gray-50 p-4 rounded-lg">${complaint.description
-                }</p>
+                    }</p>
                         </div>
 
                         ${complaint.photo_urls &&
-                    complaint.photo_urls.length > 0
-                    ? `
+                        complaint.photo_urls.length > 0
+                        ? `
                         <div>
                             <h4 class="text-lg font-medium text-gray-900 mb-4">Photos</h4>
                             <div class="grid grid-cols-2 gap-4">
                                 ${complaint.photo_urls
-                        .map(
-                            (url) => `
+                            .map(
+                                (url) => `
                                     <img src="${url}" alt="Complaint photo" class="w-full h-32 object-cover rounded-lg border border-gray-200">
                                 `
-                        )
-                        .join("")}
+                            )
+                            .join("")}
                             </div>
                         </div>
                         `
-                    : ""
-                }
+                        : ""
+                    }
                     </div>
 
                     <!-- Right Column - Actions -->
@@ -1107,21 +1086,21 @@
                                 <label for="statusSelect" class="block text-sm font-medium text-gray-700 mb-2">Update Status</label>
                                 <select id="statusSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
                                     <option value="reported" ${complaint.status === "reported"
-                    ? "selected"
-                    : ""
-                }>Reported</option>
+                        ? "selected"
+                        : ""
+                    }>Reported</option>
                                     <option value="in_progress" ${complaint.status === "in_progress"
-                    ? "selected"
-                    : ""
-                }>In Progress</option>
+                        ? "selected"
+                        : ""
+                    }>In Progress</option>
                                     <option value="resolved" ${complaint.status === "resolved"
-                    ? "selected"
-                    : ""
-                }>Resolved</option>
+                        ? "selected"
+                        : ""
+                    }>Resolved</option>
                                     <option value="closed" ${complaint.status === "closed"
-                    ? "selected"
-                    : ""
-                }>Closed</option>
+                        ? "selected"
+                        : ""
+                    }>Closed</option>
                                 </select>
                             </div>
 
@@ -1131,19 +1110,19 @@
                                 <select id="porterSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
                                     <option value="">Unassigned</option>
                                     ${porters
-                    .map(
-                        (porter) => `
+                        .map(
+                            (porter) => `
                                         <option value="${porter.id}" ${complaint.assigned_porter_id ===
-                                porter.id
-                                ? "selected"
-                                : ""
-                            }>
+                                    porter.id
+                                    ? "selected"
+                                    : ""
+                                }>
                                             ${porter.full_name} (${porter.email || porter.phone
-                            })
+                                })
                                         </option>
                                     `
-                    )
-                    .join("")}
+                        )
+                        .join("")}
                                 </select>
                             </div>
 
@@ -1160,402 +1139,403 @@
 
                         <!-- Current Assignment -->
                         ${complaint.assigned_porter_id
-                    ? `
+                        ? `
                         <div>
                             <h4 class="text-lg font-medium text-gray-900 mb-4">Current Assignment</h4>
                             <div class="bg-gray-50 p-4 rounded-lg">
                                 <p class="text-sm text-gray-700">
                                     Assigned to: ${porters.find(
-                        (p) =>
-                            p.id ===
-                            complaint.assigned_porter_id
-                    )?.full_name || "Unknown Porter"
-                    }
+                            (p) =>
+                                p.id ===
+                                complaint.assigned_porter_id
+                        )?.full_name || "Unknown Porter"
+                        }
                                 </p>
                             </div>
                         </div>
                         `
-                    : ""
-                }
+                        : ""
+                    }
                     </div>
                 </div>
             `;
 
-            // Add event listeners for modal actions
-            document.getElementById("updateComplaint").onclick = () =>
-                updateComplaintFromModal(complaint.id);
-            document.getElementById("assignToMe").onclick = () =>
-                assignToMe(complaint.id);
+                // Add event listeners for modal actions
+                document.getElementById("updateComplaint").onclick = () =>
+                    updateComplaintFromModal(complaint.id);
+                document.getElementById("assignToMe").onclick = () =>
+                    assignToMe(complaint.id);
 
-            complaintModal.classList.remove("hidden");
-        }
-
-        async function updateComplaintFromModal(complaintId) {
-            const status = document.getElementById("statusSelect").value;
-            const porterId = document.getElementById("porterSelect").value;
-
-            const updates = {};
-            if (status) updates.status = status;
-            if (porterId) updates.assigned_porter_id = porterId;
-
-            try {
-                await updateComplaint(complaintId, updates);
-                complaintModal.classList.add("hidden");
-                fetchComplaints(); // Refresh the list
-                showSuccess("Complaint updated successfully");
-            } catch (error) {
-                showError(error.message);
-            }
-        }
-
-        async function assignToMe(complaintId) {
-            const userId = sessionStorage.getItem("user_id");
-            if (!userId) {
-                showError("User ID not found");
-                return;
+                complaintModal.classList.remove("hidden");
             }
 
-            try {
-                await updateComplaint(complaintId, {
-                    assigned_porter_id: userId,
-                });
-                complaintModal.classList.add("hidden");
-                fetchComplaints(); // Refresh the list
-                showSuccess("Complaint assigned to you");
-            } catch (error) {
-                showError(error.message);
-            }
-        }
+            async function updateComplaintFromModal(complaintId) {
+                const status = document.getElementById("statusSelect").value;
+                const porterId = document.getElementById("porterSelect").value;
 
-        function showError(message) {
-            // Simple error notification - could be enhanced with a proper toast system
-            alert("Error: " + message);
-        }
+                const updates = {};
+                if (status) updates.status = status;
+                if (porterId) updates.assigned_porter_id = porterId;
 
-        function showSuccess(message) {
-            // Simple success notification - could be enhanced with a proper toast system
-            alert("Success: " + message);
-        }
-
-        // Event Listeners
-        refreshButton.onclick = () => {
-            currentPage = 1;
-            fetchComplaints();
-        };
-
-        closeModal.onclick = () => {
-            complaintModal.classList.add("hidden");
-        };
-
-        logoutButton.onclick = () => {
-            disconnectWebSocket();
-            sessionStorage.clear();
-            window.location.href = "/dashboard/login.html";
-        };
-
-        // Filter event listeners
-        [
-            statusFilter,
-            hostelFilter,
-            categoryFilter,
-            severityFilter,
-        ].forEach((filter) => {
-            filter.onchange = updateFilters;
-        });
-
-        // Pagination event listeners
-        prevPage.onclick = () => {
-            if (currentPage > 1) {
-                currentPage--;
-                fetchComplaints();
-            }
-        };
-
-        nextPage.onclick = () => {
-            currentPage++;
-            fetchComplaints();
-        };
-
-        prevPageMobile.onclick = () => {
-            if (currentPage > 1) {
-                currentPage--;
-                fetchComplaints();
-            }
-        };
-
-        nextPageMobile.onclick = () => {
-            currentPage++;
-            fetchComplaints();
-        };
-
-        // Initialize
-        document.addEventListener("DOMContentLoaded", async () => {
-            // Check authentication
-            if (!sessionStorage.getItem("access_token")) {
-                window.location.href = "/dashboard/login.html";
-                return;
-            }
-
-            // Set user info
-            await loadUserProfile();
-
-            // Load initial data
-            await fetchPorters();
-            await fetchComplaints();
-
-            // Connect WebSocket for real-time updates
-            connectWebSocket();
-
-            // Populate filter options
-            // Fetch hostels and categories from the API so the dashboard stays
-            // in sync with the backend and the bot's canonical list.
-            async function fetchHostelsAndCategories() {
-                // Hostels are embedded in the HTML as a permanent list to match the bot's
-                // canonical `HOSTELS`. We keep that static so the dashboard dropdown
-                // is always populated even before authentication.
-
-                // Populate categories using the canonical CATEGORY_KEY_TO_LABEL mapping
-                // so the dashboard matches the bot exactly in label text and order.
-                // We still attempt to fetch the server categories to include any
-                // server-side-only categories, but we render in the canonical order.
                 try {
-                    let serverCategories = [];
-                    const cRes = await fetch(`${API_BASE_URL}/api/v1/categories`);
-                    if (cRes && cRes.ok) {
-                        serverCategories = await cRes.json();
-                    }
+                    await updateComplaint(complaintId, updates);
+                    complaintModal.classList.add("hidden");
+                    fetchComplaints(); // Refresh the list
+                    showSuccess("Complaint updated successfully");
+                } catch (error) {
+                    showError(error.message);
+                }
+            }
 
-                    // Build a map of server category keys for quick lookup
-                    const serverKeys = new Set((serverCategories || []).map(c => c.name));
+            async function assignToMe(complaintId) {
+                const userId = sessionStorage.getItem("user_id");
+                if (!userId) {
+                    showError("User ID not found");
+                    return;
+                }
 
-                    // First, add canonical categories in the order defined in CATEGORY_KEY_TO_LABEL
-                    Object.keys(CATEGORY_KEY_TO_LABEL).forEach((storageKey) => {
-                        const option = document.createElement("option");
-                        option.value = storageKey;
-                        option.textContent = CATEGORY_KEY_TO_LABEL[storageKey];
-                        categoryFilter.appendChild(option);
-                        // Mark as seen so we don't duplicate later
-                        if (serverKeys.has(storageKey)) serverKeys.delete(storageKey);
+                try {
+                    await updateComplaint(complaintId, {
+                        assigned_porter_id: userId,
                     });
+                    complaintModal.classList.add("hidden");
+                    fetchComplaints(); // Refresh the list
+                    showSuccess("Complaint assigned to you");
+                } catch (error) {
+                    showError(error.message);
+                }
+            }
 
-                    // Append any server-side-only categories that are not in our canonical mapping
-                    // Place them after the canonical list so admins can still see additional types.
-                    if (serverCategories && serverCategories.length) {
-                        serverCategories.forEach((category) => {
-                            if (!Object.prototype.hasOwnProperty.call(CATEGORY_KEY_TO_LABEL, category.name)) {
-                                const option = document.createElement("option");
-                                option.value = category.name;
-                                option.textContent = category.display_name || category.name;
-                                categoryFilter.appendChild(option);
-                            }
+            function showError(message) {
+                // Simple error notification - could be enhanced with a proper toast system
+                alert("Error: " + message);
+            }
+
+            function showSuccess(message) {
+                // Simple success notification - could be enhanced with a proper toast system
+                alert("Success: " + message);
+            }
+
+            // Event Listeners
+            refreshButton.onclick = () => {
+                currentPage = 1;
+                fetchComplaints();
+            };
+
+            closeModal.onclick = () => {
+                complaintModal.classList.add("hidden");
+            };
+
+            logoutButton.onclick = () => {
+                disconnectWebSocket();
+                sessionStorage.clear();
+                window.location.href = "/dashboard/login.html";
+            };
+
+            // Filter event listeners
+            [
+                statusFilter,
+                hostelFilter,
+                categoryFilter,
+                severityFilter,
+            ].forEach((filter) => {
+                filter.onchange = updateFilters;
+            });
+
+            // Pagination event listeners
+            prevPage.onclick = () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    fetchComplaints();
+                }
+            };
+
+            nextPage.onclick = () => {
+                currentPage++;
+                fetchComplaints();
+            };
+
+            prevPageMobile.onclick = () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    fetchComplaints();
+                }
+            };
+
+            nextPageMobile.onclick = () => {
+                currentPage++;
+                fetchComplaints();
+            };
+
+            // Initialize
+            document.addEventListener("DOMContentLoaded", async () => {
+                // Check authentication
+                if (!sessionStorage.getItem("access_token")) {
+                    window.location.href = "/dashboard/login.html";
+                    return;
+                }
+
+                // Set user info
+                await loadUserProfile();
+
+                // Load initial data
+                await fetchPorters();
+                await fetchComplaints();
+
+                // Connect WebSocket for real-time updates
+                connectWebSocket();
+
+                // Populate filter options
+                // Fetch hostels and categories from the API so the dashboard stays
+                // in sync with the backend and the bot's canonical list.
+                async function fetchHostelsAndCategories() {
+                    // Hostels are embedded in the HTML as a permanent list to match the bot's
+                    // canonical `HOSTELS`. We keep that static so the dashboard dropdown
+                    // is always populated even before authentication.
+
+                    // Populate categories using the canonical CATEGORY_KEY_TO_LABEL mapping
+                    // so the dashboard matches the bot exactly in label text and order.
+                    // We still attempt to fetch the server categories to include any
+                    // server-side-only categories, but we render in the canonical order.
+                    try {
+                        let serverCategories = [];
+                        const cRes = await fetch(`${API_BASE_URL}/api/v1/categories`);
+                        if (cRes && cRes.ok) {
+                            serverCategories = await cRes.json();
+                        }
+
+                        // Build a map of server category keys for quick lookup
+                        const serverKeys = new Set((serverCategories || []).map(c => c.name));
+
+                        // First, add canonical categories in the order defined in CATEGORY_KEY_TO_LABEL
+                        Object.keys(CATEGORY_KEY_TO_LABEL).forEach((storageKey) => {
+                            const option = document.createElement("option");
+                            option.value = storageKey;
+                            option.textContent = CATEGORY_KEY_TO_LABEL[storageKey];
+                            categoryFilter.appendChild(option);
+                            // Mark as seen so we don't duplicate later
+                            if (serverKeys.has(storageKey)) serverKeys.delete(storageKey);
+                        });
+
+                        // Append any server-side-only categories that are not in our canonical mapping
+                        // Place them after the canonical list so admins can still see additional types.
+                        if (serverCategories && serverCategories.length) {
+                            serverCategories.forEach((category) => {
+                                if (!Object.prototype.hasOwnProperty.call(CATEGORY_KEY_TO_LABEL, category.name)) {
+                                    const option = document.createElement("option");
+                                    option.value = category.name;
+                                    option.textContent = category.display_name || category.name;
+                                    categoryFilter.appendChild(option);
+                                }
+                            });
+                        }
+                    } catch (err) {
+                        console.error("Error fetching categories:", err);
+
+                        // Fall back to canonical mapping if fetch fails
+                        Object.keys(CATEGORY_KEY_TO_LABEL).forEach((storageKey) => {
+                            const option = document.createElement("option");
+                            option.value = storageKey;
+                            option.textContent = CATEGORY_KEY_TO_LABEL[storageKey];
+                            categoryFilter.appendChild(option);
                         });
                     }
-                } catch (err) {
-                    console.error("Error fetching categories:", err);
+                }
 
-                    // Fall back to canonical mapping if fetch fails
-                    Object.keys(CATEGORY_KEY_TO_LABEL).forEach((storageKey) => {
-                        const option = document.createElement("option");
-                        option.value = storageKey;
-                        option.textContent = CATEGORY_KEY_TO_LABEL[storageKey];
-                        categoryFilter.appendChild(option);
+                // Populate filters from API
+                fetchHostelsAndCategories();
+            });
+
+            // Profile Management Functions
+            let currentUser = null;
+
+            async function loadUserProfile() {
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/v1/profile/me`, {
+                        headers: getAuthHeaders(),
                     });
+
+                    if (!response.ok) {
+                        throw new Error("Failed to load user profile");
+                    }
+
+                    currentUser = await response.json();
+
+                    // Update user info in header
+                    userInfo.textContent = currentUser.email || `User ID: ${currentUser.id}`;
+
+                    // Populate profile modal if it's open
+                    if (!profileModal.classList.contains("hidden")) {
+                        populateProfileModal();
+                    }
+                } catch (error) {
+                    console.error("Failed to load user profile:", error);
+                    const userId = sessionStorage.getItem("user_id");
+                    userInfo.textContent = `User ID: ${userId}`;
                 }
             }
 
-            // Populate filters from API
-            fetchHostelsAndCategories();
-        });
+            function populateProfileModal() {
+                if (!currentUser) return;
 
-        // Profile Management Functions
-        let currentUser = null;
+                document.getElementById("profileEmail").value = currentUser.email || "";
+                document.getElementById("profileFullName").value = currentUser.full_name || "";
+                document.getElementById("profileRole").value = (currentUser.role || "porter").toUpperCase();
 
-        async function loadUserProfile() {
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/v1/profile/me`, {
-                    headers: getAuthHeaders(),
-                });
-
-                if (!response.ok) {
-                    throw new Error("Failed to load user profile");
-                }
-
-                currentUser = await response.json();
-
-                // Update user info in header
-                userInfo.textContent = currentUser.email || `User ID: ${currentUser.id}`;
-
-                // Populate profile modal if it's open
-                if (!profileModal.classList.contains("hidden")) {
-                    populateProfileModal();
-                }
-            } catch (error) {
-                console.error("Failed to load user profile:", error);
-                const userId = sessionStorage.getItem("user_id");
-                userInfo.textContent = `User ID: ${userId}`;
-            }
-        }
-
-        function populateProfileModal() {
-            if (!currentUser) return;
-
-            document.getElementById("profileEmail").value = currentUser.email || "";
-            document.getElementById("profileFullName").value = currentUser.full_name || "";
-            document.getElementById("profileRole").value = (currentUser.role || "porter").toUpperCase();
-
-            // Show invite admin section only for admins
-            const inviteAdminSection = document.getElementById("inviteAdminSection");
-            if (currentUser.role === "admin") {
-                inviteAdminSection.classList.remove("hidden");
-            } else {
-                inviteAdminSection.classList.add("hidden");
-            }
-        }
-
-        // Profile Modal Event Handlers
-        profileButton.addEventListener("click", async () => {
-            await loadUserProfile();
-            populateProfileModal();
-            profileModal.classList.remove("hidden");
-        });
-
-        closeProfileModal.addEventListener("click", () => {
-            profileModal.classList.add("hidden");
-            // Reset forms
-            document.getElementById("changePasswordForm").reset();
-            document.getElementById("inviteAdminForm").reset();
-            document.getElementById("passwordChangeMessage").classList.add("hidden");
-            document.getElementById("inviteMessage").classList.add("hidden");
-        });
-
-        // Close modal when clicking outside
-        profileModal.addEventListener("click", (e) => {
-            if (e.target === profileModal) {
-                closeProfileModal.click();
-            }
-        });
-
-        // Change Password Form Handler
-        document.getElementById("changePasswordForm").addEventListener("submit", async (e) => {
-            e.preventDefault();
-
-            const currentPassword = document.getElementById("currentPassword").value;
-            const newPassword = document.getElementById("newPassword").value;
-            const confirmPassword = document.getElementById("confirmPassword").value;
-            const messageDiv = document.getElementById("passwordChangeMessage");
-            const button = document.getElementById("changePasswordButton");
-            const buttonText = document.getElementById("changePasswordButtonText");
-            const spinner = document.getElementById("changePasswordSpinner");
-
-            // Validate passwords match
-            if (newPassword !== confirmPassword) {
-                messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
-                messageDiv.innerHTML = '<p class="text-sm text-red-800">New passwords do not match</p>';
-                messageDiv.classList.remove("hidden");
-                return;
-            }
-
-            try {
-                button.disabled = true;
-                buttonText.classList.add("hidden");
-                spinner.classList.remove("hidden");
-                messageDiv.classList.add("hidden");
-
-                const response = await fetch(`${API_BASE_URL}/api/v1/profile/change-password`, {
-                    method: "POST",
-                    headers: {
-                        ...getAuthHeaders(),
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        current_password: currentPassword,
-                        new_password: newPassword,
-                    }),
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    messageDiv.className = "bg-green-50 border border-green-200 rounded-lg p-4";
-                    messageDiv.innerHTML = '<p class="text-sm text-green-800">Password changed successfully!</p>';
-                    document.getElementById("changePasswordForm").reset();
+                // Show invite admin section only for admins
+                const inviteAdminSection = document.getElementById("inviteAdminSection");
+                if (currentUser.role === "admin") {
+                    inviteAdminSection.classList.remove("hidden");
                 } else {
-                    messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
-                    messageDiv.innerHTML = `<p class="text-sm text-red-800">${data.detail || "Failed to change password"}</p>`;
+                    inviteAdminSection.classList.add("hidden");
                 }
-                messageDiv.classList.remove("hidden");
-            } catch (error) {
-                console.error("Password change error:", error);
-                messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
-                messageDiv.innerHTML = '<p class="text-sm text-red-800">An error occurred. Please try again.</p>';
-                messageDiv.classList.remove("hidden");
-            } finally {
-                button.disabled = false;
-                buttonText.classList.remove("hidden");
-                spinner.classList.add("hidden");
-            }
-        });
-
-        // Invite Admin Form Handler
-        document.getElementById("inviteAdminForm").addEventListener("submit", async (e) => {
-            e.preventDefault();
-
-            const email = document.getElementById("inviteEmail").value.trim();
-            const messageDiv = document.getElementById("inviteMessage");
-            const button = document.getElementById("inviteAdminButton");
-            const buttonText = document.getElementById("inviteAdminButtonText");
-            const spinner = document.getElementById("inviteAdminSpinner");
-
-            // Basic email validation
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(email)) {
-                messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
-                messageDiv.innerHTML = '<p class="text-sm text-red-800">Please enter a valid email address</p>';
-                messageDiv.classList.remove("hidden");
-                return;
             }
 
-            try {
-                button.disabled = true;
-                buttonText.classList.add("hidden");
-                spinner.classList.remove("hidden");
-                messageDiv.classList.add("hidden");
+            // Profile Modal Event Handlers
+            profileButton.addEventListener("click", async () => {
+                await loadUserProfile();
+                populateProfileModal();
+                profileModal.classList.remove("hidden");
+            });
 
-                const response = await fetch(`${API_BASE_URL}/auth/admin/invite`, {
-                    method: "POST",
-                    headers: {
-                        ...getAuthHeaders(),
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({ email }),
-                });
+            closeProfileModal.addEventListener("click", () => {
+                profileModal.classList.add("hidden");
+                // Reset forms
+                document.getElementById("changePasswordForm").reset();
+                document.getElementById("inviteAdminForm").reset();
+                document.getElementById("passwordChangeMessage").classList.add("hidden");
+                document.getElementById("inviteMessage").classList.add("hidden");
+            });
 
-                const data = await response.json();
-
-                if (response.ok) {
-                    messageDiv.className = "bg-green-50 border border-green-200 rounded-lg p-4";
-                    messageDiv.innerHTML = `<p class="text-sm text-green-800">Invitation sent successfully to ${email}!</p>`;
-                    document.getElementById("inviteAdminForm").reset();
-                } else {
-                    messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
-                    messageDiv.innerHTML = `<p class="text-sm text-red-800">${data.detail || "Failed to send invitation"}</p>`;
+            // Close modal when clicking outside
+            profileModal.addEventListener("click", (e) => {
+                if (e.target === profileModal) {
+                    closeProfileModal.click();
                 }
-                messageDiv.classList.remove("hidden");
-            } catch (error) {
-                console.error("Invite admin error:", error);
-                messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
-                messageDiv.innerHTML = '<p class="text-sm text-red-800">An error occurred. Please try again.</p>';
-                messageDiv.classList.remove("hidden");
-            } finally {
-                button.disabled = false;
-                buttonText.classList.remove("hidden");
-                spinner.classList.add("hidden");
-            }
-        });
+            });
 
-        // Cleanup on page unload
-        window.addEventListener("beforeunload", () => {
-            disconnectWebSocket();
+            // Change Password Form Handler
+            document.getElementById("changePasswordForm").addEventListener("submit", async (e) => {
+                e.preventDefault();
+
+                const currentPassword = document.getElementById("currentPassword").value;
+                const newPassword = document.getElementById("newPassword").value;
+                const confirmPassword = document.getElementById("confirmPassword").value;
+                const messageDiv = document.getElementById("passwordChangeMessage");
+                const button = document.getElementById("changePasswordButton");
+                const buttonText = document.getElementById("changePasswordButtonText");
+                const spinner = document.getElementById("changePasswordSpinner");
+
+                // Validate passwords match
+                if (newPassword !== confirmPassword) {
+                    messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
+                    messageDiv.innerHTML = '<p class="text-sm text-red-800">New passwords do not match</p>';
+                    messageDiv.classList.remove("hidden");
+                    return;
+                }
+
+                try {
+                    button.disabled = true;
+                    buttonText.classList.add("hidden");
+                    spinner.classList.remove("hidden");
+                    messageDiv.classList.add("hidden");
+
+                    const response = await fetch(`${API_BASE_URL}/api/v1/profile/change-password`, {
+                        method: "POST",
+                        headers: {
+                            ...getAuthHeaders(),
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                            current_password: currentPassword,
+                            new_password: newPassword,
+                        }),
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        messageDiv.className = "bg-green-50 border border-green-200 rounded-lg p-4";
+                        messageDiv.innerHTML = '<p class="text-sm text-green-800">Password changed successfully!</p>';
+                        document.getElementById("changePasswordForm").reset();
+                    } else {
+                        messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
+                        messageDiv.innerHTML = `<p class="text-sm text-red-800">${data.detail || "Failed to change password"}</p>`;
+                    }
+                    messageDiv.classList.remove("hidden");
+                } catch (error) {
+                    console.error("Password change error:", error);
+                    messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
+                    messageDiv.innerHTML = '<p class="text-sm text-red-800">An error occurred. Please try again.</p>';
+                    messageDiv.classList.remove("hidden");
+                } finally {
+                    button.disabled = false;
+                    buttonText.classList.remove("hidden");
+                    spinner.classList.add("hidden");
+                }
+            });
+
+            // Invite Admin Form Handler
+            document.getElementById("inviteAdminForm").addEventListener("submit", async (e) => {
+                e.preventDefault();
+
+                const email = document.getElementById("inviteEmail").value.trim();
+                const messageDiv = document.getElementById("inviteMessage");
+                const button = document.getElementById("inviteAdminButton");
+                const buttonText = document.getElementById("inviteAdminButtonText");
+                const spinner = document.getElementById("inviteAdminSpinner");
+
+                // Basic email validation
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(email)) {
+                    messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
+                    messageDiv.innerHTML = '<p class="text-sm text-red-800">Please enter a valid email address</p>';
+                    messageDiv.classList.remove("hidden");
+                    return;
+                }
+
+                try {
+                    button.disabled = true;
+                    buttonText.classList.add("hidden");
+                    spinner.classList.remove("hidden");
+                    messageDiv.classList.add("hidden");
+
+                    const response = await fetch(`${API_BASE_URL}/auth/admin/invite`, {
+                        method: "POST",
+                        headers: {
+                            ...getAuthHeaders(),
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({ email }),
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        messageDiv.className = "bg-green-50 border border-green-200 rounded-lg p-4";
+                        messageDiv.innerHTML = `<p class="text-sm text-green-800">Invitation sent successfully to ${email}!</p>`;
+                        document.getElementById("inviteAdminForm").reset();
+                    } else {
+                        messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
+                        messageDiv.innerHTML = `<p class="text-sm text-red-800">${data.detail || "Failed to send invitation"}</p>`;
+                    }
+                    messageDiv.classList.remove("hidden");
+                } catch (error) {
+                    console.error("Invite admin error:", error);
+                    messageDiv.className = "bg-red-50 border border-red-200 rounded-lg p-4";
+                    messageDiv.innerHTML = '<p class="text-sm text-red-800">An error occurred. Please try again.</p>';
+                    messageDiv.classList.remove("hidden");
+                } finally {
+                    button.disabled = false;
+                    buttonText.classList.remove("hidden");
+                    spinner.classList.add("hidden");
+                }
+            });
+
+            // Cleanup on page unload
+            window.addEventListener("beforeunload", () => {
+                disconnectWebSocket();
+            });
         });
     </script>
 </body>
