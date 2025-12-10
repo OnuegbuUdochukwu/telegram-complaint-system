@@ -20,19 +20,16 @@ function checkAuth(redirectUrl = 'login.html') {
  * @returns {Promise<void>}
  */
 async function loginUser(username, password) {
-    const body = new URLSearchParams();
-    body.append("username", username);
-    body.append("password", password);
-
     const baseUrl = window.API_BASE_URL || "http://localhost:8001";
     console.log("Attempting login to:", baseUrl);
 
-    const response = await fetch(`${baseUrl}/auth/login`, {
+    // Use JSON-based login endpoint to avoid form parsing conflicts
+    const response = await fetch(`${baseUrl}/auth/login-json`, {
         method: "POST",
         headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
+            "Content-Type": "application/json",
         },
-        body: body.toString(),
+        body: JSON.stringify({ username, password }),
     });
 
     if (!response.ok) {

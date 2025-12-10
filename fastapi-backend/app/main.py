@@ -126,6 +126,19 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), session=Depend
     return {"access_token": token, "token_type": "bearer", "id": str(porter.id), "role": (porter.role or "porter")}
 
 
+# Alternative JSON-based login to avoid OAuth2PasswordRequestForm conflicts with async session
+@app.post("/auth/login-json", response_model=dict)
+async def login_json(username: str = Body(...), password: str = Body(...), session=Depends(get_session)):
+    # Validate credentials against porters table (email or phone as username)
+    porter = await auth.authenticate_porter(username, password, session)
+    if not porter:
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    # Use the stored Porter.role when issuing JWT so admin/porter is consistent
+    token = auth.create_access_token(subject=porter.id, role=(porter.role or "porter"))
+    # Return the created token and the porter id (so clients can correlate id <-> token)
+    return {"access_token": token, "token_type": "bearer", "id": str(porter.id), "role": (porter.role or "porter")}
+
+
 @app.post("/auth/register", response_model=dict)
 async def register_porter(
     request: Request,
