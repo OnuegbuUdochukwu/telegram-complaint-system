@@ -85,10 +85,15 @@ def decode_access_token(token: str) -> TokenPayload:
 
 
 async def authenticate_porter(username: str, password: str, session) -> Optional[Porter]:
-    # Allow login by email or phone
-    statement = select(Porter).where((Porter.email == username) | (Porter.phone == username))
+    # Try email first, then phone - sequential lookup instead of OR clause
+    statement = select(Porter).where(Porter.email == username)
     result = await session.exec(statement)
     porter = result.first()
+    if not porter:
+        # Try phone if email didn't match
+        statement = select(Porter).where(Porter.phone == username)
+        result = await session.exec(statement)
+        porter = result.first()
     if not porter or not porter.password_hash:
         return None
     if not verify_password(password, porter.password_hash):
