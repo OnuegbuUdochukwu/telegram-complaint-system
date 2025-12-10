@@ -52,6 +52,7 @@ class S3Storage:
 
         session = boto3.session.Session(**session_kwargs) if session_kwargs else boto3.session.Session()
 
+        # Internal client for actual S3 operations (uses Docker-internal endpoint)
         client_kwargs = {
             "service_name": "s3",
             "region_name": settings.s3_region,
@@ -63,20 +64,21 @@ class S3Storage:
             client_kwargs["use_ssl"] = False
 
         self._client = session.client(**client_kwargs)
+        
+        # Separate client for presigned URL generation using public endpoint
+        # This ensures the signature matches the host that external clients will use
+        if settings.s3_endpoint_public and settings.s3_endpoint_public != settings.s3_endpoint:
+            presign_kwargs = client_kwargs.copy()
+            presign_kwargs["endpoint_url"] = settings.s3_endpoint_public
+            self._presign_client = session.client(**presign_kwargs)
+        else:
+            self._presign_client = self._client
+            
         self._bucket = settings.s3_bucket
         self._kms_key_id = settings.kms_key_id
         self._upload_expiry = settings.s3_presign_expiry_upload
         self._download_expiry = settings.s3_presign_expiry_get
         self._cloudfront_domain = settings.cloudfront_domain
-        # Store endpoints for URL rewriting
-        self._internal_endpoint = settings.s3_endpoint
-        self._public_endpoint = settings.s3_endpoint_public
-
-    def _rewrite_url_for_external(self, url: str) -> str:
-        """Rewrite internal S3 URL to use public endpoint for external clients."""
-        if self._public_endpoint and self._internal_endpoint:
-            return url.replace(self._internal_endpoint, self._public_endpoint)
-        return url
 
     # ---------- helpers ----------
     @staticmethod
@@ -104,7 +106,8 @@ class S3Storage:
             conditions.append(["content-length-range", 1, content_length])
 
         try:
-            url = self._client.generate_presigned_url(
+            # Use presign_client (which uses public endpoint) for external clients
+            url = self._presign_client.generate_presigned_url(
                 ClientMethod="put_object",
                 Params={
                     "Bucket": self._bucket,
@@ -122,7 +125,7 @@ class S3Storage:
             upload_id=key,
             photo_id=key.split("/")[-1].split(".")[0],
             method="PUT",
-            url=self._rewrite_url_for_external(url),
+            url=url,
             fields=None,
             expires_in=self._upload_expiry,
             s3_key=key,
