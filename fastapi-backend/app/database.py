@@ -43,11 +43,13 @@ elif "asyncpg" in DATABASE_URL or "postgresql" in DATABASE_URL:
 
 engine = create_async_engine(DATABASE_URL, **engine_kwargs)
 
+# Create session factory at module level for proper initialization
+async_session_factory = sessionmaker(
+    engine, class_=AsyncSession, expire_on_commit=False
+)
+
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    async_session = sessionmaker(
-        engine, class_=AsyncSession, expire_on_commit=False
-    )
-    async with async_session() as session:
+    async with async_session_factory() as session:
         yield session
 
 async def init_db() -> None:
