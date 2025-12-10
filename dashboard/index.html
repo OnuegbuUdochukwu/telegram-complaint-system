@@ -469,8 +469,8 @@
         document.addEventListener('DOMContentLoaded', () => {
             // Auth checked in head
 
-
-            // Mapping storage key -> display label for categories.
+            // API configuration - use window.API_BASE_URL from config.js
+            const API_BASE_URL = window.API_BASE_URL || "http://localhost:8001";
 
             // Mapping storage key -> display label for categories.
             // Keep keys in sync with backend storage keys (no DB migration required).
@@ -540,8 +540,9 @@
                     return;
                 }
 
-                const wsUrl = `ws://${window.location.host
-                    }/ws/dashboard?token=${encodeURIComponent(token)}`;
+                // Use backend host from API_BASE_URL for WebSocket (not frontend host)
+                const wsHost = new URL(API_BASE_URL).host;
+                const wsUrl = `ws://${wsHost}/ws/dashboard?token=${encodeURIComponent(token)}`;
 
                 try {
                     websocket = new WebSocket(wsUrl);
