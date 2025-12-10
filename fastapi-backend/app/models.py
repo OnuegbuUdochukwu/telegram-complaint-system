@@ -96,7 +96,7 @@ class Complaint(SQLModel, table=True):
     room_number: str
     category: str
     description: str
-    photo_urls: Optional[List[str]] = None
+    photo_urls: Optional[List[str]] = Field(default=None, sa_column=Column(sa.JSON))
     severity: str
     status: str = Field(default="reported")
     # Ensure assigned_porter_id column type matches porters.id when using Postgres UUIDs
@@ -104,7 +104,14 @@ class Complaint(SQLModel, table=True):
         assigned_porter_id: Optional[uuid.UUID] = Field(default=None, foreign_key="porters.id", sa_column=Column(PG_UUID(as_uuid=True)))
     else:
         assigned_porter_id: Optional[str] = None
-    created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
+    # Use server_default for created_at to avoid asyncpg timezone conversion issues
+    if _USE_PG_UUID:
+        created_at: Optional[datetime] = Field(
+            default=None,
+            sa_column=Column(sa.DateTime(timezone=True), server_default=text("now()"))
+        )
+    else:
+        created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: Optional[datetime] = None
 
 

@@ -1006,7 +1006,9 @@ async def update_complaint(
         updated = True
 
     if updated:
-        complaint.updated_at = datetime.now(timezone.utc)
+        # Use utcnow() (timezone-naive) - PostgreSQL will store with timezone correctly
+        # Using timezone.utc causes asyncpg type conversion errors
+        complaint.updated_at = datetime.utcnow()
         session.add(complaint)
         
         # Create audit record for assignment changes
