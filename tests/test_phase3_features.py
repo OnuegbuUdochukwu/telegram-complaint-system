@@ -46,7 +46,7 @@ def test_metrics():
 def test_photo_upload_basic():
     """Test 3.9: Photo uploads"""
     print("Testing photo upload functionality...")
-    
+
     # Create a test complaint first
     complaint_payload = {
         "telegram_user_id": "test-user-phase3",
@@ -54,15 +54,17 @@ def test_photo_upload_basic():
         "room_number": "A200",
         "category": "electrical",
         "description": "Test for Phase 3 photo upload",
-        "severity": "medium"
+        "severity": "medium",
     }
-    
-    resp = httpx.post(f"{BASE_URL}/api/v1/complaints/submit", json=complaint_payload, timeout=TIMEOUT)
+
+    resp = httpx.post(
+        f"{BASE_URL}/api/v1/complaints/submit", json=complaint_payload, timeout=TIMEOUT
+    )
     assert resp.status_code == 201, f"Expected 201, got {resp.status_code}"
     complaint_id = resp.json()["complaint_id"]
-    
+
     print(f"✓ Created complaint {complaint_id}")
-    
+
     # Note: Photo upload requires authentication, which we're not testing here
     # but the endpoint exists. Testing the endpoints existence.
     print("✓ Photo upload endpoint structure verified")
@@ -71,34 +73,36 @@ def test_photo_upload_basic():
 def test_retention_purge():
     """Test 3.15: Data retention - Purge endpoint"""
     print("Testing purge endpoint...")
-    
+
     # First, ensure we're authenticated as admin
     # Use the admin user that's already created in conftest (admin-purge@test.com)
     # or register a new one if needed
     register_payload = {
         "full_name": "Admin Test User",
         "email": "admin-purge@test.com",  # This email is in AUTO_ADMIN_EMAILS
-        "password": "adminpass123"
+        "password": "adminpass123",
     }
-    
+
     # Try to register (may fail if user exists, that's OK)
     httpx.post(f"{BASE_URL}/auth/register", json=register_payload, timeout=TIMEOUT)
-    
+
     # Login
     login_resp = httpx.post(
         f"{BASE_URL}/auth/login",
         data={"username": "admin-purge@test.com", "password": "adminpass123"},
-        timeout=TIMEOUT
+        timeout=TIMEOUT,
     )
-    
+
     if login_resp.status_code == 200:
         token = login_resp.json()["access_token"]
         headers = {"Authorization": f"Bearer {token}"}
-        
+
         # Test purge endpoint
-        resp = httpx.delete(f"{BASE_URL}/api/v1/admin/purge", headers=headers, timeout=TIMEOUT)
+        resp = httpx.delete(
+            f"{BASE_URL}/api/v1/admin/purge", headers=headers, timeout=TIMEOUT
+        )
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
-        
+
         data = resp.json()
         assert "message" in data
         print("✓ Purge endpoint works")
@@ -119,7 +123,7 @@ def test_websocket_health():
 def verify_files_exist():
     """Verify that all required files for Phase 3 exist"""
     print("Verifying Phase 3 implementation files...")
-    
+
     files_to_check = [
         ".github/workflows/ci.yml",
         "fastapi-backend/Dockerfile",
@@ -129,9 +133,9 @@ def verify_files_exist():
         "LOAD_TESTING_GUIDE.md",
         "CAPACITY_PLANNING.md",
         "load_tests/test_complaints_load.py",
-        "tests/test_observability_and_retention.py"
+        "tests/test_observability_and_retention.py",
     ]
-    
+
     for filepath in files_to_check:
         path = Path(filepath)
         if path.exists():
@@ -139,7 +143,7 @@ def verify_files_exist():
         else:
             print(f"✗ {filepath} MISSING")
             return False
-    
+
     return True
 
 
@@ -149,26 +153,26 @@ def main():
     print("Phase 3 Feature Testing (Sections 3.9 - 3.16)")
     print("=" * 70)
     print()
-    
+
     try:
         # Check file existence
         if not verify_files_exist():
             print("\n❌ Some required files are missing!")
             sys.exit(1)
-        
+
         print("\nTesting backend connectivity...")
-        
+
         # Test observability features
         test_health()
         test_metrics()
         test_websocket_health()
-        
+
         # Test photo upload structure
         test_photo_upload_basic()
-        
+
         # Test retention/purge
         test_retention_purge()
-        
+
         print("\n" + "=" * 70)
         print("✓ All Phase 3 features implemented and basic tests passed!")
         print("=" * 70)
@@ -186,14 +190,14 @@ def main():
         print("  pip install locust")
         print("  cd load_tests && locust -f test_complaints_load.py")
         print()
-        
+
     except Exception as e:
         print(f"\n❌ Test failed: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 
 
 if __name__ == "__main__":
     main()
-

@@ -62,21 +62,37 @@ def _wait_for_port(host: str, port: int, timeout: float = 20.0) -> None:
                 return
         except OSError:
             time.sleep(0.2)
-    raise RuntimeError(f"Backend server did not start on {host}:{port} within {timeout}s")
+    raise RuntimeError(
+        f"Backend server did not start on {host}:{port} within {timeout}s"
+    )
 
 
 async def _ensure_seed_users():
     admin_email = os.environ.get("TEST_ADMIN_EMAIL", "admin@test.local")
     admin_password = os.environ.get("TEST_ADMIN_PASSWORD", "testpass123")
-    
+
     # Create a dedicated async engine for seeding to avoid event loop issues
     seed_engine = create_async_engine(os.environ["DATABASE_URL"])
-    async_session = sessionmaker(seed_engine, class_=AsyncSession, expire_on_commit=False)
-    
+    async_session = sessionmaker(
+        seed_engine, class_=AsyncSession, expire_on_commit=False
+    )
+
     async with async_session() as session:
-        await auth.create_porter(session, full_name="Test Admin", email=admin_email, password=admin_password, role="admin")
-        await auth.create_porter(session, full_name="Purge Admin", email="admin-purge@test.com", password="adminpass123", role="admin")
-    
+        await auth.create_porter(
+            session,
+            full_name="Test Admin",
+            email=admin_email,
+            password=admin_password,
+            role="admin",
+        )
+        await auth.create_porter(
+            session,
+            full_name="Purge Admin",
+            email="admin-purge@test.com",
+            password="adminpass123",
+            role="admin",
+        )
+
     await seed_engine.dispose()
 
 
@@ -91,10 +107,11 @@ def backend_server():
     # Initialize DB schema synchronously for the test session
     # We use a sync engine just for the initial CREATE TABLE
     from sqlmodel import create_engine
+
     sync_db_url = os.environ["DATABASE_URL"].replace("sqlite+aiosqlite", "sqlite")
     sync_engine = create_engine(sync_db_url)
     SQLModel.metadata.create_all(sync_engine)
-    
+
     # Seed users using async
     asyncio.run(_ensure_seed_users())
 
@@ -153,7 +170,9 @@ async def make_porter(db_engine) -> Callable[[str, str], Tuple[str, str]]:
     """Return a factory that creates a porter directly in the DB and returns (id, token)."""
 
     async def _create(email: str, role: str = "porter"):
-        async_session = sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
+        async_session = sessionmaker(
+            db_engine, class_=AsyncSession, expire_on_commit=False
+        )
         async with async_session() as session:
             porter = await auth.create_porter(
                 session,
@@ -162,7 +181,9 @@ async def make_porter(db_engine) -> Callable[[str, str], Tuple[str, str]]:
                 email=email,
                 role=role,
             )
-            token = auth.create_access_token(subject=porter.id, role=(porter.role or "porter"))
+            token = auth.create_access_token(
+                subject=porter.id, role=(porter.role or "porter")
+            )
             return porter.id, token
 
     return _create

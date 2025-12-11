@@ -40,7 +40,9 @@ async def test_dashboard_login_and_list_complaints(admin_token, make_porter):
 
         # The dashboard endpoint returns a PaginatedComplaints model; even if no complaints exist
         # the request should succeed for admin (200) and return JSON with keys including 'items' and 'total'
-        assert list_resp.status_code == 200, f"Dashboard list failed: {list_resp.status_code} {list_resp.text}"
+        assert (
+            list_resp.status_code == 200
+        ), f"Dashboard list failed: {list_resp.status_code} {list_resp.text}"
         j = list_resp.json()
         assert isinstance(j, dict)
         assert "items" in j and "total" in j

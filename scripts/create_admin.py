@@ -29,7 +29,9 @@ def main():
     password = os.environ.get("ADMIN_PASSWORD") or secrets.token_urlsafe(12)
 
     with Session(engine) as session:
-        porter = create_porter(session, full_name=full_name, password=password, email=email, role="admin")
+        porter = create_porter(
+            session, full_name=full_name, password=password, email=email, role="admin"
+        )
         token = create_access_token(subject=porter.id, role="admin")
 
         print("ADMIN_CREATED")
@@ -40,5 +42,5 @@ def main():
         print(f"access_token: {token}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -2,6 +2,7 @@ import os
 import pytest
 from client import upload_photo
 
+
 @pytest.mark.asyncio
 async def test_client_upload_photo_mock():
     """When BACKEND_URL is not set, upload_photo should return a mock response
@@ -10,6 +11,7 @@ async def test_client_upload_photo_mock():
     # Ensure BACKEND_URL is not set for this unit test to exercise mock fallback
     os.environ.pop("BACKEND_URL", None)
     import client
+
     old_url = client.BACKEND_URL
     client.BACKEND_URL = None
     print(f"DEBUG: client.BACKEND_URL set to {client.BACKEND_URL}")
@@ -25,7 +27,9 @@ async def test_client_upload_photo_mock():
         assert resp.get("file_name") == filename
         assert resp.get("file_size") == len(data)
         assert resp.get("file_url") is not None
-        assert resp.get("file_url").startswith("/storage/"), "Mock file_url should point to /storage/ path"
-    
+        assert resp.get("file_url").startswith(
+            "/storage/"
+        ), "Mock file_url should point to /storage/ path"
+
     finally:
         client.BACKEND_URL = old_url

@@ -23,15 +23,21 @@ def test_submit_and_get_complaint():
     }
 
     # POST the complaint
-    post_resp = httpx.post(f"{BASE_URL}/api/v1/complaints/submit", json=payload, timeout=10.0)
-    assert post_resp.status_code == 201, f"POST failed: {post_resp.status_code} {post_resp.text}"
+    post_resp = httpx.post(
+        f"{BASE_URL}/api/v1/complaints/submit", json=payload, timeout=10.0
+    )
+    assert (
+        post_resp.status_code == 201
+    ), f"POST failed: {post_resp.status_code} {post_resp.text}"
     jd = post_resp.json()
     assert "complaint_id" in jd, f"Missing complaint_id in response: {jd}"
     complaint_id = jd["complaint_id"]
 
     # GET the complaint back
     get_resp = httpx.get(f"{BASE_URL}/api/v1/complaints/{complaint_id}", timeout=10.0)
-    assert get_resp.status_code == 200, f"GET failed: {get_resp.status_code} {get_resp.text}"
+    assert (
+        get_resp.status_code == 200
+    ), f"GET failed: {get_resp.status_code} {get_resp.text}"
     item = get_resp.json()
 
     # Validate core fields

@@ -2,7 +2,13 @@ import pytest
 import respx
 from httpx import Response
 import os
-from client import submit_complaint, get_complaint_status, get_user_complaints, _get_service_token
+from client import (
+    submit_complaint,
+    get_complaint_status,
+    get_user_complaints,
+    _get_service_token,
+)
+
 
 # Mock environment variables for all tests in this module
 @pytest.fixture(autouse=True)
@@ -13,12 +19,15 @@ def mock_env(monkeypatch):
     # Also reset the client to ensure fresh state
     monkeypatch.setattr("client._client", None)
 
+
 @pytest.mark.asyncio
 async def test_submit_complaint_sends_auth_header():
     """Verify submit_complaint sends the correct Authorization header."""
     async with respx.mock(base_url="http://test-backend") as respx_mock:
         route = respx_mock.post("/api/v1/complaints/submit").mock(
-            return_value=Response(201, json={"complaint_id": "123", "status": "recieved"})
+            return_value=Response(
+                201, json={"complaint_id": "123", "status": "recieved"}
+            )
         )
 
         await submit_complaint({"test": "data"})
@@ -27,6 +36,7 @@ async def test_submit_complaint_sends_auth_header():
         request = route.calls.last.request
         assert "Authorization" in request.headers
         assert request.headers["Authorization"] == "Bearer test-token-123"
+
 
 @pytest.mark.asyncio
 async def test_get_complaint_status_sends_auth_header():
@@ -43,6 +53,7 @@ async def test_get_complaint_status_sends_auth_header():
         assert "Authorization" in request.headers
         assert request.headers["Authorization"] == "Bearer test-token-123"
 
+
 @pytest.mark.asyncio
 async def test_get_user_complaints_sends_auth_header():
     """Verify get_user_complaints sends the correct Authorization header."""
@@ -58,6 +69,7 @@ async def test_get_user_complaints_sends_auth_header():
         assert "Authorization" in request.headers
         assert request.headers["Authorization"] == "Bearer test-token-123"
 
+
 @pytest.mark.asyncio
 async def test_service_token_login_flow(monkeypatch):
     """Verify _get_service_token logs in if explicit token is missing but credentials exist."""
@@ -69,9 +81,9 @@ async def test_service_token_login_flow(monkeypatch):
         route = respx_mock.post("/auth/login").mock(
             return_value=Response(200, json={"access_token": "logged-in-token"})
         )
-        
+
         token = await _get_service_token()
-        
+
         assert token == "logged-in-token"
         assert route.called
         request = route.calls.last.request

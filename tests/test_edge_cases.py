@@ -15,10 +15,17 @@ def test_missing_required_field_returns_422():
         "severity": "low",
     }
 
-    resp = httpx.post(f"{BASE_URL}/api/v1/complaints/submit", json=payload, headers={"Authorization": "Bearer test-service-token"}, timeout=10.0)
+    resp = httpx.post(
+        f"{BASE_URL}/api/v1/complaints/submit",
+        json=payload,
+        headers={"Authorization": "Bearer test-service-token"},
+        timeout=10.0,
+    )
     assert resp.status_code == 422
     j = resp.json()
-    assert any("telegram_user_id" in str(item.get("loc", [])) for item in j.get("detail", []))
+    assert any(
+        "telegram_user_id" in str(item.get("loc", [])) for item in j.get("detail", [])
+    )
 
 
 def test_invalid_field_type_returns_422():
@@ -32,7 +39,12 @@ def test_invalid_field_type_returns_422():
         "severity": "medium",
     }
 
-    resp = httpx.post(f"{BASE_URL}/api/v1/complaints/submit", json=payload, headers={"Authorization": "Bearer test-service-token"}, timeout=10.0)
+    resp = httpx.post(
+        f"{BASE_URL}/api/v1/complaints/submit",
+        json=payload,
+        headers={"Authorization": "Bearer test-service-token"},
+        timeout=10.0,
+    )
     assert resp.status_code == 422
 
 

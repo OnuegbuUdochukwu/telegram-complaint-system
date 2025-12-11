@@ -20,7 +20,10 @@ def get_admin_token():
     # try seeding admin via script if present
     try:
         import subprocess
-        script = os.path.join(os.getcwd(), "fastapi-backend", "scripts", "get_admin_token.py")
+
+        script = os.path.join(
+            os.getcwd(), "fastapi-backend", "scripts", "get_admin_token.py"
+        )
         if os.path.exists(script):
             out = subprocess.check_output(["python", script], text=True)
             # script prints token line as JSON or token on last line
@@ -49,7 +52,11 @@ def test_admin_can_list_and_close_complaint():
     comp_id = comp["id"] if isinstance(comp, dict) and "id" in comp else comp
 
     # admin closes complaint
-    r = Client().patch(f"{BASE}/api/v1/complaints/{comp_id}/status", json={"status": "closed"}, headers=headers)
+    r = Client().patch(
+        f"{BASE}/api/v1/complaints/{comp_id}/status",
+        json={"status": "closed"},
+        headers=headers,
+    )
     assert r.status_code == 200
 
 
@@ -69,5 +76,9 @@ def test_porter_cannot_close_complaint():
     comp_id = comp.get("id") if isinstance(comp, dict) else comp
 
     # porter attempts to close -> should be forbidden (403)
-    r = Client().patch(f"{BASE}/api/v1/complaints/{comp_id}/status", json={"status": "closed"}, headers=headers)
+    r = Client().patch(
+        f"{BASE}/api/v1/complaints/{comp_id}/status",
+        json={"status": "closed"},
+        headers=headers,
+    )
     assert r.status_code == 403

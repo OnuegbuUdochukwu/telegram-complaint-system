@@ -14,7 +14,18 @@ import re
 # General / UI constants
 # ---------------------------------------------------------------------------
 # Hostels (canonical list used by the bot to render the hostel selection keyboard)
-HOSTELS: List[str] = ["John", "Joseph", "Paul", "Peter", "Daniel", "Esther", "Dorcas", "Lydia", "Mary", "Deborah"]
+HOSTELS: List[str] = [
+    "John",
+    "Joseph",
+    "Paul",
+    "Peter",
+    "Daniel",
+    "Esther",
+    "Dorcas",
+    "Lydia",
+    "Mary",
+    "Deborah",
+]
 
 # Legacy human-friendly categories (kept for backward compatibility/reference).
 # Prefer using CATEGORY_LABEL_TO_KEY and CATEGORY_KEY_TO_LABEL in the app logic.
@@ -51,7 +62,10 @@ CATEGORY_LABEL_TO_KEY: Dict[str, str] = {
 
 # Reverse mapping (storage key -> display label) - canonical display labels
 CATEGORY_KEY_TO_LABEL: Dict[str, str] = {
-    key: label for label, key in CATEGORY_LABEL_TO_KEY.items() if label in (
+    key: label
+    for label, key in CATEGORY_LABEL_TO_KEY.items()
+    if label
+    in (
         "Plumbing / Water",
         "Electrical / Lighting",
         "Carpentry",
@@ -72,7 +86,13 @@ SEVERITY_KEY_TO_LABEL: Dict[str, str] = dict(zip(SEVERITY_KEYS, SEVERITY_LABELS)
 
 # Status
 STATUS_KEYS: List[str] = ["reported", "in_progress", "on_hold", "resolved", "rejected"]
-STATUS_LABELS: List[str] = ["Reported", "In Progress", "On Hold", "Resolved", "Rejected"]
+STATUS_LABELS: List[str] = [
+    "Reported",
+    "In Progress",
+    "On Hold",
+    "Resolved",
+    "Rejected",
+]
 STATUS_KEY_TO_LABEL: Dict[str, str] = dict(zip(STATUS_KEYS, STATUS_LABELS))
 
 # Default values
@@ -95,7 +115,15 @@ GET_WING = 7  # retained for backward-compatibility but not used in the active f
 SELECT_SEVERITY = 8
 
 # Active conversation flow states (GET_WING is no longer used; wing is derived from room number)
-ALL_STATES: List[int] = [GET_TELEGRAM_ID, SELECT_HOSTEL, GET_ROOM_NUMBER, SELECT_CATEGORY, GET_DESCRIPTION, SELECT_SEVERITY, SUBMIT_COMPLAINT]
+ALL_STATES: List[int] = [
+    GET_TELEGRAM_ID,
+    SELECT_HOSTEL,
+    GET_ROOM_NUMBER,
+    SELECT_CATEGORY,
+    GET_DESCRIPTION,
+    SELECT_SEVERITY,
+    SUBMIT_COMPLAINT,
+]
 
 # ---------------------------------------------------------------------------
 # Validation patterns and small helpers
@@ -114,18 +142,34 @@ JSON_SCHEMA_COMPLAINT = {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "Complaint",
     "type": "object",
-    "required": ["telegram_user_id", "hostel", "wing", "room_number", "category", "description", "severity"],
+    "required": [
+        "telegram_user_id",
+        "hostel",
+        "wing",
+        "room_number",
+        "category",
+        "description",
+        "severity",
+    ],
     "properties": {
-        "telegram_user_id": {"type": "string", "pattern": TELEGRAM_USER_ID_PATTERN.pattern},
+        "telegram_user_id": {
+            "type": "string",
+            "pattern": TELEGRAM_USER_ID_PATTERN.pattern,
+        },
         "hostel": {"type": "string", "maxLength": 50},
         "wing": {"type": "string", "maxLength": 20},
-        "room_number": {"type": "string", "maxLength": 10, "pattern": ROOM_NUMBER_PATTERN.pattern, "examples": [ROOM_NUMBER_EXAMPLE]},
+        "room_number": {
+            "type": "string",
+            "maxLength": 10,
+            "pattern": ROOM_NUMBER_PATTERN.pattern,
+            "examples": [ROOM_NUMBER_EXAMPLE],
+        },
         "category": {"type": "string", "enum": CATEGORY_KEYS},
         "description": {"type": "string", "minLength": 10, "maxLength": 500},
         "severity": {"type": "string", "enum": SEVERITY_KEYS},
         "status": {"type": "string", "enum": STATUS_KEYS},
-        "photo_urls": {"type": "array", "items": {"type": "string", "format": "uri"}}
-    }
+        "photo_urls": {"type": "array", "items": {"type": "string", "format": "uri"}},
+    },
 }
 
 # ---------------------------------------------------------------------------
@@ -165,4 +209,3 @@ __all__ = [
     # schemas
     "JSON_SCHEMA_COMPLAINT",
 ]
-

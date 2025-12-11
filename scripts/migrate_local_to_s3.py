@@ -34,9 +34,19 @@ logger = logging.getLogger("migrate-local-to-s3")
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Migrate local files to S3")
-    parser.add_argument("--storage-dir", default="storage", help="Directory containing legacy photo files")
-    parser.add_argument("--bucket", default=None, help="Override bucket name (defaults to env S3_BUCKET)")
-    parser.add_argument("--dry-run", action="store_true", help="Only log actions without uploading")
+    parser.add_argument(
+        "--storage-dir",
+        default="storage",
+        help="Directory containing legacy photo files",
+    )
+    parser.add_argument(
+        "--bucket",
+        default=None,
+        help="Override bucket name (defaults to env S3_BUCKET)",
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Only log actions without uploading"
+    )
     return parser.parse_args()
 
 
@@ -79,4 +89,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

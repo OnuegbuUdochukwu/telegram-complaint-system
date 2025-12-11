@@ -8,6 +8,7 @@ from app.config import get_settings
 os.environ["BACKEND_SERVICE_TOKEN"] = "test-service-token"
 os.environ["STORAGE_PROVIDER"] = "local"
 
+
 @pytest.mark.asyncio
 async def test_submit_complaint_requires_auth():
     """Verify that submitting a complaint without a token fails."""
@@ -23,11 +24,12 @@ async def test_submit_complaint_requires_auth():
         resp = await client.post("/api/v1/complaints/submit", json=complaint_data)
         assert resp.status_code in (401, 403)
 
+
 @pytest.mark.asyncio
 async def test_submit_complaint_with_service_token():
     """Verify that submitting a complaint with a valid service token succeeds."""
     headers = {"Authorization": "Bearer test-service-token"}
-    
+
     async with AsyncClient(app=app, base_url="http://test") as client:
         complaint_data = {
             "telegram_user_id": "12345",
@@ -37,9 +39,12 @@ async def test_submit_complaint_with_service_token():
             "description": "Pipe burst",
             "severity": "high",
         }
-        resp = await client.post("/api/v1/complaints/submit", json=complaint_data, headers=headers)
+        resp = await client.post(
+            "/api/v1/complaints/submit", json=complaint_data, headers=headers
+        )
         assert resp.status_code == 201
         assert "complaint_id" in resp.json()
+
 
 @pytest.mark.asyncio
 async def test_bot_list_complaints():
@@ -47,7 +52,7 @@ async def test_bot_list_complaints():
     # First submit a complaint to have something to list
     headers = {"Authorization": "Bearer test-service-token"}
     tg_id = "99999"
-    
+
     async with AsyncClient(app=app, base_url="http://test") as client:
         # Submit
         complaint_data = {
@@ -58,8 +63,10 @@ async def test_bot_list_complaints():
             "description": "Lights out",
             "severity": "medium",
         }
-        await client.post("/api/v1/complaints/submit", json=complaint_data, headers=headers)
-        
+        await client.post(
+            "/api/v1/complaints/submit", json=complaint_data, headers=headers
+        )
+
         # List as bot (no auth header, but filtering by telegram_user_id)
         resp = await client.get(f"/api/v1/complaints?telegram_user_id={tg_id}")
         assert resp.status_code == 200
@@ -67,11 +74,12 @@ async def test_bot_list_complaints():
         assert data["total"] >= 1
         assert data["items"][0]["telegram_user_id"] == tg_id
 
+
 @pytest.mark.asyncio
 async def test_get_complaint_details():
     """Verify fetching a specific complaint by ID."""
     headers = {"Authorization": "Bearer test-service-token"}
-    
+
     async with AsyncClient(app=app, base_url="http://test") as client:
         # Submit first
         complaint_data = {
@@ -82,9 +90,11 @@ async def test_get_complaint_details():
             "description": "Window broken",
             "severity": "low",
         }
-        resp = await client.post("/api/v1/complaints/submit", json=complaint_data, headers=headers)
+        resp = await client.post(
+            "/api/v1/complaints/submit", json=complaint_data, headers=headers
+        )
         complaint_id = resp.json()["complaint_id"]
-        
+
         # Get details (this currently requires NO auth? or depends on list logic? verify get_complaint implementation)
         # Looking at main.py: get_complaint does NOT have security dependency!
         # It's currently public... which might be OK for MVP if UUIDs are secret, but let's verify.

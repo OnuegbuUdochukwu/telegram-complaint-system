@@ -41,8 +41,9 @@ async def test_presign_and_confirm_flow(monkeypatch):
         # This creates S3Storage inside the mocked environment.
         from app.storage_s3 import S3Storage
         from app.routes import photos
+
         monkeypatch.setattr(photos, "storage", S3Storage())
-        
+
         # Disable thumbnail job for test
         photos_router.enqueue_thumbnail_job = lambda *a, **k: None
 
@@ -51,6 +52,7 @@ async def test_presign_and_confirm_flow(monkeypatch):
         db_url = os.environ["DATABASE_URL"]
         sync_url = db_url.replace("sqlite+aiosqlite", "sqlite")
         from sqlmodel import create_engine
+
         sync_engine = create_engine(sync_url)
 
         complaint = Complaint(
@@ -61,7 +63,7 @@ async def test_presign_and_confirm_flow(monkeypatch):
             description="Leak",
             severity="low",
         )
-        
+
         with Session(sync_engine) as session:
             session.add(complaint)
             session.commit()
@@ -86,7 +88,12 @@ async def test_presign_and_confirm_flow(monkeypatch):
             key = body["s3_key"]
 
             # Simulate upload by writing directly via boto3
-            s3.put_object(Bucket=os.environ["S3_BUCKET"], Key=key, Body=b"\xff\xd8\xff", ContentType="image/jpeg")
+            s3.put_object(
+                Bucket=os.environ["S3_BUCKET"],
+                Key=key,
+                Body=b"\xff\xd8\xff",
+                ContentType="image/jpeg",
+            )
 
             confirm_resp = await client.post(
                 f"/api/v1/complaints/{complaint_id}/photos/confirm",
@@ -102,4 +109,3 @@ async def test_presign_and_confirm_flow(monkeypatch):
             payload = confirm_resp.json()
             assert payload["complaint_id"] == complaint_id
             assert payload["file_name"] == "test.jpg"
-
