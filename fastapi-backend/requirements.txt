@@ -24,3 +24,5 @@ moto[s3]==5.0.12
 pytest-asyncio==0.23.8
 asyncpg==0.29.0
 aiosqlite==0.19.0
+ruff==0.1.8
+black==23.12.0

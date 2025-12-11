@@ -19,8 +19,8 @@ REPO_ROOT = Path(__file__).parent
 
 # Set environment variables BEFORE importing app modules to bypass strict checks
 os.environ["JWT_SECRET"] = "test-secret-key-for-pytest-only-12345"
-# Use aiosqlite for async SQLite testing
-os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///./test.db"
+# Use aiosqlite for async SQLite testing by default, but allow override (e.g. for CI with Postgres)
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///./test.db")
 os.environ["STORAGE_PROVIDER"] = "local"
 os.environ["BACKEND_SERVICE_TOKEN"] = "test-service-token"
 

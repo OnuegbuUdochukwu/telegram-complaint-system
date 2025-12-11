@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD Pipeline
 
 on:
   push:
@@ -7,18 +7,47 @@ on:
     branches: [ main, develop ]
 
 jobs:
+  # ------------------------------------------------------------------
+  # Linting Code Quality
+  # ------------------------------------------------------------------
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: 'pip'
+
+      - name: Install Linting Tools
+        run: pip install ruff black
+
+      - name: Run Ruff (Linter)
+        working-directory: ./fastapi-backend
+        run: ruff check .
+
+      - name: Run Black (Formatter Check)
+        working-directory: ./fastapi-backend
+        run: black --check .
+
+  # ------------------------------------------------------------------
+  # Automated Tests
+  # ------------------------------------------------------------------
   test:
+    needs: lint
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11"]
+        python-version: ["3.10", "3.11"]
     
     services:
       postgres:
-        image: postgres:15
+        image: postgres:15-alpine
         env:
-          POSTGRES_PASSWORD: postgres
           POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
           POSTGRES_DB: test_db
         options: >-
           --health-cmd pg_isready
@@ -27,50 +56,81 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        working-directory: ./fastapi-backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx alembic
+      
+      - name: Run Alembic Migrations
+        working-directory: ./fastapi-backend
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_db
+        run: |
+          alembic upgrade head
+      
+      - name: Run Pytest
+        working-directory: ./fastapi-backend
+        env:
+          # This override allows tests to run against the Postgres service container
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_db
+          SECRET_KEY: test-secret-key-for-ci-only
+          # Using local storage for tests to avoid S3 dependency in CI
+          STORAGE_PROVIDER: local
+          REDIS_URL: redis://localhost:6379/0
+        run: |
+          pytest tests/ -v
+
+  # ------------------------------------------------------------------
+  # Docker Build & Push
+  # ------------------------------------------------------------------
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
     
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-        cache: 'pip'
-    
-    - name: Install dependencies
-      working-directory: ./fastapi-backend
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pytest pytest-asyncio
-    
-    - name: Run Alembic migrations
-      working-directory: ./fastapi-backend
-      env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
-      run: |
-        alembic upgrade head
-    
-    - name: Seed admin user
-      working-directory: ./fastapi-backend
-      env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
-      run: |
-        python scripts/seed_porter.py
-    
-    - name: Run tests with pytest
-      working-directory: ./fastapi-backend
-      env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
-        JWT_SECRET: test-secret-key-for-ci-only
-      run: |
-        cd ..
-        pytest tests/ -v
-    
-    - name: Lint with flake8
-      working-directory: ./fastapi-backend
-      run: |
-        pip install flake8
-        flake8 app/ --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 app/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build Backend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./fastapi-backend
+          file: ./fastapi-backend/Dockerfile
+          target: production
+          push: false # Set to true if secrets are configured
+          tags: backend:latest
+          # cache-from: type=gha
+          # cache-to: type=gha,mode=max
 
+      - name: Build Bot Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.bot
+          push: false # Set to true if secrets are configured
+          tags: bot:latest

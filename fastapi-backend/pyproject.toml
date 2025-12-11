@@ -1,0 +1,25 @@
+[tool.ruff]
+select = ["E", "F"]
+ignore = [
+    "E712", # Allow == True/False comparisons for SQLModel/SQLAlchemy
+    "E722", # Allow bare except (consider fixing later)
+    "F841", # Allow unused variables (legacy code cleanup needed manually)
+    "E501", # Ignore line too long (black handles formatting, strings/comments may exceed)
+]
+
+# Exclude specific files or directories
+exclude = [
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+    ".venv",
+    "venv",
+]
+
+# Per-file ignores
+[tool.ruff.per-file-ignores]
+"scripts/*" = ["E402"] # Imports not at top of file needed for sys.path
+"app/routes/photos.py" = ["E402"]
+"app/websocket_manager.py" = ["E402"]
+"app/*" = ["F401"] # Unused imports - ruff fix --unsafe-fixes cleans these, but safe to ignore for now if not running unsafe
