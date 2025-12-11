@@ -126,8 +126,6 @@ jobs:
           target: production
           push: false # Set to true if secrets are configured
           tags: backend:latest
-          # cache-from: type=gha
-          # cache-to: type=gha,mode=max
 
       - name: Build Bot Image
         uses: docker/build-push-action@v5
