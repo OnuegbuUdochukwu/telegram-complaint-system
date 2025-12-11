@@ -21,5 +21,7 @@ exclude = [
 [tool.ruff.per-file-ignores]
 "scripts/*" = ["E402"] # Imports not at top of file needed for sys.path
 "app/routes/photos.py" = ["E402"]
+"app/main.py" = ["E402"]
+"alembic/env.py" = ["E402"]
 "app/websocket_manager.py" = ["E402"]
 "app/*" = ["F401"] # Unused imports - ruff fix --unsafe-fixes cleans these, but safe to ignore for now if not running unsafe

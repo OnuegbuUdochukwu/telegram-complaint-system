@@ -1,4 +1,5 @@
 import sys
+import os
 from logging.config import fileConfig
 
 from alembic import context
@@ -15,7 +16,6 @@ from dotenv import dotenv_values
 from pathlib import Path
 _env_path = Path(__file__).resolve().parents[1] / ".env"
 env = dotenv_values(str(_env_path))
-import os
 DATABASE_URL = os.environ.get("DATABASE_URL") or env.get("DATABASE_URL") or ""
 if DATABASE_URL:
     print(f"DEBUG: Alembic using DATABASE_URL: {DATABASE_URL}")
