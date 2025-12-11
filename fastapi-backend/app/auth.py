@@ -2,13 +2,12 @@ from typing import Optional, Tuple
 from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm, HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 from passlib.context import CryptContext
 from .database import get_session
 from .models import Porter
 from sqlmodel import select
-import uuid
 import os
 
 # Settings (in real deploy these should come from env variables)

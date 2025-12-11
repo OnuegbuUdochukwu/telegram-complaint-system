@@ -1,7 +1,6 @@
 """
 Telegram bot integration for admin alerts and notifications.
 """
-import asyncio
 import logging
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timezone

@@ -1,6 +1,6 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Request, Query, WebSocket, WebSocketDisconnect, File, UploadFile
+from fastapi import FastAPI, Depends, HTTPException, Request, Query, WebSocket, WebSocketDisconnect, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials, OAuth2PasswordRequestForm
 from fastapi import Body
 from fastapi.staticfiles import StaticFiles
@@ -21,14 +21,13 @@ from .websocket_manager import manager
 from .telegram_notifier import telegram_notifier
 from .observability import (
     setup_logging, init_sentry, setup_metrics_middleware,
-    metrics_endpoint, get_health_check
+    get_health_check
 )
 import logging
-import json
 
 # Local imports required by route handlers and dependencies
 from .database import get_session, init_db
-from .models import Complaint, Porter, AssignmentAudit, Hostel, Photo, AdminInvitation, OTPToken
+from .models import Complaint, Porter, AssignmentAudit, Photo, AdminInvitation, OTPToken
 from sqlalchemy import text as sa_text
 from .email_service import send_invitation_email, send_otp_email
 from .otp_utils import create_otp_token, verify_otp_token, validate_password_strength
@@ -45,7 +44,6 @@ from .upload_metrics import (
 )
 from .routes import photos as photos_routes
 from .config import get_settings
-from sqlalchemy.ext.asyncio import AsyncSession
 
 # Setup observability
 setup_logging()
@@ -73,7 +71,6 @@ class HostelPublic(BaseModel):
 
 class CategoryPublic(BaseModel):
     name: str
-import os
 
 app = FastAPI(title="Complaint Management API")
 
@@ -1108,7 +1105,6 @@ async def assign_complaint(
     complaint.updated_at = datetime.now(timezone.utc)
     session.add(complaint)
     # Create audit record
-    from .models import AssignmentAudit
     audit = AssignmentAudit(complaint_id=complaint.id, assigned_by=user.id, assigned_to=target.id)
     session.add(audit)
     await session.commit()
@@ -1123,7 +1119,6 @@ async def list_assignments(complaint_id: str, user: Porter = Depends(auth.get_cu
     if (user.role or "porter").lower() != "admin":
         raise HTTPException(status_code=403, detail="Insufficient privileges")
 
-    from .models import AssignmentAudit
     stmt = select(AssignmentAudit).where(AssignmentAudit.complaint_id == complaint_id).order_by(AssignmentAudit.created_at.desc())
     result = await session.exec(stmt)
     rows = result.all()
@@ -1139,7 +1134,6 @@ async def upload_photo_to_complaint(
     session=Depends(get_session)
 ):
     """Legacy photo upload endpoint retained for backward compatibility."""
-    import io
 
     UPLOAD_ATTEMPTS.inc()
 

@@ -7,16 +7,14 @@ This script uses the backend app's SQLModel session to insert a porter with a ha
 """
 import argparse
 from pathlib import Path
-import os
 
 # Ensure project root is on sys.path
 ROOT = Path(__file__).resolve().parents[2]
 import sys
 sys.path.append(str(ROOT / "fastapi-backend"))
 
-from app.database import get_engine, get_session
+from app.database import get_session
 from app import auth
-from app.models import Porter
 from app.database import init_db
 
 

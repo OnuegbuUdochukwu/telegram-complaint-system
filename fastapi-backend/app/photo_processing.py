@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Optional
-import logging
 
 from celery import Celery
 from celery.utils.log import get_task_logger

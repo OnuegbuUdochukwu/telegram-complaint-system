@@ -68,7 +68,7 @@ async def create_otp_token(
     active_requests = [otp for otp in recent_otps if is_active(otp)]
     
     if len(active_requests) >= OTP_RATE_LIMIT_MAX_REQUESTS:
-        error_msg = f"Too many OTP requests. Please wait before requesting another code."
+        error_msg = "Too many OTP requests. Please wait before requesting another code."
         logger.warning(f"Rate limit exceeded for {email} (purpose: {purpose})")
         return None, error_msg
     

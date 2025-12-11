@@ -6,7 +6,7 @@ Uses Pillow (PIL) for image manipulation.
 
 from PIL import Image
 import io
-from typing import Tuple, Optional, BinaryIO
+from typing import Tuple, Optional
 import logging
 
 logger = logging.getLogger("app.photo_utils")

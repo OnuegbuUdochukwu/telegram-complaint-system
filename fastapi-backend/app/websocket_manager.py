@@ -2,11 +2,10 @@
 WebSocket and real-time notification management for the complaint system.
 """
 import json
-import asyncio
 import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timezone
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import WebSocket
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
