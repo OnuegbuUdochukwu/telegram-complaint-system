@@ -136,3 +136,5 @@ jobs:
           file: ./Dockerfile.bot
           push: false # Set to true if secrets are configured
           tags: bot:latest
+      volumes:
+          - bot_data:/app/bot_data

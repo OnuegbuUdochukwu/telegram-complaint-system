@@ -712,11 +712,20 @@ def main():
     # Use the same HTTPXRequest instance for getUpdates polling. The
     # Application expects a BaseRequest-like object, not a dict. Passing the
     # request object ensures polling uses the same configured timeouts/pool.
+    from telegram.ext import PicklePersistence
+
+    # --- Persistence Setup ---
+    # Ensure the directory exists
+    os.makedirs("bot_data", exist_ok=True)
+    my_persistence = PicklePersistence(filepath="bot_data/conversationbot")
+
+    # Use the same HTTPXRequest instance for getUpdates polling.
     application = (
         Application.builder()
         .token(TELEGRAM_BOT_TOKEN)
         .request(request)
         .get_updates_request(request)
+        .persistence(my_persistence)
         .build()
     )
 
@@ -955,6 +964,25 @@ def main():
             logger.warning("Failed to send error notification to user.")
 
     application.add_error_handler(global_error_handler)
+
+    # --- Orphaned Callback Handler (UX Improvement) ---
+    # If a user clicks a button from an old conversation that is no longer in memory/persistence,
+    # the ConversationHandler won't catch it. This handler will catch it and inform the user.
+    async def handle_orphaned_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if update.callback_query:
+            await update.callback_query.answer("Session expired. Please start a new report.", show_alert=True)
+            try:
+                await update.callback_query.message.reply_text(
+                    "⚠️ **Session Expired**\n\n"
+                    "It looks like this menu is from an old or inactive session.\n"
+                    "Please type /report to start a new complaint.",
+                    parse_mode="Markdown"
+                )
+            except Exception:
+                pass
+
+    # Register this last (group=100 ensures it runs after everything else)
+    application.add_handler(CallbackQueryHandler(handle_orphaned_callback), group=100)
 
     logger.info("Bot is initialized. Polling for updates...")
 

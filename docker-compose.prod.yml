@@ -179,6 +179,8 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       BACKEND_URL: http://backend:8000
       BACKEND_SERVICE_TOKEN: ${BACKEND_SERVICE_TOKEN}
+    volumes:
+      - bot_data:/app/bot_data
     depends_on:
       backend:
         condition: service_healthy
@@ -218,3 +220,4 @@ volumes:
   postgres-data:
   redis-data:
   minio-data:
+  bot_data:
