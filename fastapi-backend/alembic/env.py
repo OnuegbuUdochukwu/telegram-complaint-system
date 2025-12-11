@@ -15,7 +15,8 @@ from dotenv import dotenv_values
 from pathlib import Path
 _env_path = Path(__file__).resolve().parents[1] / ".env"
 env = dotenv_values(str(_env_path))
-DATABASE_URL = env.get("DATABASE_URL") or ""
+import os
+DATABASE_URL = os.environ.get("DATABASE_URL") or env.get("DATABASE_URL") or ""
 if DATABASE_URL:
     print(f"DEBUG: Alembic using DATABASE_URL: {DATABASE_URL}")
     config.set_main_option("sqlalchemy.url", DATABASE_URL)

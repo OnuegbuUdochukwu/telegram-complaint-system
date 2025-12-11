@@ -22,13 +22,15 @@ async def test_admin_assigns_another_porter(admin_token, create_and_token):
     payload = {"telegram_user_id": "assign-user", "hostel": "H1", "room_number": "A101", "category": "test", "description": "assign test", "severity": "low"}
     
     async with httpx.AsyncClient(timeout=10.0) as client:
-        r = await client.post(f"{BASE}/api/v1/complaints/submit", json=payload)
+        # Use service token to bypass auth or identify as bot
+        headers = {"Authorization": "Bearer test-service-token"}
+        r = await client.post(f"{BASE}/api/v1/complaints/submit", json=payload, headers=headers)
         assert r.status_code == 201
         cid = r.json()["complaint_id"]
 
         # Admin assigns p2
-        headers = {"Authorization": f"Bearer {admin_token}"}
-        r = await client.patch(f"{BASE}/api/v1/complaints/{cid}/assign", json={"assigned_porter_id": p2_id}, headers=headers)
+        admin_headers = {"Authorization": f"Bearer {admin_token}"}
+        r = await client.patch(f"{BASE}/api/v1/complaints/{cid}/assign", json={"assigned_porter_id": p2_id}, headers=admin_headers)
         assert r.status_code == 200
         assert r.json()["assigned_porter_id"] == p2_id
 
@@ -42,13 +44,14 @@ async def test_porter_assigns_self_then_fails_assign_other(create_and_token, adm
     payload = {"telegram_user_id": "assign-user-2", "hostel": "H1", "room_number": "A102", "category": "test", "description": "assign test 2", "severity": "low"}
     
     async with httpx.AsyncClient(timeout=10.0) as client:
-        r = await client.post(f"{BASE}/api/v1/complaints/submit", json=payload)
+        headers = {"Authorization": "Bearer test-service-token"}
+        r = await client.post(f"{BASE}/api/v1/complaints/submit", json=payload, headers=headers)
         assert r.status_code == 201
         cid = r.json()["complaint_id"]
 
-        headers = {"Authorization": f"Bearer {token}"}
+        auth_headers = {"Authorization": f"Bearer {token}"}
         # Porter assigns self
-        r = await client.patch(f"{BASE}/api/v1/complaints/{cid}/assign", json={"assigned_porter_id": p_id}, headers=headers)
+        r = await client.patch(f"{BASE}/api/v1/complaints/{cid}/assign", json={"assigned_porter_id": p_id}, headers=auth_headers)
         assert r.status_code == 200
         assert r.json()["assigned_porter_id"] == p_id
 
@@ -64,5 +67,5 @@ async def test_porter_assigns_self_then_fails_assign_other(create_and_token, adm
         assert found, f"Audit row for assignment to {p_id} not found: {audits}"
 
         # Porter tries to assign someone else -> 403
-        r = await client.patch(f"{BASE}/api/v1/complaints/{cid}/assign", json={"assigned_porter_id": other_id}, headers=headers)
+        r = await client.patch(f"{BASE}/api/v1/complaints/{cid}/assign", json={"assigned_porter_id": other_id}, headers=auth_headers)
         assert r.status_code == 403

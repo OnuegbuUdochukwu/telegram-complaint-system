@@ -91,7 +91,7 @@ jobs:
           alembic upgrade head
       
       - name: Run Pytest
-        working-directory: ./fastapi-backend
+        working-directory: .
         env:
           # This override allows tests to run against the Postgres service container
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_db
@@ -99,6 +99,7 @@ jobs:
           # Using local storage for tests to avoid S3 dependency in CI
           STORAGE_PROVIDER: local
           REDIS_URL: redis://localhost:6379/0
+          PYTHONPATH: ./fastapi-backend
         run: |
           pytest tests/ -v
 
