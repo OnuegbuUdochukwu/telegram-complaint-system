@@ -14,6 +14,7 @@ config = context.config
 # the user doesn't have to manually edit alembic.ini.
 from dotenv import dotenv_values
 from pathlib import Path
+
 _env_path = Path(__file__).resolve().parents[1] / ".env"
 env = dotenv_values(str(_env_path))
 DATABASE_URL = os.environ.get("DATABASE_URL") or env.get("DATABASE_URL") or ""
@@ -27,6 +28,7 @@ fileConfig(config.config_file_name)
 # Import the app's metadata
 from app.database import engine
 from app.models import SQLModel
+
 target_metadata = SQLModel.metadata
 
 
@@ -39,15 +41,18 @@ def run_migrations_offline():
 
 import asyncio
 
+
 def do_run_migrations(connection):
     context.configure(connection=connection, target_metadata=target_metadata)
     with context.begin_transaction():
         context.run_migrations()
 
+
 async def run_async_migrations():
     connectable = engine
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
+
 
 def run_migrations_online():
     asyncio.run(run_async_migrations())

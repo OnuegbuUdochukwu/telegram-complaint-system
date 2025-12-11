@@ -35,7 +35,9 @@ class Settings:
     s3_bucket: str
     s3_region: str
     s3_endpoint: Optional[str]
-    s3_endpoint_public: Optional[str]  # External URL for presigned URLs (e.g., localhost:9000 when backend uses minio:9000)
+    s3_endpoint_public: Optional[
+        str
+    ]  # External URL for presigned URLs (e.g., localhost:9000 when backend uses minio:9000)
     s3_use_ssl: bool
     s3_access_key_id: Optional[str]
     s3_secret_access_key: Optional[str]
@@ -65,7 +67,9 @@ def _as_bool(value: Optional[str], default: bool = False) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _env_lookup(key: str, env: dict[str, str], default: Optional[str] = None) -> Optional[str]:
+def _env_lookup(
+    key: str, env: dict[str, str], default: Optional[str] = None
+) -> Optional[str]:
     return os.environ.get(key) or env.get(key) or default
 
 
@@ -83,17 +87,25 @@ def get_settings() -> Settings:
         environment=_env_lookup("APP_ENV", env_file, "development"),
         storage_provider=storage_provider,
         service_token=_env_lookup("BACKEND_SERVICE_TOKEN", env_file),
-        backend_url=_env_lookup("BACKEND_URL", env_file) or _env_lookup("TEST_BACKEND_URL", env_file),
+        backend_url=_env_lookup("BACKEND_URL", env_file)
+        or _env_lookup("TEST_BACKEND_URL", env_file),
         database_url=_env_lookup("DATABASE_URL", env_file, "sqlite:///./test.db"),
         s3_bucket=_env_lookup("S3_BUCKET", env_file, "complaint-photos"),
         s3_region=_env_lookup("S3_REGION", env_file, "us-east-1"),
-        s3_endpoint=_env_lookup("S3_ENDPOINT", env_file) or _env_lookup("S3_ENDPOINT_URL", env_file),
+        s3_endpoint=_env_lookup("S3_ENDPOINT", env_file)
+        or _env_lookup("S3_ENDPOINT_URL", env_file),
         s3_endpoint_public=_env_lookup("S3_ENDPOINT_PUBLIC", env_file),
         s3_use_ssl=_as_bool(_env_lookup("S3_USE_SSL", env_file, "true"), True),
-        s3_access_key_id=_env_lookup("S3_ACCESS_KEY_ID", env_file) or _env_lookup("S3_ACCESS_KEY", env_file),
-        s3_secret_access_key=_env_lookup("S3_SECRET_ACCESS_KEY", env_file) or _env_lookup("S3_SECRET_KEY", env_file),
-        s3_presign_expiry_upload=int(_env_lookup("S3_PRESIGN_EXPIRY_SECONDS_UPLOAD", env_file, "300")),
-        s3_presign_expiry_get=int(_env_lookup("S3_PRESIGN_EXPIRY_SECONDS_GET", env_file, "3600")),
+        s3_access_key_id=_env_lookup("S3_ACCESS_KEY_ID", env_file)
+        or _env_lookup("S3_ACCESS_KEY", env_file),
+        s3_secret_access_key=_env_lookup("S3_SECRET_ACCESS_KEY", env_file)
+        or _env_lookup("S3_SECRET_KEY", env_file),
+        s3_presign_expiry_upload=int(
+            _env_lookup("S3_PRESIGN_EXPIRY_SECONDS_UPLOAD", env_file, "300")
+        ),
+        s3_presign_expiry_get=int(
+            _env_lookup("S3_PRESIGN_EXPIRY_SECONDS_GET", env_file, "3600")
+        ),
         kms_key_id=_env_lookup("KMS_KEY_ID", env_file),
         cloudfront_domain=_env_lookup("CLOUDFRONT_DOMAIN", env_file),
         redis_url=redis_url,
@@ -104,11 +116,12 @@ def get_settings() -> Settings:
             int(_env_lookup("THUMBNAIL_SIZE_LARGE", env_file, "1024")),
         ),
         enable_virus_scan=_as_bool(_env_lookup("ENABLE_VIRUS_SCAN", env_file, "false")),
-        metrics_namespace=_env_lookup("METRICS_NAMESPACE", env_file, "telegram_complaints"),
+        metrics_namespace=_env_lookup(
+            "METRICS_NAMESPACE", env_file, "telegram_complaints"
+        ),
         minio_root_user=_env_lookup("MINIO_ROOT_USER", env_file),
         minio_root_password=_env_lookup("MINIO_ROOT_PASSWORD", env_file),
     )
 
 
 __all__ = ["Settings", "get_settings"]
-

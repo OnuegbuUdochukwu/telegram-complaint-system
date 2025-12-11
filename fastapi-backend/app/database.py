@@ -12,14 +12,20 @@ _env_path = Path(__file__).resolve().parents[2] / ".env"
 # Load .env but allow explicit environment variable to override it. Tests set
 # DATABASE_URL in os.environ to force a local SQLite DB for isolation.
 config = dotenv_values(str(_env_path))
-DATABASE_URL = os.environ.get("DATABASE_URL") or config.get("DATABASE_URL") or "sqlite+aiosqlite:///./test.db"
+DATABASE_URL = (
+    os.environ.get("DATABASE_URL")
+    or config.get("DATABASE_URL")
+    or "sqlite+aiosqlite:///./test.db"
+)
 
 # Ensure we use the async driver for postgres
 if DATABASE_URL:
     if DATABASE_URL.startswith("postgresql://"):
         DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
     elif DATABASE_URL.startswith("postgresql+psycopg2://"):
-        DATABASE_URL = DATABASE_URL.replace("postgresql+psycopg2://", "postgresql+asyncpg://")
+        DATABASE_URL = DATABASE_URL.replace(
+            "postgresql+psycopg2://", "postgresql+asyncpg://"
+        )
 
 # Configure sqlite to be usable from multiple threads in this local/dev setup.
 # For production (Postgres) these options are ignored.
@@ -27,8 +33,12 @@ engine_kwargs = {"echo": False, "future": True}
 if DATABASE_URL.startswith("sqlite"):
     # Allow connections to be used across threads (useful for uvicorn worker threads)
     engine_kwargs["connect_args"] = {"check_same_thread": False}
-    
-    if ":memory:" in DATABASE_URL or "mode=memory" in DATABASE_URL or DATABASE_URL == "sqlite+aiosqlite://":
+
+    if (
+        ":memory:" in DATABASE_URL
+        or "mode=memory" in DATABASE_URL
+        or DATABASE_URL == "sqlite+aiosqlite://"
+    ):
         # For in-memory DBs, we need StaticPool to share the same connection/DB across threads
         # and prevent it from being dropped when the connection closes.
         engine_kwargs["poolclass"] = StaticPool
@@ -48,9 +58,11 @@ async_session_factory = sessionmaker(
     engine, class_=AsyncSession, expire_on_commit=False
 )
 
+
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     async with async_session_factory() as session:
         yield session
+
 
 async def init_db() -> None:
     # Decide whether to run Alembic migrations (Postgres) or create tables
@@ -73,4 +85,3 @@ async def init_db() -> None:
         # Non-Postgres (e.g., SQLite tests/dev) — create tables directly.
         async with engine.begin() as conn:
             await conn.run_sync(SQLModel.metadata.create_all)
-

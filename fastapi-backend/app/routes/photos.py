@@ -72,11 +72,15 @@ class PhotoResponse(BaseModel):
 
 def _ensure_s3():
     if not storage:
-        raise HTTPException(status_code=412, detail="S3 storage is not enabled. Set STORAGE_PROVIDER=s3.")
+        raise HTTPException(
+            status_code=412,
+            detail="S3 storage is not enabled. Set STORAGE_PROVIDER=s3.",
+        )
     return storage
 
 
 from fastapi.concurrency import run_in_threadpool
+
 
 async def _load_complaint(session: Session, complaint_id: str) -> Complaint:
     complaint = await session.get(Complaint, complaint_id)
@@ -85,7 +89,11 @@ async def _load_complaint(session: Session, complaint_id: str) -> Complaint:
     return complaint
 
 
-@router.post("/complaints/{complaint_id}/photos/presign", response_model=PresignResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/complaints/{complaint_id}/photos/presign",
+    response_model=PresignResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def presign_upload(
     complaint_id: str,
     request: PresignRequest,
@@ -97,7 +105,10 @@ async def presign_upload(
 
     content_type = request.content_type.lower()
     if content_type not in ALLOWED_MIME_TYPES:
-        raise HTTPException(status_code=400, detail=f"Unsupported content type. Allowed: {', '.join(sorted(ALLOWED_MIME_TYPES))}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported content type. Allowed: {', '.join(sorted(ALLOWED_MIME_TYPES))}",
+        )
 
     photo_id = str(uuid.uuid4())
     extension = guess_extension(content_type)
@@ -108,7 +119,9 @@ async def presign_upload(
         try:
             # generate_presigned_put is purely local crypto and string formatting in boto3
             # so it is safe to call synchronously without threadpool
-            upload = storage.generate_presigned_put(key, content_type, request.content_length)
+            upload = storage.generate_presigned_put(
+                key, content_type, request.content_length
+            )
         except StorageError as exc:
             raise HTTPException(status_code=500, detail=str(exc))
 
@@ -120,7 +133,8 @@ async def presign_upload(
             content_type=content_type,
             content_length=request.content_length,
             s3_key=key,
-            expires_at=datetime.utcnow() + timedelta(seconds=settings.s3_presign_expiry_upload),
+            expires_at=datetime.utcnow()
+            + timedelta(seconds=settings.s3_presign_expiry_upload),
             created_at=datetime.utcnow(),
         )
         session.add(record)
@@ -135,7 +149,7 @@ async def presign_upload(
             fields=upload.fields,
             expires_in=upload.expires_in,
         )
-    
+
     # For local storage, return a direct upload URL to the backend
     record = PhotoUpload(
         id=str(uuid.uuid4()),
@@ -153,8 +167,11 @@ async def presign_upload(
 
     # Return backend upload URL for local storage
     from ..config import get_settings
+
     backend_url = get_settings().backend_url or "http://localhost:8001"
-    upload_url = f"{backend_url}/api/v1/complaints/{complaint_id}/photos/{photo_id}/upload"
+    upload_url = (
+        f"{backend_url}/api/v1/complaints/{complaint_id}/photos/{photo_id}/upload"
+    )
 
     return PresignResponse(
         upload_id=record.id,
@@ -167,7 +184,9 @@ async def presign_upload(
     )
 
 
-@router.put("/complaints/{complaint_id}/photos/{photo_id}/upload", response_model=PhotoResponse)
+@router.put(
+    "/complaints/{complaint_id}/photos/{photo_id}/upload", response_model=PhotoResponse
+)
 async def direct_upload(
     complaint_id: str,
     photo_id: str,
@@ -175,7 +194,7 @@ async def direct_upload(
     session: Session = Depends(get_session),
 ):
     """Direct upload endpoint for local storage (alternative to S3 presigned PUT).
-    
+
     This endpoint mimics S3 presigned URLs by relying on the secrecy of the photo_id/upload_id
     and the expiry time checked against the PhotoUpload record. Authentication is NOT required
     because the client (using S3-style flow) does not send credentials, only the URL.
@@ -211,14 +230,15 @@ async def direct_upload(
 
     # Store using local storage
     from ..storage import upload_photo as local_upload_photo
+
     try:
         # File I/O might block, use threadpool
         file_url, thumbnail_url = await run_in_threadpool(
-            local_upload_photo, 
-            body, 
-            complaint_id, 
-            photo_id, 
-            upload.content_type or "image/jpeg"
+            local_upload_photo,
+            body,
+            complaint_id,
+            photo_id,
+            upload.content_type or "image/jpeg",
         )
     except Exception as exc:
         UPLOAD_FAILURES.inc()
@@ -288,7 +308,7 @@ async def confirm_upload(
 
         # s3.head_object makes network call -> run in threadpool
         head = await run_in_threadpool(s3.head_object, payload.s3_key)
-        
+
         file_size = payload.file_size or head.get("ContentLength")
         content_type = payload.content_type or head.get("ContentType")
         file_url = f"s3://{settings.s3_bucket}/{payload.s3_key}"
@@ -342,13 +362,19 @@ async def list_photos(
     session: Session = Depends(get_session),
 ):
     await _load_complaint(session, complaint_id)
-    stmt = select(Photo).where(Photo.complaint_id == complaint_id).order_by(Photo.created_at.desc())
+    stmt = (
+        select(Photo)
+        .where(Photo.complaint_id == complaint_id)
+        .order_by(Photo.created_at.desc())
+    )
     result = await session.exec(stmt)
     photos = result.all()
     return [_serialize_photo(p) for p in photos]
 
 
-@router.get("/complaints/{complaint_id}/photos/{photo_id}", response_model=PhotoResponse)
+@router.get(
+    "/complaints/{complaint_id}/photos/{photo_id}", response_model=PhotoResponse
+)
 async def get_photo(
     complaint_id: str,
     photo_id: str,
@@ -362,7 +388,10 @@ async def get_photo(
     return _serialize_photo(photo, include_signed_urls=True)
 
 
-@router.delete("/complaints/{complaint_id}/photos/{photo_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/complaints/{complaint_id}/photos/{photo_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
 async def delete_photo_endpoint(
     complaint_id: str,
     photo_id: str,
@@ -375,7 +404,7 @@ async def delete_photo_endpoint(
 
     # delete_photo might do blocking FS or s3 op -> threadpool
     await run_in_threadpool(delete_photo, complaint_id, photo_id)
-    
+
     await session.delete(photo)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -386,7 +415,11 @@ def storage_health(_: object = Depends(get_authenticated_user_or_service)):
     s3 = _ensure_s3()
     try:
         s3.ensure_bucket()
-        return {"status": "ok", "bucket": settings.s3_bucket, "region": settings.s3_region}
+        return {
+            "status": "ok",
+            "bucket": settings.s3_bucket,
+            "region": settings.s3_region,
+        }
     except Exception as exc:
         raise HTTPException(status_code=503, detail=str(exc))
 
@@ -418,4 +451,3 @@ def _serialize_photo(photo: Photo, include_signed_urls: bool = False) -> PhotoRe
         download_url=download_url,
         thumbnail_download_url=thumbnail_url,
     )
-

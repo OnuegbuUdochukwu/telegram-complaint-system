@@ -49,7 +49,11 @@ class S3Storage:
                 aws_secret_access_key=settings.s3_secret_access_key,
             )
 
-        session = boto3.session.Session(**session_kwargs) if session_kwargs else boto3.session.Session()
+        session = (
+            boto3.session.Session(**session_kwargs)
+            if session_kwargs
+            else boto3.session.Session()
+        )
 
         # Internal client for actual S3 operations (uses Docker-internal endpoint)
         client_kwargs = {
@@ -63,16 +67,19 @@ class S3Storage:
             client_kwargs["use_ssl"] = False
 
         self._client = session.client(**client_kwargs)
-        
+
         # Separate client for presigned URL generation using public endpoint
         # This ensures the signature matches the host that external clients will use
-        if settings.s3_endpoint_public and settings.s3_endpoint_public != settings.s3_endpoint:
+        if (
+            settings.s3_endpoint_public
+            and settings.s3_endpoint_public != settings.s3_endpoint
+        ):
             presign_kwargs = client_kwargs.copy()
             presign_kwargs["endpoint_url"] = settings.s3_endpoint_public
             self._presign_client = session.client(**presign_kwargs)
         else:
             self._presign_client = self._client
-            
+
         self._bucket = settings.s3_bucket
         self._kms_key_id = settings.kms_key_id
         self._upload_expiry = settings.s3_presign_expiry_upload
@@ -81,11 +88,18 @@ class S3Storage:
 
     # ---------- helpers ----------
     @staticmethod
-    def build_s3_key(complaint_id: str, photo_id: str, variant: str = "original", extension: str = "jpg") -> str:
+    def build_s3_key(
+        complaint_id: str,
+        photo_id: str,
+        variant: str = "original",
+        extension: str = "jpg",
+    ) -> str:
         prefix = "originals" if variant == "original" else "thumbnails"
         return f"complaints/{complaint_id}/{prefix}/{photo_id}.{extension}"
 
-    def _apply_object_defaults(self, extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def _apply_object_defaults(
+        self, extra: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         params: Dict[str, Any] = {}
         if self._kms_key_id:
             params["ServerSideEncryption"] = "aws:kms"
@@ -95,7 +109,9 @@ class S3Storage:
         return params
 
     # ---------- presign ----------
-    def generate_presigned_put(self, key: str, content_type: str, content_length: Optional[int]) -> PresignedUpload:
+    def generate_presigned_put(
+        self, key: str, content_type: str, content_length: Optional[int]
+    ) -> PresignedUpload:
         conditions = [
             {"bucket": self._bucket},
             {"key": key},
@@ -112,7 +128,9 @@ class S3Storage:
                     "Bucket": self._bucket,
                     "Key": key,
                     "ContentType": content_type,
-                    **self._apply_object_defaults({"Metadata": {"managed-by": "complaint-backend"}}),
+                    **self._apply_object_defaults(
+                        {"Metadata": {"managed-by": "complaint-backend"}}
+                    ),
                 },
                 ExpiresIn=self._upload_expiry,
                 HttpMethod="PUT",
@@ -156,11 +174,17 @@ class S3Storage:
             {"Key": self.build_s3_key(complaint_id, photo_id, "thumbnail")},
         ]
         try:
-            self._client.delete_objects(Bucket=self._bucket, Delete={"Objects": objects, "Quiet": True})
+            self._client.delete_objects(
+                Bucket=self._bucket, Delete={"Objects": objects, "Quiet": True}
+            )
         except ClientError as exc:
-            raise StorageError(f"Failed to delete objects for photo {photo_id}: {exc}") from exc
+            raise StorageError(
+                f"Failed to delete objects for photo {photo_id}: {exc}"
+            ) from exc
 
-    def copy_object(self, source_key: str, dest_key: str, content_type: Optional[str] = None) -> None:
+    def copy_object(
+        self, source_key: str, dest_key: str, content_type: Optional[str] = None
+    ) -> None:
         extra = {}
         if content_type:
             extra["ContentType"] = content_type
@@ -173,14 +197,23 @@ class S3Storage:
                 ExtraArgs=self._apply_object_defaults(extra),
             )
         except ClientError as exc:
-            raise StorageError(f"copy_object failed from {source_key} to {dest_key}: {exc}") from exc
+            raise StorageError(
+                f"copy_object failed from {source_key} to {dest_key}: {exc}"
+            ) from exc
 
-    def put_object(self, key: str, data: bytes, content_type: Optional[str] = None) -> None:
+    def put_object(
+        self, key: str, data: bytes, content_type: Optional[str] = None
+    ) -> None:
         extra = {}
         if content_type:
             extra["ContentType"] = content_type
         try:
-            self._client.put_object(Bucket=self._bucket, Key=key, Body=data, **self._apply_object_defaults(extra))
+            self._client.put_object(
+                Bucket=self._bucket,
+                Key=key,
+                Body=data,
+                **self._apply_object_defaults(extra),
+            )
         except ClientError as exc:
             raise StorageError(f"put_object failed for {key}: {exc}") from exc
 
@@ -199,7 +232,10 @@ class S3Storage:
         except ClientError as exc:
             error_code = exc.response.get("Error", {}).get("Code")
             if error_code in {"404", "NoSuchBucket"}:
-                logger.info("Bucket %s missing; attempting to create for dev/local use", self._bucket)
+                logger.info(
+                    "Bucket %s missing; attempting to create for dev/local use",
+                    self._bucket,
+                )
                 params = {"Bucket": self._bucket}
                 region = get_settings().s3_region
                 if region and region != "us-east-1":
@@ -215,4 +251,3 @@ def guess_extension(content_type: str) -> str:
 
 
 __all__ = ["S3Storage", "StorageError", "PresignedUpload", "guess_extension"]
-

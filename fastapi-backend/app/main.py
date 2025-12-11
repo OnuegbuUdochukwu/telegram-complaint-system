@@ -1,4 +1,14 @@
-from fastapi import FastAPI, Depends, HTTPException, Request, Query, WebSocket, WebSocketDisconnect, File, UploadFile
+from fastapi import (
+    FastAPI,
+    Depends,
+    HTTPException,
+    Request,
+    Query,
+    WebSocket,
+    WebSocketDisconnect,
+    File,
+    UploadFile,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials, OAuth2PasswordRequestForm
@@ -20,8 +30,10 @@ from sqlmodel import select, func
 from .websocket_manager import manager
 from .telegram_notifier import telegram_notifier
 from .observability import (
-    setup_logging, init_sentry, setup_metrics_middleware,
-    get_health_check
+    setup_logging,
+    init_sentry,
+    setup_metrics_middleware,
+    get_health_check,
 )
 import logging
 
@@ -34,7 +46,13 @@ from .otp_utils import create_otp_token, verify_otp_token, validate_password_str
 from email_validator import validate_email, EmailNotValidError
 import secrets
 import uuid
-from .storage import upload_photo, upload_thumbnail, get_photo_url, delete_photo, get_s3_key
+from .storage import (
+    upload_photo,
+    upload_thumbnail,
+    get_photo_url,
+    delete_photo,
+    get_s3_key,
+)
 from .photo_utils import validate_image, process_image
 from .dependencies import get_authenticated_user_or_service
 from .upload_metrics import (
@@ -72,6 +90,7 @@ class HostelPublic(BaseModel):
 class CategoryPublic(BaseModel):
     name: str
 
+
 app = FastAPI(title="Complaint Management API")
 
 # Setup metrics middleware
@@ -88,17 +107,21 @@ app.add_middleware(
 
 # Setup TrustedHost middleware
 app.add_middleware(
-    TrustedHostMiddleware,
-    allowed_hosts=os.environ.get("ALLOWED_HOSTS", "*").split(",")
+    TrustedHostMiddleware, allowed_hosts=os.environ.get("ALLOWED_HOSTS", "*").split(",")
 )
 app.include_router(photos_routes.router)
 
 # Serve the static dashboard files from the repository's `dashboard/` folder
 from pathlib import Path
+
 _ROOT = Path(__file__).resolve().parents[2]
 _DASHBOARD_DIR = _ROOT / "dashboard"
 if _DASHBOARD_DIR.exists():
-    app.mount("/dashboard", StaticFiles(directory=str(_DASHBOARD_DIR), html=True), name="dashboard")
+    app.mount(
+        "/dashboard",
+        StaticFiles(directory=str(_DASHBOARD_DIR), html=True),
+        name="dashboard",
+    )
 
 # Serve local uploaded storage when present (development fallback)
 _STORAGE_DIR = _ROOT / "storage"
@@ -111,21 +134,33 @@ if _STORAGE_DIR.exists():
 # to respond and return a JSON 401 when appropriate.
 security = HTTPBasic(auto_error=False)
 
+
 @app.post("/auth/login", response_model=dict)
-async def login(form_data: OAuth2PasswordRequestForm = Depends(), session=Depends(get_session)):
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(), session=Depends(get_session)
+):
     # Validate credentials against porters table (email or phone as username)
-    porter = await auth.authenticate_porter(form_data.username, form_data.password, session)
+    porter = await auth.authenticate_porter(
+        form_data.username, form_data.password, session
+    )
     if not porter:
         raise HTTPException(status_code=401, detail="Invalid username or password")
     # Use the stored Porter.role when issuing JWT so admin/porter is consistent
     token = auth.create_access_token(subject=porter.id, role=(porter.role or "porter"))
     # Return the created token and the porter id (so clients can correlate id <-> token)
-    return {"access_token": token, "token_type": "bearer", "id": str(porter.id), "role": (porter.role or "porter")}
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "id": str(porter.id),
+        "role": (porter.role or "porter"),
+    }
 
 
 # Alternative JSON-based login to avoid OAuth2PasswordRequestForm conflicts with async session
 @app.post("/auth/login-json", response_model=dict)
-async def login_json(username: str = Body(...), password: str = Body(...), session=Depends(get_session)):
+async def login_json(
+    username: str = Body(...), password: str = Body(...), session=Depends(get_session)
+):
     # Validate credentials against porters table (email or phone as username)
     porter = await auth.authenticate_porter(username, password, session)
     if not porter:
@@ -133,7 +168,12 @@ async def login_json(username: str = Body(...), password: str = Body(...), sessi
     # Use the stored Porter.role when issuing JWT so admin/porter is consistent
     token = auth.create_access_token(subject=porter.id, role=(porter.role or "porter"))
     # Return the created token and the porter id (so clients can correlate id <-> token)
-    return {"access_token": token, "token_type": "bearer", "id": str(porter.id), "role": (porter.role or "porter")}
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "id": str(porter.id),
+        "role": (porter.role or "porter"),
+    }
 
 
 @app.post("/auth/register", response_model=dict)
@@ -159,7 +199,14 @@ async def register_porter(
     # Allow initial bootstrap: if no porters exist, allow first registration as admin
     if existing is None:
         try:
-            porter = await auth.create_porter(session, full_name=full_name, password=password, email=email, phone=phone, role="admin")
+            porter = await auth.create_porter(
+                session,
+                full_name=full_name,
+                password=password,
+                email=email,
+                phone=phone,
+                role="admin",
+            )
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc))
         return {"id": porter.id, "email": porter.email, "phone": porter.phone}
@@ -168,15 +215,26 @@ async def register_porter(
     import os
 
     auto_admin_raw = os.environ.get("AUTO_ADMIN_EMAILS", "")
-    auto_admin_emails = {addr.strip().lower() for addr in auto_admin_raw.split(",") if addr.strip()}
+    auto_admin_emails = {
+        addr.strip().lower() for addr in auto_admin_raw.split(",") if addr.strip()
+    }
     desired_role = "admin" if email and email.lower() in auto_admin_emails else "porter"
 
     # Also allow during pytest runs (CI/test harness) by checking for the
     # PYTEST_CURRENT_TEST env var which pytest sets for running tests. This
     # keeps tests deterministic even when the DB already contains rows.
-    if os.environ.get("ALLOW_DEV_REGISTER") in ("1", "true", "True") or os.environ.get("PYTEST_CURRENT_TEST"):
+    if os.environ.get("ALLOW_DEV_REGISTER") in ("1", "true", "True") or os.environ.get(
+        "PYTEST_CURRENT_TEST"
+    ):
         try:
-            porter = await auth.create_porter(session, full_name=full_name, password=password, email=email, phone=phone, role=desired_role)
+            porter = await auth.create_porter(
+                session,
+                full_name=full_name,
+                password=password,
+                email=email,
+                phone=phone,
+                role=desired_role,
+            )
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc))
         return {"id": porter.id, "email": porter.email, "phone": porter.phone}
@@ -184,7 +242,11 @@ async def register_porter(
     # Otherwise, require admin token manually (dependency removed so we check here)
     auth_header = request.headers.get("authorization")
     if not auth_header or not auth_header.lower().startswith("bearer "):
-        raise HTTPException(status_code=401, detail="Not authenticated", headers={"X-Auth-Reason": "Missing bearer token"})
+        raise HTTPException(
+            status_code=401,
+            detail="Not authenticated",
+            headers={"X-Auth-Reason": "Missing bearer token"},
+        )
     token = auth_header.split(None, 1)[1]
     try:
         payload = auth.decode_access_token(token)
@@ -195,7 +257,14 @@ async def register_porter(
         raise HTTPException(status_code=403, detail="Insufficient privileges")
 
     try:
-        porter = await auth.create_porter(session, full_name=full_name, password=password, email=email, phone=phone, role=desired_role)
+        porter = await auth.create_porter(
+            session,
+            full_name=full_name,
+            password=password,
+            email=email,
+            phone=phone,
+            role=desired_role,
+        )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
     return {"id": porter.id, "email": porter.email, "phone": porter.phone}
@@ -209,6 +278,7 @@ async def register_porter(
 # Admin Invitation and Self-Registration Endpoints
 # ============================================================================
 
+
 class InviteAdminRequest(BaseModel):
     email: str
 
@@ -220,41 +290,45 @@ async def invite_admin(
     session=Depends(get_session),
 ):
     """Admin-only endpoint to send an invitation to a new admin.
-    
+
     Creates an invitation record and sends an email with a signup link.
     """
     email = request_data.email.lower().strip()
-    
+
     # Validate email format
     try:
         validated = validate_email(email)
         email = validated.email
     except EmailNotValidError as e:
         raise HTTPException(status_code=400, detail=f"Invalid email address: {str(e)}")
-    
+
     # Check if email already exists as a porter
     result = await session.exec(select(Porter).where(Porter.email == email))
     existing_porter = result.first()
     if existing_porter:
-        raise HTTPException(status_code=400, detail="A user with this email already exists")
-    
+        raise HTTPException(
+            status_code=400, detail="A user with this email already exists"
+        )
+
     # Check if there's already a pending invitation for this email
     now = datetime.now(timezone.utc)
     result = await session.exec(
         select(AdminInvitation).where(
             AdminInvitation.email == email,
             AdminInvitation.used == False,
-            AdminInvitation.expires_at > now
+            AdminInvitation.expires_at > now,
         )
     )
     existing_invitation = result.first()
-    
+
     if existing_invitation:
-        raise HTTPException(status_code=400, detail="An active invitation already exists for this email")
-    
+        raise HTTPException(
+            status_code=400, detail="An active invitation already exists for this email"
+        )
+
     # Generate secure invitation token
     invitation_token = secrets.token_urlsafe(32)
-    
+
     # Create invitation (expires in 48 hours)
     expires_at = datetime.now(timezone.utc) + timedelta(hours=48)
     invitation = AdminInvitation(
@@ -262,25 +336,27 @@ async def invite_admin(
         invited_by=user.id,
         token=invitation_token,
         expires_at=expires_at,
-        used=False
+        used=False,
     )
-    
+
     session.add(invitation)
     await session.commit()
     await session.refresh(invitation)
-    
+
     # Send invitation email
     email_sent = await send_invitation_email(email, invitation_token, user.full_name)
-    
+
     if not email_sent:
         # If email fails in production, we might want to fail the request
         # For now, log and continue (user can still use the token from the response in dev)
-        logger.warning(f"Failed to send invitation email to {email}, but invitation was created")
-    
+        logger.warning(
+            f"Failed to send invitation email to {email}, but invitation was created"
+        )
+
     return {
         "message": "Invitation sent successfully",
         "email": email,
-        "expires_at": expires_at.isoformat()
+        "expires_at": expires_at.isoformat(),
     }
 
 
@@ -288,23 +364,22 @@ async def invite_admin(
 async def validate_invitation_token(token: str, session=Depends(get_session)):
     """Validate an invitation token and return invitation details."""
     now = datetime.now(timezone.utc)
-    
+
     result = await session.exec(
         select(AdminInvitation).where(
             AdminInvitation.token == token,
             AdminInvitation.used == False,
-            AdminInvitation.expires_at > now
+            AdminInvitation.expires_at > now,
         )
     )
     invitation = result.first()
-    
+
     if not invitation:
-        raise HTTPException(status_code=404, detail="Invalid or expired invitation token")
-    
-    return {
-        "email": invitation.email,
-        "expires_at": invitation.expires_at.isoformat()
-    }
+        raise HTTPException(
+            status_code=404, detail="Invalid or expired invitation token"
+        )
+
+    return {"email": invitation.email, "expires_at": invitation.expires_at.isoformat()}
 
 
 class SignupRequest(BaseModel):
@@ -319,7 +394,7 @@ async def signup(
     session=Depends(get_session),
 ):
     """Complete admin signup with invitation token and OTP verification.
-    
+
     Note: OTP verification should be done separately via /auth/verify-otp before calling this.
     The frontend should handle the two-step flow: verify OTP first, then call signup.
     """
@@ -329,42 +404,49 @@ async def signup(
         select(AdminInvitation).where(
             AdminInvitation.token == request_data.invitation_token,
             AdminInvitation.used == False,
-            AdminInvitation.expires_at > now
+            AdminInvitation.expires_at > now,
         )
     )
     invitation = result.first()
-    
+
     if not invitation:
-        raise HTTPException(status_code=400, detail="Invalid or expired invitation token")
-    
+        raise HTTPException(
+            status_code=400, detail="Invalid or expired invitation token"
+        )
+
     # Validate password strength
     is_valid, error_msg = validate_password_strength(request_data.password)
     if not is_valid:
         raise HTTPException(status_code=400, detail=error_msg)
-    
+
     # Check if OTP was verified (there should be a used OTP token for this email with purpose='signup')
     result = await session.exec(
-        select(OTPToken).where(
+        select(OTPToken)
+        .where(
             OTPToken.email == invitation.email,
             OTPToken.purpose == "signup",
             OTPToken.used == True,
-            OTPToken.expires_at > now - timedelta(minutes=10)  # OTP must have been used recently
-        ).order_by(OTPToken.created_at.desc())
+            OTPToken.expires_at
+            > now - timedelta(minutes=10),  # OTP must have been used recently
+        )
+        .order_by(OTPToken.created_at.desc())
     )
     verified_otp = result.first()
-    
+
     if not verified_otp:
         raise HTTPException(
             status_code=400,
-            detail="Email verification required. Please verify your email with the OTP code first."
+            detail="Email verification required. Please verify your email with the OTP code first.",
         )
-    
+
     # Check if user already exists
     result = await session.exec(select(Porter).where(Porter.email == invitation.email))
     existing_porter = result.first()
     if existing_porter:
-        raise HTTPException(status_code=400, detail="A user with this email already exists")
-    
+        raise HTTPException(
+            status_code=400, detail="A user with this email already exists"
+        )
+
     # Create admin porter
     try:
         porter = await auth.create_porter(
@@ -372,23 +454,25 @@ async def signup(
             full_name=request_data.full_name,
             password=request_data.password,
             email=invitation.email,
-            role="admin"
+            role="admin",
         )
     except Exception as exc:
         logger.error(f"Failed to create admin porter: {exc}")
         raise HTTPException(status_code=500, detail="Failed to create admin account")
-    
+
     # Mark invitation as used
     invitation.used = True
     session.add(invitation)
     await session.commit()
-    
-    logger.info(f"Admin account created via invitation: {porter.email} (id: {porter.id})")
-    
+
+    logger.info(
+        f"Admin account created via invitation: {porter.email} (id: {porter.id})"
+    )
+
     return {
         "message": "Admin account created successfully",
         "id": porter.id,
-        "email": porter.email
+        "email": porter.email,
     }
 
 
@@ -403,23 +487,26 @@ async def send_otp(
     session=Depends(get_session),
 ):
     """Send an OTP code to the specified email address.
-    
+
     For 'signup': requires valid invitation token context (email must match invitation)
     For 'password_reset': email must belong to an existing user
     """
     email = request_data.email.lower().strip()
     purpose = request_data.purpose.lower()
-    
+
     if purpose not in ["signup", "password_reset"]:
-        raise HTTPException(status_code=400, detail="Invalid purpose. Must be 'signup' or 'password_reset'")
-    
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid purpose. Must be 'signup' or 'password_reset'",
+        )
+
     # Validate email format
     try:
         validated = validate_email(email)
         email = validated.email
     except EmailNotValidError as e:
         raise HTTPException(status_code=400, detail=f"Invalid email address: {str(e)}")
-    
+
     # For password reset, verify user exists
     if purpose == "password_reset":
         result = await session.exec(select(Porter).where(Porter.email == email))
@@ -427,7 +514,7 @@ async def send_otp(
         if not existing_user:
             # Don't reveal if email exists (security best practice)
             return {"message": "If the email exists, a verification code will be sent"}
-    
+
     # For signup, verify there's a valid invitation
     elif purpose == "signup":
         now = datetime.now(timezone.utc)
@@ -435,29 +522,31 @@ async def send_otp(
             select(AdminInvitation).where(
                 AdminInvitation.email == email,
                 AdminInvitation.used == False,
-                AdminInvitation.expires_at > now
+                AdminInvitation.expires_at > now,
             )
         )
         invitation = result.first()
         if not invitation:
-            raise HTTPException(status_code=400, detail="No valid invitation found for this email")
-    
+            raise HTTPException(
+                status_code=400, detail="No valid invitation found for this email"
+            )
+
     # Create and send OTP
     otp_code, error_msg = await create_otp_token(session, email, purpose)
-    
+
     if error_msg:
         raise HTTPException(status_code=429, detail=error_msg)
-    
+
     # Send email
     email_sent = await send_otp_email(email, otp_code, purpose)
-    
+
     if not email_sent:
         logger.warning(f"Failed to send OTP email to {email}, but OTP was created")
-    
+
     # Always return success (don't reveal if email exists for password_reset)
     return {
         "message": "Verification code sent to your email",
-        "email": email if purpose == "signup" else None  # Only reveal for signup
+        "email": email if purpose == "signup" else None,  # Only reveal for signup
     }
 
 
@@ -475,19 +564,18 @@ async def verify_otp(
     """Verify an OTP code."""
     email = request_data.email.lower().strip()
     purpose = request_data.purpose.lower()
-    
+
     if purpose not in ["signup", "password_reset"]:
         raise HTTPException(status_code=400, detail="Invalid purpose")
-    
-    is_valid, error_msg = await verify_otp_token(session, email, request_data.otp_code, purpose)
-    
+
+    is_valid, error_msg = await verify_otp_token(
+        session, email, request_data.otp_code, purpose
+    )
+
     if not is_valid:
         raise HTTPException(status_code=400, detail=error_msg)
-    
-    return {
-        "message": "Email verified successfully",
-        "verified": True
-    }
+
+    return {"message": "Email verified successfully", "verified": True}
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -501,33 +589,33 @@ async def forgot_password(
 ):
     """Request a password reset OTP."""
     email = request_data.email.lower().strip()
-    
+
     # Validate email format
     try:
         validated = validate_email(email)
         email = validated.email
     except EmailNotValidError as e:
         raise HTTPException(status_code=400, detail=f"Invalid email address: {str(e)}")
-    
+
     # Check if user exists (but don't reveal if they don't)
     result = await session.exec(select(Porter).where(Porter.email == email))
     existing_user = result.first()
     if not existing_user:
         # Return success to prevent email enumeration
         return {"message": "If the email exists, a password reset code will be sent"}
-    
+
     # Create and send OTP
     otp_code, error_msg = await create_otp_token(session, email, "password_reset")
-    
+
     if error_msg:
         raise HTTPException(status_code=429, detail=error_msg)
-    
+
     # Send email
     email_sent = await send_otp_email(email, otp_code, "password_reset")
-    
+
     if not email_sent:
         logger.warning(f"Failed to send password reset email to {email}")
-    
+
     # Always return success (security: don't reveal if email exists)
     return {"message": "If the email exists, a password reset code will be sent"}
 
@@ -545,38 +633,41 @@ async def reset_password(
 ):
     """Reset password using OTP verification."""
     email = request_data.email.lower().strip()
-    
+
     # Validate password strength
     is_valid, error_msg = validate_password_strength(request_data.new_password)
     if not is_valid:
         raise HTTPException(status_code=400, detail=error_msg)
-    
+
     # Verify OTP
-    is_valid, error_msg = await verify_otp_token(session, email, request_data.otp_code, "password_reset")
-    
+    is_valid, error_msg = await verify_otp_token(
+        session, email, request_data.otp_code, "password_reset"
+    )
+
     if not is_valid:
         raise HTTPException(status_code=400, detail=error_msg)
-    
+
     # Find user
     result = await session.exec(select(Porter).where(Porter.email == email))
     user = result.first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     # Update password
     user.password_hash = auth.get_password_hash(request_data.new_password)
     user.updated_at = datetime.now(timezone.utc)
     session.add(user)
     await session.commit()
-    
+
     logger.info(f"Password reset successful for user: {email}")
-    
+
     return {"message": "Password reset successfully"}
 
 
 # ============================================================================
 # Profile Management Endpoints
 # ============================================================================
+
 
 @app.get("/api/v1/profile/me", response_model=PorterPublic)
 def get_current_user_profile(user: Porter = Depends(auth.get_current_user)):
@@ -586,7 +677,7 @@ def get_current_user_profile(user: Porter = Depends(auth.get_current_user)):
         full_name=user.full_name,
         phone=user.phone,
         email=user.email,
-        role=user.role
+        role=user.role,
     )
 
 
@@ -602,30 +693,35 @@ async def change_password(
     session=Depends(get_session),
 ):
     """Change user's password.
-    
+
     Requires current password for verification.
     """
     # Verify current password
-    if not user.password_hash or not auth.verify_password(request_data.current_password, user.password_hash):
+    if not user.password_hash or not auth.verify_password(
+        request_data.current_password, user.password_hash
+    ):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
-    
+
     # Validate new password strength
     is_valid, error_msg = validate_password_strength(request_data.new_password)
     if not is_valid:
         raise HTTPException(status_code=400, detail=error_msg)
-    
+
     # Check if new password is different from current
     if auth.verify_password(request_data.new_password, user.password_hash):
-        raise HTTPException(status_code=400, detail="New password must be different from current password")
-    
+        raise HTTPException(
+            status_code=400,
+            detail="New password must be different from current password",
+        )
+
     # Update password
     user.password_hash = auth.get_password_hash(request_data.new_password)
     user.updated_at = datetime.now(timezone.utc)
     session.add(user)
     await session.commit()
-    
+
     logger.info(f"Password changed for user: {user.email}")
-    
+
     return {"message": "Password changed successfully"}
 
 
@@ -644,6 +740,7 @@ def health():
 def metrics() -> Response:
     """Prometheus metrics endpoint."""
     from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
@@ -658,15 +755,18 @@ class ComplaintCreate(BaseModel):
     photo_urls: Optional[List[str]] = None
     severity: str
 
-    @validator('room_number', allow_reuse=True)
+    @validator("room_number", allow_reuse=True)
     def validate_and_normalize_room_number(cls, v: str) -> str:
         """Normalize to uppercase and validate canonical format A–H followed by 3 digits."""
         if not isinstance(v, str):
-            raise ValueError('room_number must be a string')
+            raise ValueError("room_number must be a string")
         v_norm = v.strip().upper()
         import re
-        if not re.match(r'^[A-H][0-9]{3}$', v_norm):
-            raise ValueError('Room number must be one letter (A–H) followed by three digits, like A312')
+
+        if not re.match(r"^[A-H][0-9]{3}$", v_norm):
+            raise ValueError(
+                "Room number must be one letter (A–H) followed by three digits, like A312"
+            )
         return v_norm
 
 
@@ -685,14 +785,21 @@ class ComplaintUpdate(BaseModel):
 
 @app.post("/api/v1/complaints/submit", status_code=201)
 async def submit_complaint(
-    payload: ComplaintCreate, 
+    payload: ComplaintCreate,
     _: object = Depends(get_authenticated_user_or_service),
-    session=Depends(get_session)
+    session=Depends(get_session),
 ):
     # Map validated Pydantic payload into SQLModel Complaint for persistence
     data = payload.dict()
     # Validate category and severity to avoid writing invalid ENUM values into Postgres
-    allowed_categories = {"plumbing", "electrical", "carpentry", "pest", "metalworks", "other"}
+    allowed_categories = {
+        "plumbing",
+        "electrical",
+        "carpentry",
+        "pest",
+        "metalworks",
+        "other",
+    }
     allowed_severities = {"low", "medium", "high"}
     if data.get("category") not in allowed_categories:
         # Map unknown categories to 'other' to keep DB enum compatibility
@@ -704,25 +811,26 @@ async def submit_complaint(
     # Ensure ID is a UUID object if using Postgres UUIDs
     if "id" not in data:
         import uuid
+
         data["id"] = uuid.uuid4()
-    
+
     complaint = Complaint(**data)
     session.add(complaint)
     await session.commit()
     await session.refresh(complaint)
-    
+
     # Broadcast new complaint event to WebSocket clients
     try:
         await manager.broadcast_new_complaint(
             complaint_id=complaint.id,
             hostel=complaint.hostel,
             category=complaint.category,
-            severity=complaint.severity
+            severity=complaint.severity,
         )
         logger.info(f"Broadcasted new complaint event: {complaint.id}")
     except Exception as e:
         logger.error(f"Failed to broadcast new complaint event: {e}")
-    
+
     # Send Telegram notification
     try:
         complaint_data = {
@@ -731,13 +839,13 @@ async def submit_complaint(
             "category": complaint.category,
             "severity": complaint.severity,
             "description": complaint.description,
-            "room_number": complaint.room_number
+            "room_number": complaint.room_number,
         }
         await telegram_notifier.send_complaint_alert(complaint_data)
         logger.info(f"Sent Telegram notification for complaint: {complaint.id}")
     except Exception as e:
         logger.error(f"Failed to send Telegram notification: {e}")
-    
+
     return {"complaint_id": complaint.id}
 
 
@@ -747,7 +855,7 @@ async def get_complaint(complaint_id: str, session=Depends(get_session)):
     # UUID text being used in the query which causes a DB-level DataError.
     import re
 
-    uuid_like = re.compile(r'^[0-9a-fA-F-]{1,36}$')
+    uuid_like = re.compile(r"^[0-9a-fA-F-]{1,36}$")
     if not uuid_like.match(complaint_id):
         # Treat clearly invalid IDs as not found to avoid 500 internal errors.
         raise HTTPException(status_code=404, detail="Not found")
@@ -763,7 +871,11 @@ async def get_complaint(complaint_id: str, session=Depends(get_session)):
     # accessible URLs (signed for S3, path for local fallback) using
     # the storage helper `get_photo_url`.
     try:
-        photo_stmt = select(Photo).where(Photo.complaint_id == complaint_id).order_by(Photo.created_at.desc())
+        photo_stmt = (
+            select(Photo)
+            .where(Photo.complaint_id == complaint_id)
+            .order_by(Photo.created_at.desc())
+        )
         result = await session.exec(photo_stmt)
         photos = result.all()
         photo_urls = []
@@ -786,7 +898,7 @@ async def get_complaint(complaint_id: str, session=Depends(get_session)):
 
 @app.get("/api/v1/complaints", response_model=PaginatedComplaints)
 async def list_complaints(
-    request: Request, 
+    request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     status: Optional[str] = Query(None),
@@ -794,15 +906,15 @@ async def list_complaints(
     category: Optional[str] = Query(None),
     severity: Optional[str] = Query(None),
     telegram_user_id: Optional[str] = Query(None),
-    credentials: Optional[HTTPBasicCredentials] = Depends(security), 
-    session=Depends(get_session)
+    credentials: Optional[HTTPBasicCredentials] = Depends(security),
+    session=Depends(get_session),
 ):
     """
     Dashboard endpoint with pagination and filters. Allows either Basic auth (tests use this) or a Bearer token.
     - If no auth provided: return 401 (unless filtering by telegram_user_id for bot access)
     - If Basic credentials provided: accept (tests treat any creds as ok)
     - If Bearer token provided: validate and require role == 'admin'
-    
+
     Special case: If telegram_user_id is provided, allow access without auth for bot users to view their own complaints.
     """
     auth_header = request.headers.get("authorization")
@@ -813,7 +925,11 @@ async def list_complaints(
     if not auth_header and not credentials and not allow_public_access:
         # No auth of any kind. Return a JSON 401 without WWW-Authenticate
         # to avoid browsers showing the native Basic Auth popup.
-        raise HTTPException(status_code=401, detail="Unauthorized", headers={"X-Auth-Reason": "No credentials provided"})
+        raise HTTPException(
+            status_code=401,
+            detail="Unauthorized",
+            headers={"X-Auth-Reason": "No credentials provided"},
+        )
 
     # Build base query
     statement = select(Complaint)
@@ -823,22 +939,24 @@ async def list_complaints(
     if status:
         statement = statement.where(Complaint.status == status)
         count_statement = count_statement.where(Complaint.status == status)
-    
+
     if hostel:
         statement = statement.where(Complaint.hostel == hostel)
         count_statement = count_statement.where(Complaint.hostel == hostel)
-    
+
     if category:
         statement = statement.where(Complaint.category == category)
         count_statement = count_statement.where(Complaint.category == category)
-    
+
     if severity:
         statement = statement.where(Complaint.severity == severity)
         count_statement = count_statement.where(Complaint.severity == severity)
-    
+
     if telegram_user_id:
         statement = statement.where(Complaint.telegram_user_id == telegram_user_id)
-        count_statement = count_statement.where(Complaint.telegram_user_id == telegram_user_id)
+        count_statement = count_statement.where(
+            Complaint.telegram_user_id == telegram_user_id
+        )
 
     # Bearer token path: enforce RBAC (only if we have authentication)
     if auth_header and auth_header.lower().startswith("bearer "):
@@ -848,7 +966,7 @@ async def list_complaints(
         except HTTPException:
             raise HTTPException(status_code=401, detail="Invalid token")
         role = (payload.role or "porter").lower()
-        
+
         # Admin: return all complaints
         if role == "admin":
             pass  # No additional filtering needed
@@ -857,7 +975,9 @@ async def list_complaints(
         elif role == "porter":
             porter_id = payload.sub
             statement = statement.where(Complaint.assigned_porter_id == porter_id)
-            count_statement = count_statement.where(Complaint.assigned_porter_id == porter_id)
+            count_statement = count_statement.where(
+                Complaint.assigned_porter_id == porter_id
+            )
 
         # Any other role is forbidden
         else:
@@ -866,17 +986,17 @@ async def list_complaints(
     # Apply pagination
     offset = (page - 1) * page_size
     statement = statement.offset(offset).limit(page_size)
-    
+
     # Order by created_at descending (newest first)
     statement = statement.order_by(Complaint.created_at.desc())
 
     # Execute queries
     total_result = await session.exec(count_statement)
     total = total_result.one()
-    
+
     results_result = await session.exec(statement)
     results = results_result.all()
-    
+
     # Calculate total pages
     total_pages = (total + page_size - 1) // page_size
 
@@ -885,7 +1005,7 @@ async def list_complaints(
         total=total,
         page=page,
         page_size=page_size,
-        total_pages=total_pages
+        total_pages=total_pages,
     )
 
 
@@ -908,7 +1028,7 @@ async def update_complaint_status(
     # Guard against invalid-looking IDs (avoid DB DataError)
     import re
 
-    uuid_like = re.compile(r'^[0-9a-fA-F-]{1,36}$')
+    uuid_like = re.compile(r"^[0-9a-fA-F-]{1,36}$")
     if not uuid_like.match(complaint_id):
         raise HTTPException(status_code=404, detail="Not found")
 
@@ -922,7 +1042,10 @@ async def update_complaint_status(
     # Validate status value and enforce RBAC transitions
     allowed_statuses = {"reported", "in_progress", "resolved", "closed"}
     if body.status not in allowed_statuses:
-        raise HTTPException(status_code=400, detail=f"Invalid status. Allowed: {', '.join(sorted(allowed_statuses))}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status. Allowed: {', '.join(sorted(allowed_statuses))}",
+        )
 
     user_role = (user.role or "porter").lower()
     allowed, code, msg = auth.can_transition(user_role, complaint.status, body.status)
@@ -956,7 +1079,8 @@ async def update_complaint(
     """
     # Guard against invalid-looking IDs (avoid DB DataError)
     import re
-    uuid_like = re.compile(r'^[0-9a-fA-F-]{1,36}$')
+
+    uuid_like = re.compile(r"^[0-9a-fA-F-]{1,36}$")
     if not uuid_like.match(complaint_id):
         raise HTTPException(status_code=404, detail="Not found")
 
@@ -976,9 +1100,14 @@ async def update_complaint(
     if body.status is not None:
         allowed_statuses = {"reported", "in_progress", "resolved", "closed"}
         if body.status not in allowed_statuses:
-            raise HTTPException(status_code=400, detail=f"Invalid status. Allowed: {', '.join(sorted(allowed_statuses))}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid status. Allowed: {', '.join(sorted(allowed_statuses))}",
+            )
 
-        allowed, code, msg = auth.can_transition(user_role, complaint.status, body.status)
+        allowed, code, msg = auth.can_transition(
+            user_role, complaint.status, body.status
+        )
         if not allowed:
             raise HTTPException(status_code=code, detail=msg)
 
@@ -996,8 +1125,13 @@ async def update_complaint(
 
         # Authorization: admins can assign anyone; porters can only assign themselves
         if user_role != "admin":
-            if str(token_sub) != str(body.assigned_porter_id) and str(user.id) != str(body.assigned_porter_id):
-                raise HTTPException(status_code=403, detail="Insufficient privileges to assign other porters")
+            if str(token_sub) != str(body.assigned_porter_id) and str(user.id) != str(
+                body.assigned_porter_id
+            ):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Insufficient privileges to assign other porters",
+                )
 
         complaint.assigned_porter_id = target.id
         updated = True
@@ -1007,16 +1141,21 @@ async def update_complaint(
         # Using timezone.utc causes asyncpg type conversion errors
         complaint.updated_at = datetime.utcnow()
         session.add(complaint)
-        
+
         # Create audit record for assignment changes
         if body.assigned_porter_id is not None:
             from .models import AssignmentAudit
-            audit = AssignmentAudit(complaint_id=complaint.id, assigned_by=user.id, assigned_to=body.assigned_porter_id)
+
+            audit = AssignmentAudit(
+                complaint_id=complaint.id,
+                assigned_by=user.id,
+                assigned_to=body.assigned_porter_id,
+            )
             session.add(audit)
-        
+
         await session.commit()
         await session.refresh(complaint)
-        
+
         # Broadcast events and send notifications
         try:
             # Broadcast status update if status changed
@@ -1025,31 +1164,42 @@ async def update_complaint(
                     complaint_id=complaint.id,
                     old_status=old_status,
                     new_status=body.status,
-                    updated_by=user.full_name or user.id
+                    updated_by=user.full_name or user.id,
                 )
-                logger.info(f"Broadcasted status update: {complaint.id} {old_status} -> {body.status}")
-                
+                logger.info(
+                    f"Broadcasted status update: {complaint.id} {old_status} -> {body.status}"
+                )
+
                 # Send Telegram notification for status update
                 try:
                     await telegram_notifier.send_status_update_alert(
                         complaint_id=complaint.id,
                         old_status=old_status,
                         new_status=body.status,
-                        updated_by=user.full_name or user.id
+                        updated_by=user.full_name or user.id,
                     )
-                    logger.info(f"Sent Telegram status update notification: {complaint.id}")
+                    logger.info(
+                        f"Sent Telegram status update notification: {complaint.id}"
+                    )
                 except Exception as e:
-                    logger.error(f"Failed to send Telegram status update notification: {e}")
-            
+                    logger.error(
+                        f"Failed to send Telegram status update notification: {e}"
+                    )
+
             # Broadcast assignment update if assignment changed
-            if body.assigned_porter_id is not None and old_assigned_to != body.assigned_porter_id:
+            if (
+                body.assigned_porter_id is not None
+                and old_assigned_to != body.assigned_porter_id
+            ):
                 await manager.broadcast_assignment(
                     complaint_id=complaint.id,
                     assigned_to=body.assigned_porter_id,
-                    assigned_by=user.id
+                    assigned_by=user.id,
                 )
-                logger.info(f"Broadcasted assignment update: {complaint.id} -> {body.assigned_porter_id}")
-                
+                logger.info(
+                    f"Broadcasted assignment update: {complaint.id} -> {body.assigned_porter_id}"
+                )
+
         except Exception as e:
             logger.error(f"Failed to broadcast update events: {e}")
 
@@ -1088,7 +1238,13 @@ async def assign_complaint(
     user_role = (user.role or "porter").lower()
     # Temporary debug logging to capture token vs user mapping during tests
     log = logging.getLogger("app.assign")
-    log.info("assign_complaint called: token_sub=%r user_id=%r user_role=%r target_id=%r", token_sub, getattr(user, 'id', None), user_role, target_id)
+    log.info(
+        "assign_complaint called: token_sub=%r user_id=%r user_role=%r target_id=%r",
+        token_sub,
+        getattr(user, "id", None),
+        user_role,
+        target_id,
+    )
     # Compare token subject (sub) to requested target_id. This avoids
     # transient races where the Porter object in memory may not match
     # the token subject due to duplicate/regenerate flows in tests.
@@ -1098,14 +1254,19 @@ async def assign_complaint(
     # in our test harness.
     if user_role != "admin":
         if str(token_sub) != str(target_id) and str(user.id) != str(target_id):
-            raise HTTPException(status_code=403, detail="Insufficient privileges to assign other porters")
+            raise HTTPException(
+                status_code=403,
+                detail="Insufficient privileges to assign other porters",
+            )
 
     # Assign and persist
     complaint.assigned_porter_id = target.id
     complaint.updated_at = datetime.now(timezone.utc)
     session.add(complaint)
     # Create audit record
-    audit = AssignmentAudit(complaint_id=complaint.id, assigned_by=user.id, assigned_to=target.id)
+    audit = AssignmentAudit(
+        complaint_id=complaint.id, assigned_by=user.id, assigned_to=target.id
+    )
     session.add(audit)
     await session.commit()
     await session.refresh(complaint)
@@ -1113,17 +1274,34 @@ async def assign_complaint(
 
 
 @app.get("/api/v1/complaints/{complaint_id}/assignments")
-async def list_assignments(complaint_id: str, user: Porter = Depends(auth.get_current_user), session=Depends(get_session)):
+async def list_assignments(
+    complaint_id: str,
+    user: Porter = Depends(auth.get_current_user),
+    session=Depends(get_session),
+):
     """Return assignment audit rows for a complaint. Admin-only."""
     # Only admin allowed
     if (user.role or "porter").lower() != "admin":
         raise HTTPException(status_code=403, detail="Insufficient privileges")
 
-    stmt = select(AssignmentAudit).where(AssignmentAudit.complaint_id == complaint_id).order_by(AssignmentAudit.created_at.desc())
+    stmt = (
+        select(AssignmentAudit)
+        .where(AssignmentAudit.complaint_id == complaint_id)
+        .order_by(AssignmentAudit.created_at.desc())
+    )
     result = await session.exec(stmt)
     rows = result.all()
     # Map to simple dicts for the test expectations
-    return [ {"id": r.id, "complaint_id": r.complaint_id, "assigned_by": r.assigned_by, "assigned_to": r.assigned_to, "created_at": r.created_at.isoformat() if r.created_at else None} for r in rows ]
+    return [
+        {
+            "id": r.id,
+            "complaint_id": r.complaint_id,
+            "assigned_by": r.assigned_by,
+            "assigned_to": r.assigned_to,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
 
 
 @app.post("/api/v1/complaints/{complaint_id}/photos")
@@ -1131,7 +1309,7 @@ async def upload_photo_to_complaint(
     complaint_id: str,
     file: UploadFile = File(...),
     user: Porter = Depends(get_authenticated_user_or_service),
-    session=Depends(get_session)
+    session=Depends(get_session),
 ):
     """Legacy photo upload endpoint retained for backward compatibility."""
 
@@ -1146,7 +1324,7 @@ async def upload_photo_to_complaint(
             raise HTTPException(status_code=404, detail="Complaint not found")
 
         photo_id = str(uuid.uuid4())
-        
+
         # Check file size before reading into memory
         file_size = 0
         try:
@@ -1156,7 +1334,11 @@ async def upload_photo_to_complaint(
             UPLOAD_FAILURES.inc()
             logger.error(f"Error reading file: {e}")
             # If it's a memory error or size-related, return 413
-            if "memory" in str(e).lower() or "size" in str(e).lower() or "too large" in str(e).lower():
+            if (
+                "memory" in str(e).lower()
+                or "size" in str(e).lower()
+                or "too large" in str(e).lower()
+            ):
                 raise HTTPException(status_code=413, detail="File too large to process")
             raise HTTPException(status_code=400, detail=f"Error reading file: {str(e)}")
 
@@ -1176,16 +1358,24 @@ async def upload_photo_to_complaint(
             error_str = str(e).lower()
             if "size" in error_str or "too large" in error_str or "memory" in error_str:
                 raise HTTPException(status_code=413, detail="File too large to process")
-            raise HTTPException(status_code=400, detail=f"Image validation failed: {str(e)}")
+            raise HTTPException(
+                status_code=400, detail=f"Image validation failed: {str(e)}"
+            )
 
         try:
-            optimized_data, thumbnail_data, width, height, mime_type = process_image(file_data, file.filename)
+            optimized_data, thumbnail_data, width, height, mime_type = process_image(
+                file_data, file.filename
+            )
         except Exception as e:
             UPLOAD_FAILURES.inc()
             logger.error(f"Error processing image: {e}")
-            raise HTTPException(status_code=400, detail=f"Error processing image: {str(e)}")
+            raise HTTPException(
+                status_code=400, detail=f"Error processing image: {str(e)}"
+            )
 
-        file_url, thumbnail_url = upload_photo(optimized_data, complaint_id, photo_id, mime_type)
+        file_url, thumbnail_url = upload_photo(
+            optimized_data, complaint_id, photo_id, mime_type
+        )
         thumbnail_key = None
         if thumbnail_data:
             thumb_storage_url = upload_thumbnail(thumbnail_data, complaint_id, photo_id)
@@ -1193,7 +1383,9 @@ async def upload_photo_to_complaint(
                 thumbnail_url = thumb_storage_url
             thumbnail_key = get_s3_key(complaint_id, photo_id, is_thumbnail=True)
 
-        original_key = get_s3_key(complaint_id, photo_id, is_thumbnail=False, content_type=mime_type)
+        original_key = get_s3_key(
+            complaint_id, photo_id, is_thumbnail=False, content_type=mime_type
+        )
 
         photo = Photo(
             id=photo_id,
@@ -1224,7 +1416,7 @@ async def upload_photo_to_complaint(
             "file_size": photo.file_size,
             "width": photo.width,
             "height": photo.height,
-            "created_at": photo.created_at.isoformat() if photo.created_at else None
+            "created_at": photo.created_at.isoformat() if photo.created_at else None,
         }
     except HTTPException:
         # Re-raise HTTP exceptions as-is
@@ -1232,19 +1424,28 @@ async def upload_photo_to_complaint(
     except Exception as e:
         # Catch any other unhandled exceptions and return appropriate status code
         UPLOAD_FAILURES.inc()
-        logger.error(f"Unexpected error in upload_photo_to_complaint: {e}", exc_info=True)
+        logger.error(
+            f"Unexpected error in upload_photo_to_complaint: {e}", exc_info=True
+        )
         # If it's a size-related error, return 413 instead of 500
         error_str = str(e).lower()
-        if "size" in error_str or "too large" in error_str or "memory" in error_str or "413" in error_str:
+        if (
+            "size" in error_str
+            or "too large" in error_str
+            or "memory" in error_str
+            or "413" in error_str
+        ):
             raise HTTPException(status_code=413, detail="File too large to process")
-        raise HTTPException(status_code=500, detail="Internal server error during file upload")
+        raise HTTPException(
+            status_code=500, detail="Internal server error during file upload"
+        )
 
 
 @app.get("/api/v1/complaints/{complaint_id}/photos")
 async def list_complaint_photos(
     complaint_id: str,
     user: Porter = Depends(get_authenticated_user_or_service),
-    session=Depends(get_session)
+    session=Depends(get_session),
 ):
     """List stored photo metadata for a complaint."""
     statement = select(Complaint).where(Complaint.id == complaint_id)
@@ -1253,7 +1454,11 @@ async def list_complaint_photos(
     if not complaint:
         raise HTTPException(status_code=404, detail="Complaint not found")
 
-    statement = select(Photo).where(Photo.complaint_id == complaint_id).order_by(Photo.created_at.desc())
+    statement = (
+        select(Photo)
+        .where(Photo.complaint_id == complaint_id)
+        .order_by(Photo.created_at.desc())
+    )
     result = await session.exec(statement)
     photos = result.all()
     return [
@@ -1267,7 +1472,7 @@ async def list_complaint_photos(
             "mime_type": photo.mime_type,
             "width": photo.width,
             "height": photo.height,
-            "created_at": photo.created_at.isoformat() if photo.created_at else None
+            "created_at": photo.created_at.isoformat() if photo.created_at else None,
         }
         for photo in photos
     ]
@@ -1278,7 +1483,7 @@ async def delete_complaint_photo(
     complaint_id: str,
     photo_id: str,
     user: Porter = Depends(get_authenticated_user_or_service),
-    session=Depends(get_session)
+    session=Depends(get_session),
 ):
     """Delete a photo from a complaint."""
     statement = select(Complaint).where(Complaint.id == complaint_id)
@@ -1287,7 +1492,9 @@ async def delete_complaint_photo(
     if not complaint:
         raise HTTPException(status_code=404, detail="Complaint not found")
 
-    statement = select(Photo).where(Photo.id == photo_id, Photo.complaint_id == complaint_id)
+    statement = select(Photo).where(
+        Photo.id == photo_id, Photo.complaint_id == complaint_id
+    )
     result = await session.exec(statement)
     photo = result.first()
     if not photo:
@@ -1303,7 +1510,9 @@ async def delete_complaint_photo(
 
 
 @app.get("/api/v1/porters", response_model=List[PorterPublic])
-async def list_porters(user: Porter = Depends(auth.get_current_user), session=Depends(get_session)):
+async def list_porters(
+    user: Porter = Depends(auth.get_current_user), session=Depends(get_session)
+):
     """Get list of porters for assignment dropdown.
 
     This endpoint intentionally returns a public view of Porters and excludes
@@ -1313,12 +1522,23 @@ async def list_porters(user: Porter = Depends(auth.get_current_user), session=De
     result = await session.exec(statement)
     results = result.all()
     # Map to PorterPublic - convert UUID to string
-    public = [PorterPublic(id=str(r.id), full_name=r.full_name, phone=r.phone, email=r.email, role=r.role) for r in results]
+    public = [
+        PorterPublic(
+            id=str(r.id),
+            full_name=r.full_name,
+            phone=r.phone,
+            email=r.email,
+            role=r.role,
+        )
+        for r in results
+    ]
     return public
 
 
 @app.get("/api/v1/hostels", response_model=List[HostelPublic])
-async def list_hostels(user: Porter = Depends(auth.get_current_user), session=Depends(get_session)):
+async def list_hostels(
+    user: Porter = Depends(auth.get_current_user), session=Depends(get_session)
+):
     """Return configured hostels for dashboard filter population."""
     # Use a raw SQL query to return simple tuples so SQLAlchemy/SQLModel
     # don't attempt to parse the stored `created_at` strings into
@@ -1348,7 +1568,7 @@ async def list_categories(session=Depends(get_session)):
 async def websocket_endpoint(websocket: WebSocket, token: str = None):
     """
     WebSocket endpoint for real-time dashboard updates.
-    
+
     Requires JWT token as query parameter for authentication.
     """
     try:
@@ -1356,7 +1576,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = None):
         if not token:
             await websocket.close(code=4001, reason="Missing authentication token")
             return
-        
+
         # Decode and validate the JWT token
         try:
             payload = auth.decode_access_token(token)
@@ -1366,30 +1586,30 @@ async def websocket_endpoint(websocket: WebSocket, token: str = None):
             logger.error(f"WebSocket authentication failed: {e}")
             await websocket.close(code=4001, reason="Invalid authentication token")
             return
-        
+
         # Connect the WebSocket
         await manager.connect(websocket, user_id, user_role)
-        
+
         try:
             # Keep the connection alive and handle incoming messages
             while True:
                 # Wait for messages from the client (ping/pong, etc.)
                 data = await websocket.receive_text()
-                
+
                 # Handle ping messages
                 if data == "ping":
                     await websocket.send_text("pong")
                 else:
                     # Echo back any other messages (for debugging)
                     await websocket.send_text(f"Echo: {data}")
-                    
+
         except WebSocketDisconnect:
             manager.disconnect(websocket)
             logger.info(f"WebSocket disconnected: user_id={user_id}")
         except Exception as e:
             logger.error(f"WebSocket error: {e}")
             manager.disconnect(websocket)
-            
+
     except Exception as e:
         logger.error(f"WebSocket connection error: {e}")
         try:
@@ -1406,8 +1626,7 @@ def get_notification_config(user: Porter = Depends(auth.require_role("admin"))):
 
 @app.post("/api/v1/notifications/config")
 def update_notification_config(
-    config: dict,
-    user: Porter = Depends(auth.require_role("admin"))
+    config: dict, user: Porter = Depends(auth.require_role("admin"))
 ):
     """Update notification configuration (admin only)."""
     telegram_notifier.update_config(config)
@@ -1419,7 +1638,7 @@ def get_websocket_stats(user: Porter = Depends(auth.require_role("admin"))):
     """Get WebSocket connection statistics (admin only)."""
     return {
         "total_connections": manager.get_connection_count(),
-        "connections_by_role": manager.get_connections_by_role()
+        "connections_by_role": manager.get_connections_by_role(),
     }
 
 
@@ -1429,7 +1648,7 @@ def websocket_health_check():
     return {
         "status": "healthy",
         "active_connections": manager.get_connection_count(),
-        "service": "websocket_manager"
+        "service": "websocket_manager",
     }
 
 
@@ -1445,12 +1664,13 @@ def service_token_status(user: Porter = Depends(auth.get_current_user)):
         raise HTTPException(status_code=403, detail="Insufficient privileges")
 
     import os
+
     svc = os.environ.get("BACKEND_SERVICE_TOKEN")
     present = bool(svc)
     instructions = (
         "1) Generate a strong opaque token (e.g. `openssl rand -base64 32`).\n"
         "2) Set BACKEND_SERVICE_TOKEN in the bot process environment before starting the bot.\n"
-        "   Example: BACKEND_SERVICE_TOKEN=\"<token>\" BOT_ENV=... systemd/env file or export in shell.\n"
+        '   Example: BACKEND_SERVICE_TOKEN="<token>" BOT_ENV=... systemd/env file or export in shell.\n'
         "3) The bot should send the token as a Bearer Authorization header (same header used for JWTs).\n"
         "4) Once the bot is configured and tested, revoke old tokens by restarting services without the old token."
     )
@@ -1460,6 +1680,7 @@ def service_token_status(user: Porter = Depends(auth.get_current_user)):
 
 class PurgeRequest(BaseModel):
     """Request model for admin purge endpoint."""
+
     complaint_status: Optional[str] = None
     days_old: Optional[int] = None
 
@@ -1468,25 +1689,21 @@ class PurgeRequest(BaseModel):
 async def purge_old_data(
     user: Porter = Depends(auth.require_role("admin")),
     session=Depends(get_session),
-    request: PurgeRequest = None
+    request: PurgeRequest = None,
 ):
     """
     Admin-only endpoint to purge old complaint data based on retention policy.
-    
+
     Retention Policy:
     - Resolved: 90 days
     - Closed: 30 days
     - Rejected: 7 days
     """
     from datetime import timedelta
-    
+
     # Default retention periods (in days)
-    RETENTION_PERIODS = {
-        "resolved": 90,
-        "closed": 30,
-        "rejected": 7
-    }
-    
+    RETENTION_PERIODS = {"resolved": 90, "closed": 30, "rejected": 7}
+
     # Override with user-specified days if provided
     if request and request.days_old:
         retention_days = request.days_old
@@ -1498,72 +1715,78 @@ async def purge_old_data(
         else:
             # No specific status requested - apply to all that need purging
             retention_days = None
-    
+
     cutoff_date = datetime.now(timezone.utc) - timedelta(days=retention_days or 90)
-    
+
     # Find complaints to purge
     # Only purge if complaint is in a terminally resolved state (resolved, closed, rejected)
     # AND older than the retention period
     base_statement = select(Complaint).where(
         Complaint.updated_at < cutoff_date if retention_days else True
     )
-    
+
     # Filter by status if specified
     if request and request.complaint_status:
-        base_statement = base_statement.where(Complaint.status == request.complaint_status)
+        base_statement = base_statement.where(
+            Complaint.status == request.complaint_status
+        )
     else:
         # Purge all terminally resolved complaints
         base_statement = base_statement.where(
             Complaint.status.in_(["resolved", "closed", "rejected"])
         )
-    
+
     result = await session.exec(base_statement)
     complaints_to_purge = result.all()
-    
+
     if not complaints_to_purge:
         return {
             "message": "No data to purge",
             "purged_count": 0,
-            "cutoff_date": cutoff_date.isoformat()
+            "cutoff_date": cutoff_date.isoformat(),
         }
-    
+
     purged_complaint_ids = []
     photos_deleted = 0
-    
+
     # Delete photos and complaints
     for complaint in complaints_to_purge:
         # Get associated photos
         photo_statement = select(Photo).where(Photo.complaint_id == complaint.id)
         result = await session.exec(photo_statement)
         photos = result.all()
-        
+
         # Delete photos from storage and database
         for photo in photos:
             try:
                 from .storage import delete_photo
+
                 delete_photo(complaint.id, photo.id)
             except Exception as e:
                 logger.error(f"Failed to delete photo {photo.id}: {e}")
-            
+
             await session.delete(photo)
             photos_deleted += 1
-        
+
         # Delete complaint
         purged_complaint_ids.append(complaint.id)
         await session.delete(complaint)
-        
-        logger.info(f"Purging complaint {complaint.id} (status: {complaint.status}, age: {(datetime.now(timezone.utc) - complaint.updated_at).days} days)")
-    
+
+        logger.info(
+            f"Purging complaint {complaint.id} (status: {complaint.status}, age: {(datetime.now(timezone.utc) - complaint.updated_at).days} days)"
+        )
+
     # Commit all deletions
     await session.commit()
-    
+
     return {
         "message": f"Successfully purged {len(purged_complaint_ids)} complaints and {photos_deleted} photos",
         "purged_complaint_ids": purged_complaint_ids,
         "complaints_purged": len(purged_complaint_ids),
         "photos_deleted": photos_deleted,
-        "cutoff_date": cutoff_date.isoformat()
+        "cutoff_date": cutoff_date.isoformat(),
     }
+
 
 # CORS: allow dashboard to call the API; in production set more restrictive origins
 app.add_middleware(
@@ -1583,11 +1806,16 @@ async def startup_event():
     logger.info("WebSocket manager initialized")
     # Log service-token rollout status for operators
     import os
+
     svc = os.environ.get("BACKEND_SERVICE_TOKEN")
     if svc:
-        logger.info("BACKEND_SERVICE_TOKEN is configured — endpoints that accept service tokens will allow trusted callers (e.g. bot) to authenticate using this opaque token")
+        logger.info(
+            "BACKEND_SERVICE_TOKEN is configured — endpoints that accept service tokens will allow trusted callers (e.g. bot) to authenticate using this opaque token"
+        )
     else:
-        logger.info("No BACKEND_SERVICE_TOKEN configured — only regular JWT bearer tokens are accepted")
+        logger.info(
+            "No BACKEND_SERVICE_TOKEN configured — only regular JWT bearer tokens are accepted"
+        )
     # Ensure hostels in DB match the canonical list used by the bot.
     try:
         # Import here to avoid circular import at module load time
@@ -1603,18 +1831,22 @@ async def startup_event():
             existing_names = {h.display_name for h in existing}
 
             to_add = []
-            for cname in getattr(merged_constants, 'HOSTELS', []):
+            for cname in getattr(merged_constants, "HOSTELS", []):
                 if cname not in existing_names:
-                    slug = cname.lower().replace(' ', '-')
+                    slug = cname.lower().replace(" ", "-")
                     to_add.append(Hostel(slug=slug, display_name=cname))
 
             if to_add:
                 for h in to_add:
                     session.add(h)
                 await session.commit()
-                logger.info(f"Seeded {len(to_add)} hostels from merged_constants into DB: {[h.display_name for h in to_add]}")
+                logger.info(
+                    f"Seeded {len(to_add)} hostels from merged_constants into DB: {[h.display_name for h in to_add]}"
+                )
             else:
-                logger.info("Hostels table already contains canonical entries; no seeding required")
+                logger.info(
+                    "Hostels table already contains canonical entries; no seeding required"
+                )
     except Exception as e:
         logger.error(f"Failed to ensure canonical hostels in DB on startup: {e}")
 

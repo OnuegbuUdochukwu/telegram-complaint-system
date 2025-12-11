@@ -32,7 +32,9 @@ logger = get_task_logger(__name__)
 def enqueue_thumbnail_job(photo_id: str, complaint_id: Optional[str] = None) -> None:
     """Fire-and-forget helper used by the API layer."""
     try:
-        celery_app.send_task("app.photo_processing.process_photo_task", args=[photo_id, complaint_id])
+        celery_app.send_task(
+            "app.photo_processing.process_photo_task", args=[photo_id, complaint_id]
+        )
     except Exception:  # pragma: no cover - Celery not running locally
         logger.warning("Celery unavailable; processing photo %s inline", photo_id)
         process_photo_task.apply(args=[photo_id, complaint_id])
@@ -65,8 +67,12 @@ def process_photo_task(self, photo_id: str, complaint_id: Optional[str] = None) 
             logger.error("Validation failed for photo %s: %s", photo_id, error)
             raise StorageError(error or "Invalid image")
 
-        optimized_data, thumbnail_data, width, height, mime_type = process_image(data, photo.file_name or "upload.jpg")
-        thumb_key = S3Storage.build_s3_key(photo.complaint_id, photo.id, variant="thumbnail")
+        optimized_data, thumbnail_data, width, height, mime_type = process_image(
+            data, photo.file_name or "upload.jpg"
+        )
+        thumb_key = S3Storage.build_s3_key(
+            photo.complaint_id, photo.id, variant="thumbnail"
+        )
         s3.put_object(thumb_key, thumbnail_data, "image/jpeg")
 
         photo.s3_thumbnail_key = thumb_key
@@ -81,4 +87,3 @@ def process_photo_task(self, photo_id: str, complaint_id: Optional[str] = None) 
 
 
 __all__ = ["celery_app", "enqueue_thumbnail_job"]
-

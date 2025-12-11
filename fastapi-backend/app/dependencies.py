@@ -23,14 +23,20 @@ async def get_authenticated_user_or_service(
     auth_header = request.headers.get("authorization")
     if not auth_header or not auth_header.lower().startswith("bearer "):
         UPLOAD_AUTH_FAILURES.inc()
-        raise HTTPException(status_code=401, detail="Not authenticated", headers={"X-Auth-Reason": "Missing bearer token"})
+        raise HTTPException(
+            status_code=401,
+            detail="Not authenticated",
+            headers={"X-Auth-Reason": "Missing bearer token"},
+        )
 
     token = auth_header.split(None, 1)[1]
     token = token.strip().strip("'\"")
 
     svc_token = get_settings().service_token
     if svc_token and token == svc_token:
-        synthetic = Porter(id="service-token", full_name="service-token", role="service")
+        synthetic = Porter(
+            id="service-token", full_name="service-token", role="service"
+        )
         return synthetic
 
     try:
@@ -48,4 +54,3 @@ async def get_authenticated_user_or_service(
 
 
 __all__ = ["get_authenticated_user_or_service"]
-

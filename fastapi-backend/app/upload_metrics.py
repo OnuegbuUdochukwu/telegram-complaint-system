@@ -19,4 +19,3 @@ UPLOAD_AUTH_FAILURES = Counter(
     "upload_photo_auth_failures_total",
     "Total number of upload attempts that failed authentication",
 )
-

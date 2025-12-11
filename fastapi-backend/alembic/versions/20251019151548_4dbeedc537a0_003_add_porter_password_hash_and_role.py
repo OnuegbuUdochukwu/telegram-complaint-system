@@ -1,13 +1,14 @@
-
 from alembic import op
 
-revision = '4dbeedc537a0'
-down_revision = '34c06045bbb9'
+revision = "4dbeedc537a0"
+down_revision = "34c06045bbb9"
 branch_labels = None
 depends_on = None
 
+
 def upgrade():
-    op.execute(r'''
+    op.execute(
+        r"""
 -- Migration: Add password_hash and role to porters table
 -- Idempotent: only adds columns if they don't already exist
 
@@ -28,7 +29,9 @@ BEGIN
     END IF;
 END$$;
 
-''')
+"""
+    )
+
 
 def downgrade():
     # Manual downgrade is required for SQL migrations.

@@ -9,11 +9,12 @@ enum type, and renames the new type to the original name.
 
 Downgrade reverses the mapping.
 """
+
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = '20251113_migrate_category_enum'
-down_revision = '20251021_create_photos_table'
+revision = "20251113_migrate_category_enum"
+down_revision = "20251021_create_photos_table"
 branch_labels = None
 depends_on = None
 
@@ -21,17 +22,20 @@ depends_on = None
 def upgrade():
     # Perform a safe enum migration for Postgres
     # 1. Create new enum type
-    op.execute(r"""
+    op.execute(
+        r"""
     DO $$
     BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'complaint_category_new') THEN
             CREATE TYPE complaint_category_new AS ENUM ('plumbing','electrical','carpentry','pest','metalworks','other');
         END IF;
     END$$;
-    """)
+    """
+    )
 
     # 2. Alter column
-    op.execute(r"""
+    op.execute(
+        r"""
     ALTER TABLE complaints ALTER COLUMN category TYPE complaint_category_new USING (
       CASE
         WHEN category::text = 'common_area' THEN 'metalworks'
@@ -39,17 +43,20 @@ def upgrade():
         ELSE category::text
       END
     )::complaint_category_new
-    """)
+    """
+    )
 
     # 3. Drop old enum type
-    op.execute(r"""
+    op.execute(
+        r"""
     DO $$
     BEGIN
         IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'complaint_category') THEN
             DROP TYPE complaint_category;
         END IF;
     END$$;
-    """)
+    """
+    )
 
     # 4. Rename new type
     op.execute("ALTER TYPE complaint_category_new RENAME TO complaint_category")
@@ -57,7 +64,8 @@ def upgrade():
 
 def downgrade():
     # Reverse mapping: map carpentry->structural, metalworks->common_area
-    op.execute(r"""
+    op.execute(
+        r"""
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'complaint_category_old') THEN
@@ -81,4 +89,5 @@ BEGIN
 END$$;
 
 ALTER TYPE complaint_category_old RENAME TO complaint_category;
-""")
+"""
+    )

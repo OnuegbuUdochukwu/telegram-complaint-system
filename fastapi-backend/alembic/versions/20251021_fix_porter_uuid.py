@@ -8,14 +8,16 @@ Create Date: 2025-10-21 00:00:00.000000
 
 from alembic import op
 
-revision = '20251021_fix_porter_uuid'
-down_revision = '4dbeedc537a0'
+revision = "20251021_fix_porter_uuid"
+down_revision = "4dbeedc537a0"
 branch_labels = None
 depends_on = None
 
+
 def upgrade():
     # Convert complaints.assigned_porter_id to UUID to match porters.id
-    op.execute(r"""
+    op.execute(
+        r"""
     DO $$
     BEGIN
         -- Only alter if column exists and is not already uuid
@@ -52,7 +54,8 @@ def upgrade():
             END;
         END IF;
     END$$;
-    """)
+    """
+    )
 
 
 def downgrade():

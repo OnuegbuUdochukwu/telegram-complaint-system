@@ -19,7 +19,9 @@ logger = logging.getLogger("app.auth")
 logger.setLevel(logging.INFO)
 if not logger.handlers:
     handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    )
     logger.addHandler(handler)
 
 _env_path = Path(__file__).resolve().parents[2] / ".env"
@@ -32,7 +34,9 @@ if not SECRET_KEY:
     raise ValueError("JWT_SECRET not found in environment or .env file.")
 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = int(config.get("JWT_ACCESS_MINUTES") or os.environ.get("JWT_ACCESS_MINUTES") or 60)
+ACCESS_TOKEN_EXPIRE_MINUTES = int(
+    config.get("JWT_ACCESS_MINUTES") or os.environ.get("JWT_ACCESS_MINUTES") or 60
+)
 
 # Use pbkdf2_sha256 here to avoid requiring a working bcrypt C-extension
 # in test environments. It's secure and avoids the bcrypt/packaging issues
@@ -63,11 +67,15 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
-def create_access_token(subject: str, role: Optional[str] = None, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(
+    subject: str, role: Optional[str] = None, expires_delta: Optional[timedelta] = None
+) -> str:
     to_encode = {"sub": str(subject)}  # Convert to string to handle UUID objects
     if role:
         to_encode["role"] = role
-    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = datetime.now(timezone.utc) + (
+        expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
     to_encode.update({"exp": int(expire.timestamp())})
     encoded = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded
@@ -80,10 +88,16 @@ def decode_access_token(token: str) -> TokenPayload:
         logger.debug("Decoded token payload: %s", tp.dict())
         return tp
     except JWTError as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials", headers={"X-Auth-Reason": "Invalid token"}) from exc
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"X-Auth-Reason": "Invalid token"},
+        ) from exc
 
 
-async def authenticate_porter(username: str, password: str, session) -> Optional[Porter]:
+async def authenticate_porter(
+    username: str, password: str, session
+) -> Optional[Porter]:
     # Try email first, then phone - sequential lookup instead of OR clause
     statement = select(Porter).where(Porter.email == username)
     result = await session.exec(statement)
@@ -98,20 +112,38 @@ async def authenticate_porter(username: str, password: str, session) -> Optional
     if not verify_password(password, porter.password_hash):
         alt_email = os.environ.get("TEST_ADMIN_EMAIL")
         alt_password = os.environ.get("TEST_ADMIN_ALT_PASSWORD")
-        if alt_email and alt_password and username == alt_email and password == alt_password:
+        if (
+            alt_email
+            and alt_password
+            and username == alt_email
+            and password == alt_password
+        ):
             logger.info("[auth.debug] Using fallback password for %s", username)
             return porter
         return None
     return porter
 
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), session=Depends(get_session)) -> Porter:
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    session=Depends(get_session),
+) -> Porter:
     # HTTPBearer(auto_error=False) returns None when no credentials were provided
     if not credentials or not getattr(credentials, "credentials", None):
         # Normalize to a consistent 401 for the callers
-        logger.info("[auth.debug] No credentials provided or empty credentials object: %s", credentials)
-        logger.debug("[auth.debug] No credentials provided or empty credentials object: %s", credentials)
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated", headers={"X-Auth-Reason": "No credentials"})
+        logger.info(
+            "[auth.debug] No credentials provided or empty credentials object: %s",
+            credentials,
+        )
+        logger.debug(
+            "[auth.debug] No credentials provided or empty credentials object: %s",
+            credentials,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"X-Auth-Reason": "No credentials"},
+        )
 
     token = credentials.credentials
     try:
@@ -120,7 +152,11 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         # decode_access_token already raises a 401; re-raise to preserve semantics
         logger.info("[auth.debug] decode_access_token failed for token: %s", token)
         logger.debug("[auth.debug] decode_access_token failed for token: %s", token)
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials", headers={"X-Auth-Reason": "Token decode failed"})
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"X-Auth-Reason": "Token decode failed"},
+        )
 
     porter_id = payload.sub
     # Debug: print the token payload and subject type to help diagnose mapping issues
@@ -131,8 +167,16 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         p_dict = getattr(payload, "__dict__", str(payload))
     logger.info("[auth.debug] Decoded token payload: %s", p_dict)
     logger.debug("[auth.debug] Decoded token payload: %s", p_dict)
-    logger.info("[auth.debug] Token subject (sub) value: %r (type=%s)", porter_id, type(porter_id))
-    logger.debug("[auth.debug] Token subject (sub) value: %r (type=%s)", porter_id, type(porter_id))
+    logger.info(
+        "[auth.debug] Token subject (sub) value: %r (type=%s)",
+        porter_id,
+        type(porter_id),
+    )
+    logger.debug(
+        "[auth.debug] Token subject (sub) value: %r (type=%s)",
+        porter_id,
+        type(porter_id),
+    )
     statement = select(Porter).where(Porter.id == porter_id)
     result = await session.exec(statement)
     porter = result.first()
@@ -140,7 +184,11 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         # Token subject did not map to a valid porter
         logger.info("[auth.debug] No porter found matching id: %r", porter_id)
         logger.debug("[auth.debug] No porter found matching id: %r", porter_id)
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication credentials", headers={"X-Auth-Reason": "Token subject not found"})
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"X-Auth-Reason": "Token subject not found"},
+        )
     return porter
 
 
@@ -149,25 +197,41 @@ def require_role(required_role: str):
         # Use explicit role column stored on Porter model
         user_role = (user.role or "porter").lower()
         if required_role == "admin" and user_role != "admin":
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient privileges")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient privileges"
+            )
         return user
+
     return role_checker
 
 
-def get_token_subject(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
+def get_token_subject(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> str:
     """Return the token subject (sub) from the Authorization header.
 
     This helper decodes the token and returns its subject so handlers
     can compare directly against request payloads when needed.
     """
     if not credentials or not getattr(credentials, "credentials", None):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated", headers={"X-Auth-Reason": "No credentials"})
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"X-Auth-Reason": "No credentials"},
+        )
     token = credentials.credentials
     payload = decode_access_token(token)
     return payload.sub
 
 
-async def create_porter(session, full_name: str, password: str, email: Optional[str] = None, phone: Optional[str] = None, role: Optional[str] = "porter") -> Porter:
+async def create_porter(
+    session,
+    full_name: str,
+    password: str,
+    email: Optional[str] = None,
+    phone: Optional[str] = None,
+    role: Optional[str] = "porter",
+) -> Porter:
     """Helper to create a porter with hashed password. Returns the created Porter."""
     # If a porter with the same email or phone already exists, return it
     # to avoid creating duplicate rows which can make login/registration
@@ -221,7 +285,9 @@ ALLOWED_TRANSITIONS = {
 }
 
 
-def can_transition(role: Optional[str], old_status: str, new_status: str) -> Tuple[bool, int, str]:
+def can_transition(
+    role: Optional[str], old_status: str, new_status: str
+) -> Tuple[bool, int, str]:
     """Return (allowed, http_code, message) for the requested transition.
 
     - Returns (False, 400, msg) for invalid transitions.

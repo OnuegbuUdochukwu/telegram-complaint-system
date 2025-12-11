@@ -20,13 +20,20 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     # Add columns to photos table safely
     op.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS processed_at TIMESTAMPTZ")
-    op.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS storage_provider VARCHAR(32) NOT NULL DEFAULT 's3'")
+    op.execute(
+        "ALTER TABLE photos ADD COLUMN IF NOT EXISTS storage_provider VARCHAR(32) NOT NULL DEFAULT 's3'"
+    )
     op.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS s3_key VARCHAR(512)")
-    op.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS s3_thumbnail_key VARCHAR(512)")
-    op.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS checksum_sha256 VARCHAR(128)")
+    op.execute(
+        "ALTER TABLE photos ADD COLUMN IF NOT EXISTS s3_thumbnail_key VARCHAR(512)"
+    )
+    op.execute(
+        "ALTER TABLE photos ADD COLUMN IF NOT EXISTS checksum_sha256 VARCHAR(128)"
+    )
 
     # Create photo_uploads table
-    op.execute(r"""
+    op.execute(
+        r"""
     CREATE TABLE IF NOT EXISTS photo_uploads (
         id VARCHAR(36) PRIMARY KEY,
         complaint_id UUID NOT NULL REFERENCES complaints(id) ON DELETE CASCADE,
@@ -51,15 +58,20 @@ def upgrade() -> None:
         created_at TIMESTAMPTZ NOT NULL,
         confirmed_at TIMESTAMPTZ
     )
-    """)
-    
+    """
+    )
+
     # Fix types for FKs if needed (using UUID)
     # Re-reading original file: complaint_id was String(36). complaints.id is UUID.
     # This was a bug in original definition! It would have failed on FK creation.
     # So I AM FIXING A BUG HERE TOO. I will use UUID.
 
-    op.execute("CREATE INDEX IF NOT EXISTS ix_photo_uploads_complaint_id ON photo_uploads (complaint_id)")
-    op.execute("CREATE INDEX IF NOT EXISTS ix_photo_uploads_photo_id ON photo_uploads (photo_id)")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_photo_uploads_complaint_id ON photo_uploads (complaint_id)"
+    )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_photo_uploads_photo_id ON photo_uploads (photo_id)"
+    )
 
 
 def downgrade() -> None:
@@ -72,4 +84,3 @@ def downgrade() -> None:
     op.drop_column("photos", "s3_key")
     op.drop_column("photos", "storage_provider")
     op.drop_column("photos", "processed_at")
-

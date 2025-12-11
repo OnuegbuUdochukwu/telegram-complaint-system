@@ -1,4 +1,5 @@
 """Email service for sending invitation and OTP emails."""
+
 import aiosmtplib
 import logging
 from email.mime.text import MIMEText
@@ -20,25 +21,30 @@ SMTP_PORT = int(os.environ.get("SMTP_PORT") or config.get("SMTP_PORT") or "587")
 SMTP_USER = os.environ.get("SMTP_USER") or config.get("SMTP_USER") or ""
 SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD") or config.get("SMTP_PASSWORD") or ""
 SMTP_USE_TLS = os.environ.get("SMTP_USE_TLS", "true").lower() == "true"
-EMAIL_FROM = os.environ.get("EMAIL_FROM") or config.get("EMAIL_FROM") or "noreply@complaint-system.local"
-FRONTEND_URL = os.environ.get("FRONTEND_URL") or config.get("FRONTEND_URL") or "http://localhost:8001"
+EMAIL_FROM = (
+    os.environ.get("EMAIL_FROM")
+    or config.get("EMAIL_FROM")
+    or "noreply@complaint-system.local"
+)
+FRONTEND_URL = (
+    os.environ.get("FRONTEND_URL")
+    or config.get("FRONTEND_URL")
+    or "http://localhost:8001"
+)
 
 
 async def send_email(
-    to_email: str,
-    subject: str,
-    html_body: str,
-    text_body: Optional[str] = None
+    to_email: str, subject: str, html_body: str, text_body: Optional[str] = None
 ) -> bool:
     """
     Send an email using SMTP.
-    
+
     Args:
         to_email: Recipient email address
         subject: Email subject
         html_body: HTML email body
         text_body: Plain text email body (optional, will be generated from HTML if not provided)
-    
+
     Returns:
         True if email was sent successfully, False otherwise
     """
@@ -53,8 +59,9 @@ async def send_email(
         if not text_body:
             # Simple HTML to text conversion (remove tags)
             import re
-            text_body = re.sub(r'<[^>]+>', '', html_body)
-            text_body = text_body.replace('&nbsp;', ' ').replace('&amp;', '&')
+
+            text_body = re.sub(r"<[^>]+>", "", html_body)
+            text_body = text_body.replace("&nbsp;", " ").replace("&amp;", "&")
 
         # Add both plain text and HTML versions
         part1 = MIMEText(text_body, "plain")
@@ -71,10 +78,10 @@ async def send_email(
             password=SMTP_PASSWORD if SMTP_PASSWORD else None,
             use_tls=SMTP_USE_TLS,
         )
-        
+
         logger.info(f"Email sent successfully to {to_email}: {subject}")
         return True
-        
+
     except Exception as e:
         logger.error(f"Failed to send email to {to_email}: {e}")
         # In development, log the email content instead of failing
@@ -85,22 +92,24 @@ async def send_email(
         return False
 
 
-async def send_invitation_email(email: str, invitation_token: str, invited_by_name: str) -> bool:
+async def send_invitation_email(
+    email: str, invitation_token: str, invited_by_name: str
+) -> bool:
     """
     Send admin invitation email with signup link.
-    
+
     Args:
         email: Recipient email address
         invitation_token: Secure invitation token
         invited_by_name: Name of the admin who sent the invitation
-    
+
     Returns:
         True if email was sent successfully
     """
     signup_url = f"{FRONTEND_URL}/dashboard/signup.html?token={invitation_token}"
-    
+
     subject = "Admin Invitation - Complaint Management System"
-    
+
     html_body = f"""
     <!DOCTYPE html>
     <html>
@@ -139,7 +148,7 @@ async def send_invitation_email(email: str, invitation_token: str, invited_by_na
     </body>
     </html>
     """
-    
+
     text_body = f"""
     Admin Invitation - Complaint Management System
 
@@ -156,19 +165,21 @@ async def send_invitation_email(email: str, invitation_token: str, invited_by_na
 
     Complaint Management System
     """
-    
+
     return await send_email(email, subject, html_body, text_body)
 
 
-async def send_otp_email(email: str, otp_code: str, purpose: str = "verification") -> bool:
+async def send_otp_email(
+    email: str, otp_code: str, purpose: str = "verification"
+) -> bool:
     """
     Send OTP verification code email.
-    
+
     Args:
         email: Recipient email address
         otp_code: 6-digit OTP code
         purpose: Purpose of OTP ('signup' or 'password_reset')
-    
+
     Returns:
         True if email was sent successfully
     """
@@ -178,7 +189,7 @@ async def send_otp_email(email: str, otp_code: str, purpose: str = "verification
     else:
         subject = "Verification Code - Complaint Management System"
         action = "verify your email address"
-    
+
     html_body = f"""
     <!DOCTYPE html>
     <html>
@@ -212,7 +223,7 @@ async def send_otp_email(email: str, otp_code: str, purpose: str = "verification
     </body>
     </html>
     """
-    
+
     text_body = f"""
     Verification Code - Complaint Management System
 
@@ -228,6 +239,5 @@ async def send_otp_email(email: str, otp_code: str, purpose: str = "verification
 
     Complaint Management System
     """
-    
-    return await send_email(email, subject, html_body, text_body)
 
+    return await send_email(email, subject, html_body, text_body)

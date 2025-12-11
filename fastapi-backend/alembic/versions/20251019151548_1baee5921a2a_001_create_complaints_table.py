@@ -1,14 +1,15 @@
-
 from alembic import op
 
-revision = '1baee5921a2a'
+revision = "1baee5921a2a"
 down_revision = None
 branch_labels = None
 depends_on = None
 
+
 def upgrade():
-# pgcrypto extension
-    op.execute(r'''
+    # pgcrypto extension
+    op.execute(
+        r"""
     DO $$
     BEGIN
       IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pgcrypto') THEN
@@ -21,10 +22,12 @@ def upgrade():
         END;
       END IF;
     END$$;
-    ''')
+    """
+    )
 
     # ENUM types
-    op.execute(r'''
+    op.execute(
+        r"""
     DO $$
     BEGIN
       IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'complaint_category') THEN
@@ -37,10 +40,12 @@ def upgrade():
             CREATE TYPE complaint_status AS ENUM ('reported','in_progress','on_hold','resolved','rejected');
         END IF;
     END$$;
-    ''')
+    """
+    )
 
     # Create table with inline check constraint
-    op.execute(r'''
+    op.execute(
+        r"""
     CREATE TABLE IF NOT EXISTS complaints (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       telegram_user_id VARCHAR(32) NOT NULL,
@@ -57,16 +62,28 @@ def upgrade():
       updated_at TIMESTAMPTZ,
       CONSTRAINT chk_room_number_format CHECK (room_number ~ '^[A-H][0-9]{3}$')
     )
-    ''')
-    
+    """
+    )
+
     # Indexes
-    op.execute("CREATE INDEX IF NOT EXISTS idx_complaints_telegram_user_id ON complaints (telegram_user_id)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints (status)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_complaints_created_at ON complaints (created_at)")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_complaints_telegram_user_id ON complaints (telegram_user_id)"
+    )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints (status)"
+    )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_complaints_created_at ON complaints (created_at)"
+    )
 
     # Comments
-    op.execute("COMMENT ON TABLE complaints IS 'Primary table for student maintenance complaints'")
-    op.execute("COMMENT ON COLUMN complaints.photo_urls IS 'Array of photo URLs (optional)'")
+    op.execute(
+        "COMMENT ON TABLE complaints IS 'Primary table for student maintenance complaints'"
+    )
+    op.execute(
+        "COMMENT ON COLUMN complaints.photo_urls IS 'Array of photo URLs (optional)'"
+    )
+
 
 def downgrade():
     # Manual downgrade is required for SQL migrations.

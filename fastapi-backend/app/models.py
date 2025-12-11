@@ -29,38 +29,71 @@ _USE_PG_UUID = "postgres" in _DATABASE_URL.lower() or "asyncpg" in _DATABASE_URL
 class Hostel(SQLModel, table=True):
     __tablename__ = "hostels"
     if _USE_PG_UUID:
-        id: Optional[uuid.UUID] = Field(default=None, primary_key=True, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")))
+        id: Optional[uuid.UUID] = Field(
+            default=None,
+            primary_key=True,
+            sa_column=Column(
+                PG_UUID(as_uuid=True),
+                primary_key=True,
+                server_default=text("gen_random_uuid()"),
+            ),
+        )
     else:
-        id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+        id: Optional[str] = Field(
+            default_factory=lambda: str(uuid.uuid4()), primary_key=True
+        )
     slug: str = Field(sa_column_kwargs={"unique": True})
     display_name: str
-    created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: Optional[datetime] = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
     # (Hostel has no auth fields)
 
 
 class Porter(SQLModel, table=True):
     __tablename__ = "porters"
     if _USE_PG_UUID:
-        id: Optional[uuid.UUID] = Field(default=None, primary_key=True, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")))
+        id: Optional[uuid.UUID] = Field(
+            default=None,
+            primary_key=True,
+            sa_column=Column(
+                PG_UUID(as_uuid=True),
+                primary_key=True,
+                server_default=text("gen_random_uuid()"),
+            ),
+        )
     else:
-        id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+        id: Optional[str] = Field(
+            default_factory=lambda: str(uuid.uuid4()), primary_key=True
+        )
     full_name: str
     phone: Optional[str] = None
     email: Optional[str] = None
     # Password hash stored for authentication. Use a secure hashing algorithm.
     password_hash: Optional[str] = None
     # Role for RBAC: 'porter' or 'admin'. Default to 'porter'.
-    role: Optional[str] = Field(default='porter')
+    role: Optional[str] = Field(default="porter")
     # assigned_hostel_id references hostels.id; ensure column type matches hostels.id
     if _USE_PG_UUID:
-        assigned_hostel_id: Optional[uuid.UUID] = Field(default=None, foreign_key="hostels.id", sa_column=Column(PG_UUID(as_uuid=True)))
+        assigned_hostel_id: Optional[uuid.UUID] = Field(
+            default=None,
+            foreign_key="hostels.id",
+            sa_column=Column(PG_UUID(as_uuid=True)),
+        )
     else:
-        assigned_hostel_id: Optional[str] = Field(default=None, foreign_key="hostels.id")
+        assigned_hostel_id: Optional[str] = Field(
+            default=None, foreign_key="hostels.id"
+        )
     active: bool = Field(default=True)
     if _USE_PG_UUID:
-        created_at: Optional[datetime] = Field(default=None, sa_column=Column(sa.DateTime(timezone=True), server_default=text("now()")))
+        created_at: Optional[datetime] = Field(
+            default=None,
+            sa_column=Column(sa.DateTime(timezone=True), server_default=text("now()")),
+        )
     else:
-        created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
+        created_at: Optional[datetime] = Field(
+            default_factory=lambda: datetime.now(timezone.utc)
+        )
     updated_at: Optional[datetime] = None
 
 
@@ -69,7 +102,9 @@ class User(SQLModel, table=True):
     id: Optional[str] = Field(default=None, primary_key=True)
     telegram_user_id: str = Field(sa_column_kwargs={"unique": True})
     display_name: Optional[str] = None
-    created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: Optional[datetime] = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
     updated_at: Optional[datetime] = None
 
 
@@ -82,11 +117,17 @@ class Complaint(SQLModel, table=True):
         id: Optional[uuid.UUID] = Field(
             default=None,
             primary_key=True,
-            sa_column=Column(PG_UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")),
+            sa_column=Column(
+                PG_UUID(as_uuid=True),
+                primary_key=True,
+                server_default=text("gen_random_uuid()"),
+            ),
         )
     else:
         # For SQLite/local tests, use a Python-generated UUID string as the primary key.
-        id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+        id: Optional[str] = Field(
+            default_factory=lambda: str(uuid.uuid4()), primary_key=True
+        )
     telegram_user_id: str
     hostel: str
     # Wing is optional for backwards compatibility with older bot payloads.
@@ -101,17 +142,23 @@ class Complaint(SQLModel, table=True):
     status: str = Field(default="reported")
     # Ensure assigned_porter_id column type matches porters.id when using Postgres UUIDs
     if _USE_PG_UUID:
-        assigned_porter_id: Optional[uuid.UUID] = Field(default=None, foreign_key="porters.id", sa_column=Column(PG_UUID(as_uuid=True)))
+        assigned_porter_id: Optional[uuid.UUID] = Field(
+            default=None,
+            foreign_key="porters.id",
+            sa_column=Column(PG_UUID(as_uuid=True)),
+        )
     else:
         assigned_porter_id: Optional[str] = None
     # Use server_default for created_at to avoid asyncpg timezone conversion issues
     if _USE_PG_UUID:
         created_at: Optional[datetime] = Field(
             default=None,
-            sa_column=Column(sa.DateTime(timezone=True), server_default=text("now()"))
+            sa_column=Column(sa.DateTime(timezone=True), server_default=text("now()")),
         )
     else:
-        created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
+        created_at: Optional[datetime] = Field(
+            default_factory=lambda: datetime.now(timezone.utc)
+        )
     updated_at: Optional[datetime] = None
 
 
@@ -121,44 +168,62 @@ class AssignmentAudit(SQLModel, table=True):
     # Use matching column types for FK references. When Postgres with UUIDs is used
     # ensure complaint_id / assigned_by / assigned_to use the native UUID column type
     if _USE_PG_UUID:
-        complaint_id: uuid.UUID = Field(foreign_key="complaints.id", sa_column=Column(PG_UUID(as_uuid=True)))
+        complaint_id: uuid.UUID = Field(
+            foreign_key="complaints.id", sa_column=Column(PG_UUID(as_uuid=True))
+        )
         assigned_by: uuid.UUID = Field(sa_column=Column(PG_UUID(as_uuid=True)))
         assigned_to: uuid.UUID = Field(sa_column=Column(PG_UUID(as_uuid=True)))
     else:
         complaint_id: str = Field(foreign_key="complaints.id")
         assigned_by: str
         assigned_to: str
-    created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: Optional[datetime] = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
 
 
 class Photo(SQLModel, table=True):
     __tablename__ = "photos"
     if _USE_PG_UUID:
-        id: Optional[uuid.UUID] = Field(default=None, primary_key=True, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")))
+        id: Optional[uuid.UUID] = Field(
+            default=None,
+            primary_key=True,
+            sa_column=Column(
+                PG_UUID(as_uuid=True),
+                primary_key=True,
+                server_default=text("gen_random_uuid()"),
+            ),
+        )
     else:
-        id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
-    
+        id: Optional[str] = Field(
+            default_factory=lambda: str(uuid.uuid4()), primary_key=True
+        )
+
     if _USE_PG_UUID:
-        complaint_id: uuid.UUID = Field(foreign_key="complaints.id", sa_column=Column(PG_UUID(as_uuid=True)))
+        complaint_id: uuid.UUID = Field(
+            foreign_key="complaints.id", sa_column=Column(PG_UUID(as_uuid=True))
+        )
     else:
         complaint_id: str = Field(foreign_key="complaints.id")
-    
+
     # S3/Storage URL for the original photo
     file_url: str
-    
+
     # S3/Storage URL for the thumbnail (optional)
     thumbnail_url: Optional[str] = None
-    
+
     # File metadata
     file_name: str
     file_size: Optional[int] = None  # Size in bytes
     mime_type: Optional[str] = None  # e.g., "image/jpeg"
-    
+
     # Dimensions (optional, useful for display)
     width: Optional[int] = None
     height: Optional[int] = None
-    
-    created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    created_at: Optional[datetime] = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
     processed_at: Optional[datetime] = None
     storage_provider: str = Field(default="s3")
     s3_key: Optional[str] = None
@@ -171,9 +236,13 @@ class PhotoUpload(SQLModel, table=True):
 
     __tablename__ = "photo_uploads"
 
-    id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    id: Optional[str] = Field(
+        default_factory=lambda: str(uuid.uuid4()), primary_key=True
+    )
     if _USE_PG_UUID:
-        complaint_id: uuid.UUID = Field(foreign_key="complaints.id", sa_column=Column(PG_UUID(as_uuid=True)))
+        complaint_id: uuid.UUID = Field(
+            foreign_key="complaints.id", sa_column=Column(PG_UUID(as_uuid=True))
+        )
         photo_id: uuid.UUID = Field(sa_column=Column(PG_UUID(as_uuid=True)))
     else:
         complaint_id: str = Field(foreign_key="complaints.id")
@@ -184,61 +253,91 @@ class PhotoUpload(SQLModel, table=True):
     content_length: Optional[int] = None
     s3_key: str
     status: str = Field(default="pending")
-    expires_at: datetime = Field(default_factory=lambda: datetime.utcnow() + timedelta(minutes=10))
+    expires_at: datetime = Field(
+        default_factory=lambda: datetime.utcnow() + timedelta(minutes=10)
+    )
     created_at: datetime = Field(default_factory=lambda: datetime.utcnow())
     confirmed_at: Optional[datetime] = None
 
 
 class AdminInvitation(SQLModel, table=True):
     """Admin invitation model for secure admin onboarding."""
+
     __tablename__ = "admin_invitations"
     if _USE_PG_UUID:
-        id: Optional[uuid.UUID] = Field(default=None, primary_key=True, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")))
+        id: Optional[uuid.UUID] = Field(
+            default=None,
+            primary_key=True,
+            sa_column=Column(
+                PG_UUID(as_uuid=True),
+                primary_key=True,
+                server_default=text("gen_random_uuid()"),
+            ),
+        )
     else:
-        id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
-    
+        id: Optional[str] = Field(
+            default_factory=lambda: str(uuid.uuid4()), primary_key=True
+        )
+
     email: str = Field(sa_column_kwargs={"unique": True})
-    
+
     # Foreign key to Porter who sent the invitation
     if _USE_PG_UUID:
-        invited_by: uuid.UUID = Field(foreign_key="porters.id", sa_column=Column(PG_UUID(as_uuid=True)))
+        invited_by: uuid.UUID = Field(
+            foreign_key="porters.id", sa_column=Column(PG_UUID(as_uuid=True))
+        )
     else:
         invited_by: str = Field(foreign_key="porters.id")
-    
+
     # Secure random token for invitation link
     token: str = Field(sa_column_kwargs={"unique": True})
-    
+
     # Expiration time (default 48 hours)
     expires_at: datetime
-    
+
     used: bool = Field(default=False)
-    
-    created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    created_at: Optional[datetime] = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
 
 
 class OTPToken(SQLModel, table=True):
     """OTP token model for email verification and password reset."""
+
     __tablename__ = "otp_tokens"
     if _USE_PG_UUID:
-        id: Optional[uuid.UUID] = Field(default=None, primary_key=True, sa_column=Column(PG_UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")))
+        id: Optional[uuid.UUID] = Field(
+            default=None,
+            primary_key=True,
+            sa_column=Column(
+                PG_UUID(as_uuid=True),
+                primary_key=True,
+                server_default=text("gen_random_uuid()"),
+            ),
+        )
     else:
-        id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
-    
+        id: Optional[str] = Field(
+            default_factory=lambda: str(uuid.uuid4()), primary_key=True
+        )
+
     email: str
-    
+
     # Hashed OTP code (like password hashes)
     code_hash: str
-    
+
     # Purpose: 'signup', 'password_reset'
     purpose: str
-    
+
     # Expiration time (default 10 minutes)
     expires_at: datetime
-    
+
     # Rate limiting: track verification attempts
     attempts: int = Field(default=0)
     max_attempts: int = Field(default=3)
-    
+
     used: bool = Field(default=False)
-    
-    created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    created_at: Optional[datetime] = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )

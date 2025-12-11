@@ -36,4 +36,3 @@ def get_hostel_display_name(hostel: str | None) -> str | None:
 
 
 __all__ = ["get_hostel_display_name"]
-

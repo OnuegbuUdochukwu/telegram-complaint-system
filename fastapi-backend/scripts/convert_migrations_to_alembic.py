@@ -6,6 +6,7 @@ op.execute(). This keeps the SQL content unchanged while tracking it via Alembic
 Usage (from repo root):
   python fastapi-backend/scripts/convert_migrations_to_alembic.py
 """
+
 import hashlib
 from pathlib import Path
 from datetime import datetime, timezone
