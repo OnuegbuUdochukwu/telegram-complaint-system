@@ -44,7 +44,10 @@ def test_update_status_success():
         "severity": "medium",
     }
     post_resp = httpx.post(
-        f"{BASE_URL}/api/v1/complaints/submit", json=payload, timeout=10.0
+        f"{BASE_URL}/api/v1/complaints/submit",
+        json=payload,
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=10.0,
     )
     assert (
         post_resp.status_code == 201
@@ -77,7 +80,10 @@ def test_update_status_invalid_status():
         "severity": "low",
     }
     post_resp = httpx.post(
-        f"{BASE_URL}/api/v1/complaints/submit", json=payload, timeout=10.0
+        f"{BASE_URL}/api/v1/complaints/submit",
+        json=payload,
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=10.0,
     )
     assert post_resp.status_code == 201
     complaint_id = post_resp.json()["complaint_id"]
@@ -102,7 +108,10 @@ def test_update_status_unauthorized():
         "severity": "high",
     }
     post_resp = httpx.post(
-        f"{BASE_URL}/api/v1/complaints/submit", json=payload, timeout=10.0
+        f"{BASE_URL}/api/v1/complaints/submit",
+        json=payload,
+        headers={"Authorization": "Bearer test-service-token"},
+        timeout=10.0,
     )
     assert post_resp.status_code == 201
     complaint_id = post_resp.json()["complaint_id"]

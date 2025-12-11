@@ -35,7 +35,10 @@ def test_upload_photo_requires_auth():
     }
 
     post_resp = httpx.post(
-        f"{BASE_URL}/api/v1/complaints/submit", json=payload, timeout=10.0
+        f"{BASE_URL}/api/v1/complaints/submit",
+        json=payload,
+        headers={"Authorization": "Bearer test-service-token"},
+        timeout=10.0,
     )
     assert post_resp.status_code == 201
     complaint_id = post_resp.json()["complaint_id"]
@@ -87,7 +90,10 @@ def test_upload_and_list_photos():
     }
 
     post_resp = httpx.post(
-        f"{BASE_URL}/api/v1/complaints/submit", json=payload, timeout=10.0
+        f"{BASE_URL}/api/v1/complaints/submit",
+        json=payload,
+        headers=headers,
+        timeout=10.0,
     )
     assert post_resp.status_code == 201
     complaint_id = post_resp.json()["complaint_id"]
@@ -151,7 +157,10 @@ def test_photo_validation():
     }
 
     post_resp = httpx.post(
-        f"{BASE_URL}/api/v1/complaints/submit", json=payload, timeout=10.0
+        f"{BASE_URL}/api/v1/complaints/submit",
+        json=payload,
+        headers=headers,
+        timeout=10.0,
     )
     complaint_id = post_resp.json()["complaint_id"]
 

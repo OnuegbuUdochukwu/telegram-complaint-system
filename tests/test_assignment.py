@@ -4,12 +4,31 @@ import pytest
 BASE = "http://127.0.0.1:8001"
 
 
-@pytest.fixture
-def create_and_token(make_porter):
-    """Helper to create a porter and return (id, token)."""
+import pytest_asyncio
+from sqlalchemy.orm import sessionmaker
+from sqlmodel.ext.asyncio.session import AsyncSession
+from app import auth
 
-    def _create(email: str, role: str = "porter"):
-        return make_porter(email, role=role)
+@pytest_asyncio.fixture
+async def create_and_token(db_engine):
+    """Helper to create a porter and return (id, token) using async session."""
+    
+    async def _create(email: str, role: str = "porter"):
+        factory = sessionmaker(
+            db_engine, class_=AsyncSession, expire_on_commit=False
+        )
+        async with factory() as session:
+            porter = await auth.create_porter(
+                session,
+                full_name=email.split("@")[0],
+                password="testpass",
+                email=email,
+                role=role,
+            )
+            token = auth.create_access_token(
+                subject=porter.id, role=(porter.role or "porter")
+            )
+            return porter.id, token
 
     return _create
 

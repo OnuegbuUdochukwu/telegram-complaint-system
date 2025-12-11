@@ -77,7 +77,7 @@ BACKEND_URL = os.getenv("BACKEND_URL")
 # Optional service token the bot can use to authenticate to the backend when uploading photos
 BACKEND_SERVICE_TOKEN = os.getenv("BACKEND_SERVICE_TOKEN")
 
-if not TELEGRAM_BOT_TOKEN:
+if not TELEGRAM_BOT_TOKEN and not os.getenv("CI"):
     raise ValueError(
         "TELEGRAM_BOT_TOKEN not found in .env file. Ensure it is set and the file is named '.env'."
     )

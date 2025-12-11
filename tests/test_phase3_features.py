@@ -58,7 +58,10 @@ def test_photo_upload_basic():
     }
 
     resp = httpx.post(
-        f"{BASE_URL}/api/v1/complaints/submit", json=complaint_payload, timeout=TIMEOUT
+        f"{BASE_URL}/api/v1/complaints/submit",
+        json=complaint_payload,
+        headers={"Authorization": "Bearer test-service-token"},
+        timeout=TIMEOUT,
     )
     assert resp.status_code == 201, f"Expected 201, got {resp.status_code}"
     complaint_id = resp.json()["complaint_id"]

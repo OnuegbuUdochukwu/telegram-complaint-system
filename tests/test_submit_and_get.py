@@ -24,7 +24,10 @@ def test_submit_and_get_complaint():
 
     # POST the complaint
     post_resp = httpx.post(
-        f"{BASE_URL}/api/v1/complaints/submit", json=payload, timeout=10.0
+        f"{BASE_URL}/api/v1/complaints/submit",
+        json=payload,
+        headers={"Authorization": "Bearer test-service-token"},
+        timeout=10.0,
     )
     assert (
         post_resp.status_code == 201

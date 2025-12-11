@@ -91,15 +91,27 @@ class CategoryPublic(BaseModel):
     name: str
 
 
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
+# Setup rate limiting
+limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="Complaint Management API")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Setup metrics middleware
 setup_metrics_middleware(app)
 
 # Setup CORS
+# Use ALLOWED_ORIGINS env var for production, default to * for dev
+allowed_origins_str = os.environ.get("ALLOWED_ORIGINS", "*")
+allowed_origins = [origin.strip() for origin in allowed_origins_str.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for dev; restrict in prod
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -136,7 +148,9 @@ security = HTTPBasic(auto_error=False)
 
 
 @app.post("/auth/login", response_model=dict)
+@limiter.limit("5/minute")
 async def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(), session=Depends(get_session)
 ):
     # Validate credentials against porters table (email or phone as username)
@@ -158,7 +172,9 @@ async def login(
 
 # Alternative JSON-based login to avoid OAuth2PasswordRequestForm conflicts with async session
 @app.post("/auth/login-json", response_model=dict)
+@limiter.limit("5/minute")
 async def login_json(
+    request: Request,
     username: str = Body(...), password: str = Body(...), session=Depends(get_session)
 ):
     # Validate credentials against porters table (email or phone as username)
@@ -177,6 +193,7 @@ async def login_json(
 
 
 @app.post("/auth/register", response_model=dict)
+@limiter.limit("5/minute")
 async def register_porter(
     request: Request,
     full_name: str = Body(...),
@@ -284,7 +301,9 @@ class InviteAdminRequest(BaseModel):
 
 
 @app.post("/auth/admin/invite")
+@limiter.limit("10/minute")
 async def invite_admin(
+    request: Request,
     request_data: InviteAdminRequest,
     user: Porter = Depends(auth.require_role("admin")),
     session=Depends(get_session),
@@ -389,7 +408,9 @@ class SignupRequest(BaseModel):
 
 
 @app.post("/auth/signup")
+@limiter.limit("5/minute")
 async def signup(
+    request: Request,
     request_data: SignupRequest,
     session=Depends(get_session),
 ):
@@ -482,7 +503,9 @@ class SendOTPRequest(BaseModel):
 
 
 @app.post("/auth/send-otp")
+@limiter.limit("3/minute")
 async def send_otp(
+    request: Request,
     request_data: SendOTPRequest,
     session=Depends(get_session),
 ):
@@ -557,7 +580,9 @@ class VerifyOTPRequest(BaseModel):
 
 
 @app.post("/auth/verify-otp")
+@limiter.limit("10/minute")
 async def verify_otp(
+    request: Request,
     request_data: VerifyOTPRequest,
     session=Depends(get_session),
 ):
@@ -583,7 +608,9 @@ class ForgotPasswordRequest(BaseModel):
 
 
 @app.post("/auth/forgot-password")
+@limiter.limit("3/minute")
 async def forgot_password(
+    request: Request,
     request_data: ForgotPasswordRequest,
     session=Depends(get_session),
 ):
@@ -627,7 +654,9 @@ class ResetPasswordRequest(BaseModel):
 
 
 @app.post("/auth/reset-password")
+@limiter.limit("3/minute")
 async def reset_password(
+    request: Request,
     request_data: ResetPasswordRequest,
     session=Depends(get_session),
 ):

@@ -133,9 +133,9 @@ async def presign_upload(
             content_type=content_type,
             content_length=request.content_length,
             s3_key=key,
-            expires_at=datetime.utcnow()
+            expires_at=datetime.now(timezone.utc)
             + timedelta(seconds=settings.s3_presign_expiry_upload),
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         session.add(record)
         await session.commit()
@@ -159,8 +159,8 @@ async def presign_upload(
         content_type=content_type,
         content_length=request.content_length,
         s3_key=key,
-        expires_at=datetime.utcnow() + timedelta(seconds=3600),  # 1 hour
-        created_at=datetime.utcnow(),
+        expires_at=datetime.now(timezone.utc) + timedelta(seconds=3600),  # 1 hour
+        created_at=datetime.now(timezone.utc),
     )
     session.add(record)
     await session.commit()
@@ -220,7 +220,7 @@ async def direct_upload(
         raise HTTPException(status_code=404, detail="Upload record not found")
 
     # Check expiry
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     expiry = upload.expires_at or now
     if expiry.tzinfo is None:
         expiry = expiry.replace(tzinfo=timezone.utc)
@@ -267,7 +267,7 @@ async def direct_upload(
 
     session.add(photo)
     upload.status = "confirmed"
-    upload.confirmed_at = datetime.utcnow()
+    upload.confirmed_at = datetime.now(timezone.utc)
     session.add(upload)
     await session.commit()
     await session.refresh(photo)
@@ -299,7 +299,7 @@ async def confirm_upload(
         if not upload:
             raise HTTPException(status_code=404, detail="Upload record not found")
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         expiry = upload.expires_at or now
         if expiry.tzinfo is None:
             expiry = expiry.replace(tzinfo=timezone.utc)
@@ -338,7 +338,7 @@ async def confirm_upload(
 
         session.add(photo)
         upload.status = "confirmed"
-        upload.confirmed_at = datetime.utcnow()
+        upload.confirmed_at = datetime.now(timezone.utc)
         session.add(upload)
         await session.commit()
         await session.refresh(photo)
