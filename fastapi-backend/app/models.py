@@ -221,10 +221,21 @@ class Photo(SQLModel, table=True):
     width: Optional[int] = None
     height: Optional[int] = None
 
-    created_at: Optional[datetime] = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
-    processed_at: Optional[datetime] = None
+    # Use server_default for created_at to avoid asyncpg datetime serialization issues
+    if _USE_PG_UUID:
+        created_at: Optional[datetime] = Field(
+            default=None,
+            sa_column=Column(sa.DateTime(timezone=True), server_default=text("now()")),
+        )
+        processed_at: Optional[datetime] = Field(
+            default=None,
+            sa_column=Column(sa.DateTime(timezone=True)),
+        )
+    else:
+        created_at: Optional[datetime] = Field(
+            default_factory=lambda: datetime.now(timezone.utc)
+        )
+        processed_at: Optional[datetime] = None
     storage_provider: str = Field(default="s3")
     s3_key: Optional[str] = None
     s3_thumbnail_key: Optional[str] = None
@@ -269,7 +280,12 @@ class PhotoUpload(SQLModel, table=True):
             default_factory=lambda: datetime.now(timezone.utc) + timedelta(minutes=10)
         )
         created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    confirmed_at: Optional[datetime] = None
+        confirmed_at: Optional[datetime] = None
+    if _USE_PG_UUID:
+        confirmed_at: Optional[datetime] = Field(
+            default=None,
+            sa_column=Column(sa.DateTime(timezone=True)),
+        )
 
 
 class AdminInvitation(SQLModel, table=True):

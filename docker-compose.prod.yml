@@ -179,6 +179,9 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       BACKEND_URL: http://backend:8000
       BACKEND_SERVICE_TOKEN: ${BACKEND_SERVICE_TOKEN}
+      # For S3 uploads: rewrite presigned URLs from public to internal endpoint
+      S3_INTERNAL_ENDPOINT: http://minio:9000
+      S3_ENDPOINT_PUBLIC: ${S3_ENDPOINT_PUBLIC:-http://localhost:9000}
     volumes:
       - bot_data:/app/bot_data
     depends_on:

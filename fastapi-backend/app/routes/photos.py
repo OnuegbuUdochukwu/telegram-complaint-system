@@ -437,8 +437,8 @@ def _serialize_photo(photo: Photo, include_signed_urls: bool = False) -> PhotoRe
             thumbnail_url = photo.thumbnail_url
 
     return PhotoResponse(
-        id=photo.id,
-        complaint_id=photo.complaint_id,
+        id=str(photo.id),
+        complaint_id=str(photo.complaint_id),
         file_url=photo.file_url,
         thumbnail_url=photo.thumbnail_url,
         file_name=photo.file_name,

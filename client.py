@@ -299,11 +299,25 @@ async def upload_photo(
     # Step 2: PUT to S3
     method = presign.get("method", "PUT").upper()
     upload_url = presign["url"]
+    
+    # When running in Docker, the presigned URL may use a public endpoint (e.g., localhost:9000)
+    # that isn't reachable from inside Docker. Rewrite to use the internal endpoint if configured.
+    s3_internal = os.getenv("S3_INTERNAL_ENDPOINT")  # e.g., http://minio:9000
+    s3_public = os.getenv("S3_ENDPOINT_PUBLIC")  # e.g., http://localhost:9000
+    if s3_internal and s3_public and s3_public in upload_url:
+        upload_url = upload_url.replace(s3_public, s3_internal)
+        logger.debug("Rewrote upload URL from %s to %s", presign["url"], upload_url)
+    
     client = _get_client()
     if method != "PUT":
         raise RuntimeError(f"Unsupported presign method {method}")
 
-    put_headers = {"Content-Type": mime}
+    # The presigned URL includes x-amz-meta-managed-by in the signature,
+    # so we must send that header exactly as the backend signed it.
+    put_headers = {
+        "Content-Type": mime,
+        "x-amz-meta-managed-by": "complaint-backend",
+    }
     resp = await client.put(upload_url, content=file_bytes, headers=put_headers)
     resp.raise_for_status()
 
