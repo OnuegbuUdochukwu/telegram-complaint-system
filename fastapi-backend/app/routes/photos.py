@@ -82,11 +82,26 @@ def _ensure_s3():
 from fastapi.concurrency import run_in_threadpool
 
 
+
 async def _load_complaint(session: Session, complaint_id: str) -> Complaint:
     complaint = await session.get(Complaint, complaint_id)
     if not complaint:
         raise HTTPException(status_code=404, detail="Complaint not found")
     return complaint
+
+
+async def _sync_complaint_photos(session: Session, complaint_id: str):
+    """Update the Complaint.photo_urls JSON field based on actual Photo records."""
+    stmt = select(Photo).where(Photo.complaint_id == complaint_id).order_by(Photo.created_at)
+    result = await session.exec(stmt)
+    photos = result.all()
+    
+    complaint = await session.get(Complaint, complaint_id)
+    if complaint:
+        complaint.photo_urls = [p.file_url for p in photos if p.file_url]
+        session.add(complaint)
+        await session.commit()
+
 
 
 @router.post(
@@ -272,6 +287,9 @@ async def direct_upload(
     await session.commit()
     await session.refresh(photo)
 
+    # Sync photo_urls to complaint for frontend
+    await _sync_complaint_photos(session, complaint_id)
+
     UPLOAD_SUCCESSES.inc()
     return _serialize_photo(photo)
 
@@ -350,6 +368,10 @@ async def confirm_upload(
         raise HTTPException(status_code=500, detail=str(exc))
 
     enqueue_thumbnail_job(photo.id, complaint_id=complaint_id)
+    
+    # Sync photo_urls to complaint for frontend
+    await _sync_complaint_photos(session, complaint_id)
+    
     UPLOAD_SUCCESSES.inc()
 
     return _serialize_photo(photo)

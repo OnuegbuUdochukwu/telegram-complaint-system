@@ -20,7 +20,8 @@ function checkAuth(redirectUrl = 'login.html') {
  * @returns {Promise<void>}
  */
 async function loginUser(username, password) {
-    const baseUrl = window.API_BASE_URL || "http://localhost:8001";
+    // Fallback to current origin (relative) for Nginx proxy, or localhost for local testing
+    const baseUrl = window.API_BASE_URL || "";
     console.log("Attempting login to:", baseUrl);
 
     // Use JSON-based login endpoint to avoid form parsing conflicts

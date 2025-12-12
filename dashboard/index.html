@@ -469,8 +469,8 @@
         document.addEventListener('DOMContentLoaded', () => {
             // Auth checked in head
 
-            // API configuration - use window.API_BASE_URL from config.js
-            const API_BASE_URL = window.API_BASE_URL || "http://localhost:8001";
+            // API configuration - use window.API_BASE_URL from config.js or relative path
+            const API_BASE_URL = window.API_BASE_URL || "";
 
             // Mapping storage key -> display label for categories.
             // Keep keys in sync with backend storage keys (no DB migration required).
