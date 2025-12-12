@@ -965,24 +965,13 @@ def main():
 
     application.add_error_handler(global_error_handler)
 
-    # --- Orphaned Callback Handler (UX Improvement) ---
-    # If a user clicks a button from an old conversation that is no longer in memory/persistence,
-    # the ConversationHandler won't catch it. This handler will catch it and inform the user.
-    async def handle_orphaned_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if update.callback_query:
-            await update.callback_query.answer("Session expired. Please start a new report.", show_alert=True)
-            try:
-                await update.callback_query.message.reply_text(
-                    "⚠️ **Session Expired**\n\n"
-                    "It looks like this menu is from an old or inactive session.\n"
-                    "Please type /report to start a new complaint.",
-                    parse_mode="Markdown"
-                )
-            except Exception:
-                pass
+    # NOTE: Previously we had an "orphaned callback handler" here but it was
+    # interfering with valid callbacks (telegram.ext runs handlers in ALL groups,
+    # not just the first matching one). ConversationHandler's fallbacks already
+    # handle known callbacks like "cancel". For truly orphaned callbacks (from
+    # old sessions after a restart without persistence data), the callback will
+    # simply go unanswered - which is acceptable behavior.
 
-    # Register this last (group=100 ensures it runs after everything else)
-    application.add_handler(CallbackQueryHandler(handle_orphaned_callback), group=100)
 
     logger.info("Bot is initialized. Polling for updates...")
 
