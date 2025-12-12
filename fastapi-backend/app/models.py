@@ -253,10 +253,22 @@ class PhotoUpload(SQLModel, table=True):
     content_length: Optional[int] = None
     s3_key: str
     status: str = Field(default="pending")
-    expires_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc) + timedelta(minutes=10)
-    )
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    # Use server_default for created_at to avoid asyncpg timezone conversion issues.
+    # expires_at must be set explicitly in the route since it's calculated from now + expiry.
+    if _USE_PG_UUID:
+        expires_at: Optional[datetime] = Field(
+            default=None,
+            sa_column=Column(sa.DateTime(timezone=True)),
+        )
+        created_at: Optional[datetime] = Field(
+            default=None,
+            sa_column=Column(sa.DateTime(timezone=True), server_default=text("now()")),
+        )
+    else:
+        expires_at: datetime = Field(
+            default_factory=lambda: datetime.now(timezone.utc) + timedelta(minutes=10)
+        )
+        created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     confirmed_at: Optional[datetime] = None
 
 
