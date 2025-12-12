@@ -989,28 +989,36 @@ async def list_complaints(
 
     # Bearer token path: enforce RBAC (only if we have authentication)
     if auth_header and auth_header.lower().startswith("bearer "):
-        token = auth_header.split(None, 1)[1]
-        try:
-            payload = auth.decode_access_token(token)
-        except HTTPException:
-            raise HTTPException(status_code=401, detail="Invalid token")
-        role = (payload.role or "porter").lower()
-
-        # Admin: return all complaints
-        if role == "admin":
-            pass  # No additional filtering needed
-
-        # Porter: only return complaints assigned to this porter
-        elif role == "porter":
-            porter_id = payload.sub
-            statement = statement.where(Complaint.assigned_porter_id == porter_id)
-            count_statement = count_statement.where(
-                Complaint.assigned_porter_id == porter_id
-            )
-
-        # Any other role is forbidden
+        token = auth_header.split(None, 1)[1].strip().strip("''")
+        
+        # Check if it's the opaque service token (used by the bot)
+        svc_token = get_settings().service_token
+        if svc_token and token == svc_token:
+            # Service token: allow access, continue with filters applied
+            pass
         else:
-            raise HTTPException(status_code=403, detail="Insufficient privileges")
+            # Try JWT decoding
+            try:
+                payload = auth.decode_access_token(token)
+            except HTTPException:
+                raise HTTPException(status_code=401, detail="Invalid token")
+            role = (payload.role or "porter").lower()
+
+            # Admin: return all complaints
+            if role == "admin":
+                pass  # No additional filtering needed
+
+            # Porter: only return complaints assigned to this porter
+            elif role == "porter":
+                porter_id = payload.sub
+                statement = statement.where(Complaint.assigned_porter_id == porter_id)
+                count_statement = count_statement.where(
+                    Complaint.assigned_porter_id == porter_id
+                )
+
+            # Any other role is forbidden
+            else:
+                raise HTTPException(status_code=403, detail="Insufficient privileges")
 
     # Apply pagination
     offset = (page - 1) * page_size
