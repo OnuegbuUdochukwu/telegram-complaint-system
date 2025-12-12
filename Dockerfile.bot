@@ -20,8 +20,10 @@ COPY main.py .
 COPY client.py .
 COPY merged_constants.py .
 
-# Create non-root user for security
-RUN useradd -m -u 1000 botuser && chown -R botuser:botuser /app
+# Create non-root user and bot_data directory for persistence
+RUN useradd -m -u 1000 botuser && \
+    mkdir -p /app/bot_data && \
+    chown -R botuser:botuser /app
 USER botuser
 
 # No port exposure needed (polling mode)

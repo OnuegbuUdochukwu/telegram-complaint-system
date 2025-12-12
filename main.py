@@ -872,7 +872,7 @@ def main():
             # Call backend to get user's complaints
             from client import get_user_complaints
 
-            complaints = await asyncio.to_thread(get_user_complaints, user_id)
+            complaints = await get_user_complaints(user_id)
         except Exception as exc:
             logger.exception("Error fetching complaints for user %s: %s", user_id, exc)
             await safe_reply_to_update(
