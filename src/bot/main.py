@@ -21,7 +21,7 @@ from telegram.ext import (
 )
 
 # Import all required constants from the unified constants module
-from merged_constants import (
+from .merged_constants import (
     GET_TELEGRAM_ID,
     SELECT_HOSTEL,
     GET_ROOM_NUMBER,
@@ -51,12 +51,12 @@ KNOWN_COMMANDS_RE = re.compile(
 load_dotenv()
 
 # Import the client after loading .env
-from client import (
+from .client import (
     submit_complaint as client_submit,
     get_complaint_status as client_get_status,
     upload_photo as client_upload_photo,
 )
-from merged_constants import STATUS_KEY_TO_LABEL
+from .merged_constants import STATUS_KEY_TO_LABEL
 
 # Local state for the status-check conversation
 STATUS_WAITING_FOR_ID = 100
@@ -738,7 +738,7 @@ def main():
 
         try:
             # Call backend to get user's complaints
-            from client import get_user_complaints
+            from .client import get_user_complaints
 
             complaints = await get_user_complaints(user_id)
         except Exception as exc:
@@ -870,7 +870,7 @@ def main():
 
         try:
             # Call backend to get user's complaints
-            from client import get_user_complaints
+            from .client import get_user_complaints
 
             complaints = await get_user_complaints(user_id)
         except Exception as exc:

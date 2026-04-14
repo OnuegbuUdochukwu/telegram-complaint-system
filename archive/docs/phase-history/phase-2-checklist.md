@@ -129,6 +129,6 @@
 
 If you'd like, I can:
 
--   Turn this Markdown into `PHASE2_CHECKLIST.md` in the repo and commit it.
+-   Turn this Markdown into `phase-2-checklist.md` in the repo and commit it.
 -   Create starter files for the FastAPI project (`fastapi-backend/` scaffold) and sample SQL DDL files (templates) so you can begin Phase 2 quickly.
 -   Make the tasks in this document linkable to issues or git branches for tracked progress.

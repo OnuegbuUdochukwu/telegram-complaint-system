@@ -9,31 +9,33 @@ This script will:
 """
 
 import argparse
+import asyncio
 from pathlib import Path
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.append(str(ROOT / "fastapi-backend"))
 
-import requests
+import httpx
 from app.database import engine
-from sqlmodel import Session
 from app import auth
 from app.database import init_db
+from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlalchemy.orm import sessionmaker
 
 
-def main():
+async def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--email", required=True)
     parser.add_argument("--password", required=True)
     args = parser.parse_args()
 
     # Ensure DB tables exist
-    init_db()
+    await init_db()
 
-    with Session(engine) as session:
-        # Create admin porter directly in DB
-        porter = auth.create_porter(
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with async_session() as session:
+        porter = await auth.create_porter(
             session,
             full_name="Admin User",
             password=args.password,
@@ -43,14 +45,15 @@ def main():
         print(f"Created admin porter id={porter.id} email={porter.email}")
 
     # Use login endpoint to get token
-    resp = requests.post(
-        "http://127.0.0.1:8001/auth/login",
-        data={"username": args.email, "password": args.password},
-    )
-    resp.raise_for_status()
-    token = resp.json().get("access_token")
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        resp = await client.post(
+            "http://127.0.0.1:8001/auth/login",
+            data={"username": args.email, "password": args.password},
+        )
+        resp.raise_for_status()
+        token = resp.json().get("access_token")
     print(token)
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

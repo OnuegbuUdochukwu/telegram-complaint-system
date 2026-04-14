@@ -1,6 +1,6 @@
 import os
 import pytest
-from client import upload_photo
+from src.bot.client import upload_photo
 
 
 @pytest.mark.asyncio
@@ -10,7 +10,7 @@ async def test_client_upload_photo_mock():
     """
     # Ensure BACKEND_URL is not set for this unit test to exercise mock fallback
     os.environ.pop("BACKEND_URL", None)
-    import client
+    from src.bot import client
 
     old_url = client.BACKEND_URL
     client.BACKEND_URL = None

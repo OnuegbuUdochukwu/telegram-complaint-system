@@ -249,12 +249,12 @@ S3_BUCKET_NAME=complaint-photos
 - `load_tests/test_complaints_load.py`
 - `tests/test_observability_and_retention.py`
 - `test_phase3_features.py`
-- `PHASE3_IMPLEMENTATION_SUMMARY.md` (this file)
+- `phase-3-implementation-summary.md` (this file)
 
 ### Files Modified
 - `fastapi-backend/app/main.py`: Added observability imports and purge endpoint
 - `fastapi-backend/requirements.txt`: Added prometheus-client, sentry-sdk, python-json-logger
-- `PHASE3_CHECKLIST.md`: Updated progress tracking
+- `phase-3-checklist.md`: Updated progress tracking
 
 ## Conclusion
 

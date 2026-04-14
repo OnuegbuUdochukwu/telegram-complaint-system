@@ -1859,7 +1859,7 @@ async def startup_event():
         from .database import async_session_maker
         from sqlmodel import select
         from .models import Hostel
-        import merged_constants
+        from src.bot import merged_constants
 
         async with async_session_maker() as session:
             # Load existing display names

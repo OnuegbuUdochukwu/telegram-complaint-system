@@ -214,7 +214,7 @@ For production deployment, consider adding:
 - `fastapi-backend/app/models.py`: Added Photo model
 - `fastapi-backend/app/main.py`: Added photo endpoints
 - `fastapi-backend/requirements.txt`: Added boto3 and Pillow
-- `PHASE3_CHECKLIST.md`: Marked items 3.9 and 3.10 as complete
+- `../archive/docs/phase-history/phase-3-checklist.md`: Marked items 3.9 and 3.10 as complete
 
 ## Progress Update
 

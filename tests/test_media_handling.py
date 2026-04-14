@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 from telegram import Update, User, Message, PhotoSize, File
 from telegram.ext import ContextTypes, ConversationHandler
-from main import handle_photo_upload, ATTACH_PHOTOS
+from src.bot.main import handle_photo_upload, ATTACH_PHOTOS
 
 
 @pytest.fixture

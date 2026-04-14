@@ -149,7 +149,7 @@ For standalone hosting:
    BACKEND_URL=https://api.example.com
    BACKEND_SERVICE_TOKEN=secrets:/complaint/backend_service_token
    ```
-4. Run `python main.py`.
+4. Run `python -m src.bot.main`.
 5. For production, use a process manager (systemd, supervisord) or container orchestrator (ECS/Kubernetes).
 
 ---

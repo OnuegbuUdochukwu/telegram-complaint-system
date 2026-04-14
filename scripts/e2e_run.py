@@ -10,7 +10,7 @@ import json
 # ensure app package on path
 sys.path.insert(0, os.path.join(os.getcwd(), "fastapi-backend"))
 
-import client
+from src.bot import client
 import httpx
 from PIL import Image
 from app.database import engine

@@ -1,53 +1,71 @@
 # Telegram Complaint System
 
-Production-ready implementation of the Covenant University complaint workflow spanning:
+Complaint lifecycle platform composed of a Telegram reporter bot, FastAPI backend, static admin dashboard, and supporting infrastructure.
 
-- Telegram bot for students (`main.py`)
-- FastAPI backend (`fastapi-backend/`)
-- Static admin dashboard (`dashboard/`)
-- S3-backed media uploads with Celery workers, Redis, and PostgreSQL
-- Terraform IaC + operations docs under `infra/` and `docs/`
+## Repository Structure
 
-## Quick Start
+- `src/bot/`: Telegram bot source code (`main.py`, `client.py`, `merged_constants.py`).
+- `fastapi-backend/`: API, auth/RBAC, realtime updates, media/upload pipeline, migrations.
+- `dashboard/`: static admin UI (`login.html`, `index.html`, JS utilities).
+- `scripts/`: operational and smoke-test scripts.
+- `tests/`: integration/E2E-style tests against a running backend.
+- `docs/`: architecture, deployment, storage, and implementation notes.
+- `infra/`: Terraform + IAM templates for cloud deployment.
+- `archive/`: historical/legacy materials retained for traceability.
+
+## Current Implementation State
+
+- Completed: bot reporting/status flows, backend CRUD/auth/RBAC, dashboard complaint management, websocket refresh, S3/MinIO media support, observability, Alembic migrations.
+- Partially complete: checklist/doc alignment, some production hardening and UAT process artifacts.
+- Planned next work is tracked in `docs/ROADMAP.md`.
+
+## Local Development
+
+### Option A: Full stack with Docker Compose
 
 ```bash
-cp fastapi-backend/.env.example fastapi-backend/.env   # edit secrets
+cp fastapi-backend/.env.example fastapi-backend/.env
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-Services exposed locally:
+Services:
 
-| Service | Port | Notes |
-| ------- | ---- | ----- |
-| FastAPI API | 8001 | http://localhost:8001 |
-| MinIO API / Console | 9000 / 9001 | mirrors S3 |
-| Postgres | 5434 | `cms_user/cms_password` |
-| Redis | 6379 | Celery broker |
+| Service | Port | URL |
+| --- | --- | --- |
+| Backend API | 8001 | http://localhost:8001 |
+| Dashboard (served by backend) | 8001 | http://localhost:8001/dashboard/login.html |
+| MinIO API | 9000 | http://localhost:9000 |
+| MinIO Console | 9001 | http://localhost:9001 |
+| PostgreSQL | 5434 | localhost:5434 |
+| Redis | 6379 | localhost:6379 |
 
-## Running Tests
+### Option B: Backend only
 
 ```bash
 cd fastapi-backend
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-pytest
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+cp .env.example .env
+uvicorn app.main:app --reload --port 8000
 ```
 
-Unit tests (`fastapi-backend/tests`) mock S3 via `moto`. Integration tests inside `tests/` expect a running backend (`TEST_BACKEND_URL` configurable).
+Dashboard URL in this mode: `http://localhost:8000/dashboard/login.html`.
 
-## CI/CD Snapshot
+## Tests and Quality Checks
 
-1. `pytest` (backend + bot).
-2. `docker build` for backend + worker + bot images.
-3. `terraform plan` against staging workspace.
-4. Push images and deploy via ECS/Kubernetes GitOps.
-5. Smoke test `/health`, run bot `/report` happy-path script (`scripts/e2e_run.py`).
+```bash
+cd fastapi-backend
+source .venv/bin/activate
+pytest
+ruff check app scripts
+```
 
-## Deployment Summary
+Optional root-level integration tests expect a running backend and can be executed with `pytest tests`.
 
-- Provision infrastructure with Terraform (`infra/terraform`).
-- Publish container images for backend + worker (Dockerfile included).
-- Configure Secrets Manager parameters (DB URL, Redis, service token, etc.).
-- Deploy bot (python-telegram-bot) with `BACKEND_SERVICE_TOKEN` + `BACKEND_URL`.
-- Follow the comprehensive `docs/DEPLOYMENT_GUIDE.md` for end-to-end steps.
+## Production Notes
+
+- Copy `.env.production.example` to `.env.production` and set real secrets.
+- Use `docker compose -f docker-compose.prod.yml up -d` for production-like compose deployment.
+- Follow `docs/DEPLOYMENT_GUIDE.md` and `infra/terraform/` for managed cloud environments.
 

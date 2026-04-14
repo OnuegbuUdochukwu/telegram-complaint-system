@@ -1,49 +1,24 @@
 # Admin Dashboard
 
-This directory contains the Admin Dashboard MVP implementation for the Telegram Complaint Management System.
+Static admin dashboard for complaint triage and assignment.
 
-## Files
+## Main Files
 
-- `login.html` - Authentication page with modern UI design
-- `index.html` - Main dashboard with complaint management interface
+- `login.html`: auth screen.
+- `index.html`: complaints table, detail modal, status/assignment updates.
+- `js/auth.js`: token/session helpers and authenticated fetch wrappers.
+- `js/config.js`: API base URL config.
 
 ## Features
 
-### Login Page (`login.html`)
-- Clean, modern design with Tailwind CSS
-- Responsive login form
-- JWT token authentication
-- Error handling and loading states
-- Automatic redirect to dashboard
-
-### Main Dashboard (`index.html`)
-- Comprehensive complaint list with pagination
-- Advanced filtering (status, hostel, category, severity)
-- Sortable columns
-- Complaint detail modal
-- Status and assignment management
-- Real-time data refresh
-- Mobile-responsive design
+- JWT login flow and protected access.
+- Complaint listing with filtering and pagination.
+- Detail modal with update actions.
+- Realtime refresh through websocket (`ws`/`wss` auto-selected).
 
 ## Access
 
-Once the FastAPI server is running, access the dashboard at:
-- Login: `http://localhost:8000/dashboard/login.html`
-- Dashboard: `http://localhost:8000/dashboard/index.html`
-
-## Design Principles
-
-- **Modern UI**: Clean, professional interface with consistent styling
-- **Responsive**: Mobile-first design that works on all screen sizes
-- **Intuitive**: Logical navigation and clear information hierarchy
-- **Accessible**: Proper ARIA labels and keyboard navigation
-- **Fast**: Optimized loading and smooth interactions
-
-## Technical Details
-
-- Pure HTML/CSS/JavaScript (no frameworks)
-- Tailwind CSS for styling
-- Fetch API for backend communication
-- JWT token authentication
-- SessionStorage for token persistence
-- Responsive design with CSS Grid and Flexbox
+- Backend-only mode (`uvicorn` on 8000):
+  - `http://localhost:8000/dashboard/login.html`
+- Root dev compose mode (backend mapped to 8001):
+  - `http://localhost:8001/dashboard/login.html`

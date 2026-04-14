@@ -2,7 +2,7 @@ import pytest
 import respx
 from httpx import Response
 import os
-from client import (
+from src.bot.client import (
     submit_complaint,
     get_complaint_status,
     get_user_complaints,
@@ -14,10 +14,10 @@ from client import (
 @pytest.fixture(autouse=True)
 def mock_env(monkeypatch):
     # Patch the module-level variable because it's read at import time
-    monkeypatch.setattr("client.BACKEND_URL", "http://test-backend")
+    monkeypatch.setattr("src.bot.client.BACKEND_URL", "http://test-backend")
     monkeypatch.setenv("BACKEND_SERVICE_TOKEN", "test-token-123")
     # Also reset the client to ensure fresh state
-    monkeypatch.setattr("client._client", None)
+    monkeypatch.setattr("src.bot.client._client", None)
 
 
 @pytest.mark.asyncio

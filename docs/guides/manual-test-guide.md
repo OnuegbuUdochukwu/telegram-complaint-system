@@ -92,7 +92,7 @@ kill $(cat dashboard_manual_test.pid)
 
 # Or stop all at once
 pkill -f "uvicorn app.main:app"
-pkill -f "python3.*main.py"
+pkill -f "python3.*src.bot.main"
 pkill -f "http.server 3000"
 ```
 
@@ -122,7 +122,7 @@ curl http://localhost:8001/docs
 curl http://localhost:3000/login.html
 
 # Check running processes
-ps aux | grep -E "(uvicorn|python3.*main.py|http.server)"
+ps aux | grep -E "(uvicorn|python3.*src.bot.main|http.server)"
 
 # Check ports
 lsof -i :8001 -i :3000

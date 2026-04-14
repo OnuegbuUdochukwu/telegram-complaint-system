@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 from telegram import Update, User, Message, CallbackQuery, Chat
 from telegram.ext import ContextTypes, ConversationHandler
-from main import (
+from src.bot.main import (
     report_entry,
     select_hostel_callback,
     get_room_number,
@@ -17,7 +17,7 @@ from main import (
     SUBMIT_COMPLAINT,
     ATTACH_PHOTOS,
 )
-from merged_constants import HOSTELS
+from src.bot.merged_constants import HOSTELS
 
 
 @pytest.fixture

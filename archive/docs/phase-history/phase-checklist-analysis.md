@@ -10,7 +10,7 @@
 
 The codebase is in an advanced state of development. **Phases 1 and 2 are fully complete**, establishing a solid foundation with the Telegram bot and FastAPI backend. **Phase 3 is largely complete (94%)**, with a functional dashboard, authentication, and real-time features.
 
-**Critical Finding:** There is a significant discrepancy regarding **Phase 4 (Testing)**. The documentation (`PHASE4_CHECKLIST.md`) lists it as **0% complete**, but the codebase contains a substantial suite of tests (unit, integration, RBAC, realtime) in the `tests/` directory. The project is technically much further ahead than the documentation suggests.
+**Critical Finding:** There is a significant discrepancy regarding **Phase 4 (Testing)**. The documentation (`phase-4-checklist.md`) lists it as **0% complete**, but the codebase contains a substantial suite of tests (unit, integration, RBAC, realtime) in the `tests/` directory. The project is technically much further ahead than the documentation suggests.
 
 ---
 
@@ -58,7 +58,7 @@ The codebase is in an advanced state of development. **Phases 1 and 2 are fully 
 
 *   **Goal:** Ensure system robustness and quality.
 *   **Discrepancy Analysis:**
-    *   **Documentation:** `PHASE4_CHECKLIST.md` shows all items as `[ ]` (uncompleted).
+    *   **Documentation:** `phase-4-checklist.md` shows all items as `[ ]` (uncompleted).
     *   **Codebase Reality:** A comprehensive `tests/` directory exists containing:
         *   `test_rbac.py`: Tests for Role-Based Access Control.
         *   `test_phase3_features.py`: Tests for dashboard features.
@@ -71,7 +71,7 @@ The codebase is in an advanced state of development. **Phases 1 and 2 are fully 
 
 ## 🚀 Recommendations
 
-1.  **Update Phase 4 Checklist:** Immediately audit the `tests/` folder and mark corresponding items in `PHASE4_CHECKLIST.md` as complete (e.g., Unit Tests, API Tests, Security Audit tests).
+1.  **Update Phase 4 Checklist:** Immediately audit the `tests/` folder and mark corresponding items in `phase-4-checklist.md` as complete (e.g., Unit Tests, API Tests, Security Audit tests).
 2.  **Run the Test Suite:** Execute `pytest` to verify the health of the existing tests. This will confirm if the "completed" code is actually passing.
 3.  **Finalize Phase 3 Gaps:** Address the remaining secrets management and load testing tasks to close out Phase 3 100%.
 4.  **Proceed to UAT:** Since unit/integration tests appear largely written, the project is ready to move to the User Acceptance Testing (UAT) stage of Phase 4.
